@@ -1,7 +1,5 @@
 package com.example.ui.components
 
-import android.media.MediaMetadataRetriever
-import android.net.Uri
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -27,7 +25,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -51,8 +47,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.model.AudioTrack
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /**
@@ -68,39 +62,8 @@ fun TrackArtwork(
     showDetailsOnFallback: Boolean = false
 ) {
     val context = LocalContext.current
-    var imageSource by remember(track?.uri) { mutableStateOf<Any?>(track?.albumArtUri) }
-    var isImageLoaded by remember(track?.uri) { mutableStateOf(false) }
-
-    // If albumArtUri is null or failed, attempt to extract embedded picture from audio file
-    LaunchedEffect(track?.uri) {
-        if (track == null) {
-            imageSource = null
-            return@LaunchedEffect
-        }
-        if (track.albumArtUri != null) {
-            imageSource = track.albumArtUri
-        } else {
-            withContext(Dispatchers.IO) {
-                try {
-                    val mmr = MediaMetadataRetriever()
-                    if (track.uri.scheme == "content") {
-                        mmr.setDataSource(context, track.uri)
-                    } else if (track.uri.path != null) {
-                        mmr.setDataSource(track.uri.path)
-                    }
-                    val artBytes = mmr.embeddedPicture
-                    mmr.release()
-                    if (artBytes != null) {
-                        withContext(Dispatchers.Main) {
-                            imageSource = artBytes
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Fallback to stylized cover
-                }
-            }
-        }
-    }
+    val imageUri = remember(track?.id, track?.albumId) { track?.albumArtUri }
+    var isImageLoaded by remember(imageUri) { mutableStateOf(false) }
 
     val gradientColors = remember(track?.title, track?.artist) {
         getTrackGradientColors(track?.title ?: "", track?.artist ?: "")
@@ -112,43 +75,22 @@ fun TrackArtwork(
             .background(Brush.linearGradient(gradientColors)),
         contentAlignment = Alignment.Center
     ) {
-        if (imageSource != null) {
+        if (imageUri != null) {
             AsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(imageSource)
+                    .data(imageUri)
                     .crossfade(true)
                     .build(),
                 contentDescription = track?.displayTitle ?: "Album Art",
                 contentScale = ContentScale.Crop,
                 onSuccess = { isImageLoaded = true },
-                onError = {
-                    // If MediaStore albumart URI failed, try embedded picture
-                    if (imageSource is Uri && track != null) {
-                        imageSource = null
-                        // Trigger embedded extraction
-                        try {
-                            val mmr = MediaMetadataRetriever()
-                            if (track.uri.scheme == "content") {
-                                mmr.setDataSource(context, track.uri)
-                            } else if (track.uri.path != null) {
-                                mmr.setDataSource(track.uri.path)
-                            }
-                            val artBytes = mmr.embeddedPicture
-                            mmr.release()
-                            if (artBytes != null) {
-                                imageSource = artBytes
-                            }
-                        } catch (e: Exception) {
-                            imageSource = null
-                        }
-                    }
-                },
+                onError = { isImageLoaded = false },
                 modifier = Modifier.fillMaxSize()
             )
         }
 
-        // Stylized Fallback Artwork Canvas (when no embedded image exists)
-        if (imageSource == null || !isImageLoaded) {
+        // Stylized Fallback Artwork Canvas (when no image exists or loading failed)
+        if (imageUri == null || !isImageLoaded) {
             VinylSleeveArtwork(
                 track = track,
                 gradientColors = gradientColors,
