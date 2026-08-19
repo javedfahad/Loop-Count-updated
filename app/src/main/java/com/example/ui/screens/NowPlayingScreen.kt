@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.AudioTrack
 import com.example.playback.AudioPlayerManager
 import com.example.playback.PlaybackState
+import com.example.ui.components.NowPlayingArtworkCard
 import com.example.ui.dialogs.RepeatCountDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -151,32 +152,14 @@ fun NowPlayingScreen(
         ) {
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Artwork Card (Moderate, comfortable size - NOT full screen)
-            Surface(
+            // Music Artwork Card with dynamic cover art & vinyl accents
+            NowPlayingArtworkCard(
+                track = track,
+                isPlaying = playbackState.isPlaying,
                 modifier = Modifier
-                    .size(220.dp)
-                    .clip(RoundedCornerShape(32.dp))
-                    .testTag("now_playing_artwork"),
-                shape = RoundedCornerShape(32.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shadowElevation = 10.dp,
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                )
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (playbackState.isPlaying) Icons.Default.GraphicEq else Icons.Default.MusicNote,
-                        contentDescription = "Artwork",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(88.dp)
-                    )
-                }
-            }
+                    .size(230.dp)
+                    .testTag("now_playing_artwork")
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
 

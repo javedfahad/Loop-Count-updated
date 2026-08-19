@@ -1,5 +1,6 @@
 package com.example.model
 
+import android.content.ContentUris
 import android.net.Uri
 
 data class AudioTrack(
@@ -22,6 +23,13 @@ data class AudioTrack(
 
     val formattedDuration: String
         get() = formatDuration(durationMs)
+
+    val albumArtUri: Uri?
+        get() = if (albumId > 0) {
+            ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId)
+        } else {
+            null
+        }
 
     companion object {
         fun formatDuration(ms: Long): String {

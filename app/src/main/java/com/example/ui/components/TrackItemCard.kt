@@ -80,33 +80,16 @@ fun TrackItemCard(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Artwork / Icon thumbnail
-            Box(
+            // Artwork thumbnail
+            TrackArtwork(
+                track = track,
+                isPlaying = isCurrentTrack && isPlaying,
+                shape = RoundedCornerShape(12.dp),
+                iconSize = 22.dp,
                 modifier = Modifier
-                    .size(46.dp)
+                    .size(48.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (isCurrentTrack) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isCurrentTrack && isPlaying) {
-                    Icon(
-                        imageVector = Icons.Default.GraphicEq,
-                        contentDescription = "Playing",
-                        tint = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = "Audio track",
-                        tint = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
+            )
 
             Spacer(modifier = Modifier.width(14.dp))
 

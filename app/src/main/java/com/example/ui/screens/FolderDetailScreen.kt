@@ -67,6 +67,7 @@ import com.example.model.AudioTrack
 import com.example.model.UserFolder
 import com.example.playback.PlaybackState
 import com.example.ui.components.MiniPlayerBar
+import com.example.ui.components.TrackArtwork
 import com.example.ui.dialogs.FolderTimerDialog
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -417,21 +418,16 @@ fun FolderDetailScreen(
                                     .padding(horizontal = 12.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Order number badge
-                                Box(
+                                // Artwork thumbnail
+                                TrackArtwork(
+                                    track = track,
+                                    isPlaying = isCurrent && playbackState?.isPlaying == true,
+                                    shape = RoundedCornerShape(10.dp),
+                                    iconSize = 18.dp,
                                     modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "${index + 1}",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                                        .size(42.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                )
 
                                 Spacer(modifier = Modifier.width(12.dp))
 

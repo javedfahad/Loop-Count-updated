@@ -75,20 +75,15 @@ fun MiniPlayerBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Artwork thumbnail
-                Box(
+                TrackArtwork(
+                    track = track,
+                    isPlaying = playbackState.isPlaying,
+                    shape = RoundedCornerShape(12.dp),
+                    iconSize = 20.dp,
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(44.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (playbackState.isPlaying) Icons.Default.GraphicEq else Icons.Default.MusicNote,
-                        contentDescription = "Playing audio",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                )
 
                 Spacer(modifier = Modifier.width(12.dp))
 

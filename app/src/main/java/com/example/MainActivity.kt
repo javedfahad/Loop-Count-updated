@@ -19,6 +19,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
@@ -157,12 +158,11 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Scaffold(
                         snackbarHost = { SnackbarHost(snackbarHostState) },
+                        contentWindowInsets = WindowInsets(0, 0, 0, 0),
                         modifier = Modifier.fillMaxSize()
-                    ) { innerPadding ->
+                    ) { _ ->
                         Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(innerPadding)
+                            modifier = Modifier.fillMaxSize()
                         ) {
                             when (val screen = currentScreen) {
                                 is Screen.Splash -> {

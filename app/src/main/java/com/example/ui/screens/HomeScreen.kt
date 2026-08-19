@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Clear
@@ -267,13 +268,27 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             Column {
-                TopAppBar(
-                    title = {
-                        if (isSearchActive) {
+                if (isSearchActive) {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(
+                                onClick = {
+                                    isSearchActive = false
+                                    searchQuery = ""
+                                },
+                                modifier = Modifier.testTag("search_close_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Exit search"
+                                )
+                            }
+                        },
+                        title = {
                             OutlinedTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text("Search audio files...") },
+                                placeholder = { Text("Search audio files, folders...", fontSize = 14.sp) },
                                 singleLine = true,
                                 trailingIcon = {
                                     if (searchQuery.isNotEmpty()) {
@@ -282,110 +297,119 @@ fun HomeScreen(
                                         }
                                     }
                                 },
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("search_text_field")
                             )
-                        } else {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                LoopCountLogo(size = 32.dp)
-                                Spacer(modifier = Modifier.width(10.dp))
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        )
+                    )
+                } else {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(
+                                onClick = onOpenDrawer,
+                                modifier = Modifier.testTag("nav_drawer_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "Open navigation drawer"
+                                )
+                            }
+                        },
+                        title = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                LoopCountLogo(size = 30.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "LoopCount",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    fontSize = 19.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
                                 )
                             }
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = onOpenDrawer,
-                            modifier = Modifier.testTag("nav_drawer_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Open navigation drawer"
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(
-                            onClick = {
-                                isSearchActive = !isSearchActive
-                                if (!isSearchActive) searchQuery = ""
-                            },
-                            modifier = Modifier.testTag("search_toggle_button")
-                        ) {
-                            Icon(
-                                imageVector = if (isSearchActive) Icons.Default.Clear else Icons.Default.Search,
-                                contentDescription = if (isSearchActive) "Close search" else "Search"
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { showSortMenu = true },
-                            modifier = Modifier.testTag("sort_menu_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SortByAlpha,
-                                contentDescription = "Sort tracks"
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Sort by Title") },
-                                onClick = {
-                                    sortMode = SortMode.TITLE
-                                    showSortMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Sort by Artist") },
-                                onClick = {
-                                    sortMode = SortMode.ARTIST
-                                    showSortMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Sort by Duration") },
-                                onClick = {
-                                    sortMode = SortMode.DURATION
-                                    showSortMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Sort by Recently Added") },
-                                onClick = {
-                                    sortMode = SortMode.DATE_ADDED
-                                    showSortMenu = false
-                                }
-                            )
-                        }
-
-                        if (selectedTabIndex == 0) {
+                        },
+                        actions = {
                             IconButton(
-                                onClick = onRefreshTracks,
-                                enabled = !isLoading,
-                                modifier = Modifier.testTag("refresh_button")
+                                onClick = { isSearchActive = true },
+                                modifier = Modifier.testTag("search_toggle_button")
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Refresh library",
-                                    modifier = if (isLoading) Modifier.graphicsLayer(rotationZ = refreshRotation) else Modifier
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search"
                                 )
                             }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
+
+                            IconButton(
+                                onClick = { showSortMenu = true },
+                                modifier = Modifier.testTag("sort_menu_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SortByAlpha,
+                                    contentDescription = "Sort tracks"
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showSortMenu,
+                                onDismissRequest = { showSortMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Sort by Title") },
+                                    onClick = {
+                                        sortMode = SortMode.TITLE
+                                        showSortMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Sort by Artist") },
+                                    onClick = {
+                                        sortMode = SortMode.ARTIST
+                                        showSortMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Sort by Duration") },
+                                    onClick = {
+                                        sortMode = SortMode.DURATION
+                                        showSortMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Sort by Recently Added") },
+                                    onClick = {
+                                        sortMode = SortMode.DATE_ADDED
+                                        showSortMenu = false
+                                    }
+                                )
+                            }
+
+                            if (selectedTabIndex == 0) {
+                                IconButton(
+                                    onClick = onRefreshTracks,
+                                    enabled = !isLoading,
+                                    modifier = Modifier.testTag("refresh_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Refresh library",
+                                        modifier = if (isLoading) Modifier.graphicsLayer(rotationZ = refreshRotation) else Modifier
+                                    )
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        )
                     )
-                )
+                }
 
                 if (isLoading) {
                     LinearProgressIndicator(
