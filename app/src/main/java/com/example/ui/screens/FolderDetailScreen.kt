@@ -1,0 +1,608 @@
+package com.example.ui.screens
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.model.AudioTrack
+import com.example.model.UserFolder
+import com.example.playback.PlaybackState
+import com.example.ui.components.MiniPlayerBar
+import com.example.ui.dialogs.FolderTimerDialog
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun FolderDetailScreen(
+    folder: UserFolder,
+    allTracks: List<AudioTrack>,
+    currentTrack: AudioTrack?,
+    isPlaying: Boolean,
+    playbackState: PlaybackState? = null,
+    onOpenNowPlaying: (() -> Unit)? = null,
+    onPlayPause: (() -> Unit)? = null,
+    onNext: (() -> Unit)? = null,
+    onBack: () -> Unit,
+    onPlayTrack: (AudioTrack, List<AudioTrack>) -> Unit,
+    onPlayFolder: (List<AudioTrack>, Int) -> Unit,
+    onReorder: (List<AudioTrack>) -> Unit,
+    onAddTracks: (List<AudioTrack>) -> Unit,
+    onRemoveTrack: (String) -> Unit,
+    onDeleteFolder: ((Long) -> Unit)? = null,
+    onRenameFolder: ((Long, String) -> Unit)? = null
+) {
+    var showAddTracksDialog by remember { mutableStateOf(false) }
+    var showTimerDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameInputText by remember { mutableStateOf(folder.name) }
+    var showMenu by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(folder.name) {
+        renameInputText = folder.name
+    }
+
+    if (showTimerDialog) {
+        FolderTimerDialog(
+            folderName = folder.name,
+            onDismiss = { showTimerDialog = false },
+            onConfirm = { minutes ->
+                showTimerDialog = false
+                onPlayFolder(folder.tracks, minutes)
+            }
+        )
+    }
+
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = { Text("Delete Folder", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("Delete \"${folder.name}\"? This removes the folder list from LoopCount. Your original audio files on the device will not be deleted.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        onDeleteFolder?.invoke(folder.id)
+                        onBack()
+                    },
+                    modifier = Modifier.testTag("confirm_delete_folder_button")
+                ) {
+                    Text("Delete Folder", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    if (showRenameDialog) {
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename Folder", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = renameInputText,
+                    onValueChange = { renameInputText = it },
+                    label = { Text("Folder Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (renameInputText.isNotBlank()) {
+                            onRenameFolder?.invoke(folder.id, renameInputText.trim())
+                            showRenameDialog = false
+                        }
+                    },
+                    enabled = renameInputText.isNotBlank()
+                ) {
+                    Text("Save", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    if (showAddTracksDialog) {
+        AddTracksToFolderDialog(
+            allTracks = allTracks,
+            existingUris = folder.tracks.map { it.uri.toString() }.toSet(),
+            onDismiss = { showAddTracksDialog = false },
+            onConfirm = { selected ->
+                showAddTracksDialog = false
+                onAddTracks(selected)
+            }
+        )
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            text = folder.name,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = if (folder.id > 0) "${folder.tracks.size} tracks • Custom Folder" else "${folder.tracks.size} tracks • Device Folder",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.testTag("folder_detail_back")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { showTimerDialog = true },
+                        modifier = Modifier.testTag("folder_detail_timer")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = "Play for timer",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    if (folder.id > 0) {
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier.testTag("folder_detail_more_menu")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More folder options"
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Rename Folder") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null)
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    renameInputText = folder.name
+                                    showRenameDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete Folder", color = MaterialTheme.colorScheme.error) },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    showDeleteConfirmDialog = true
+                                }
+                            )
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        },
+        floatingActionButton = {
+            if (folder.id > 0) {
+                FloatingActionButton(
+                    onClick = { showAddTracksDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = CircleShape,
+                    modifier = Modifier.testTag("folder_detail_add_tracks_fab")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add tracks"
+                    )
+                }
+            }
+        },
+        bottomBar = {
+            if (playbackState?.currentTrack != null && onOpenNowPlaying != null && onPlayPause != null && onNext != null) {
+                MiniPlayerBar(
+                    playbackState = playbackState,
+                    onClick = onOpenNowPlaying,
+                    onPlayPause = onPlayPause,
+                    onNext = onNext
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+        ) {
+            // Action Banner Bento Card
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = { onPlayFolder(folder.tracks, 0) },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        enabled = folder.tracks.isNotEmpty(),
+                        modifier = Modifier.testTag("folder_detail_play_all")
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Play All", fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = { showTimerDialog = true },
+                        shape = RoundedCornerShape(14.dp),
+                        enabled = folder.tracks.isNotEmpty(),
+                        modifier = Modifier.testTag("folder_detail_play_for")
+                    ) {
+                        Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Play for...")
+                    }
+                }
+            }
+
+            if (folder.tracks.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 60.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(56.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "No tracks in this folder",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Tap + below to add local audio files",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    itemsIndexed(
+                        items = folder.tracks,
+                        key = { _, item -> item.uri.toString() }
+                    ) { index, track ->
+                        val isCurrent = currentTrack?.uri == track.uri
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .combinedClickable(
+                                    onClick = { onPlayTrack(track, folder.tracks) },
+                                    onLongClick = { onRemoveTrack(track.uri.toString()) }
+                                )
+                                .testTag("folder_track_${track.id}"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            else MaterialTheme.colorScheme.surface,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Order number badge
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${index + 1}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                // Track title & artist
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = track.displayTitle,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${track.displayArtist} • ${track.formattedDuration}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                // Reorder buttons (Move Up / Move Down)
+                                IconButton(
+                                    onClick = {
+                                        if (index > 0) {
+                                            val mutable = folder.tracks.toMutableList()
+                                            val temp = mutable[index]
+                                            mutable[index] = mutable[index - 1]
+                                            mutable[index - 1] = temp
+                                            onReorder(mutable)
+                                        }
+                                    },
+                                    enabled = index > 0,
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowUpward,
+                                        contentDescription = "Move up",
+                                        tint = if (index > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        if (index < folder.tracks.size - 1) {
+                                            val mutable = folder.tracks.toMutableList()
+                                            val temp = mutable[index]
+                                            mutable[index] = mutable[index + 1]
+                                            mutable[index + 1] = temp
+                                            onReorder(mutable)
+                                        }
+                                    },
+                                    enabled = index < folder.tracks.size - 1,
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDownward,
+                                        contentDescription = "Move down",
+                                        tint = if (index < folder.tracks.size - 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                // Delete from folder
+                                IconButton(
+                                    onClick = { onRemoveTrack(track.uri.toString()) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Remove from folder",
+                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(80.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddTracksToFolderDialog(
+    allTracks: List<AudioTrack>,
+    existingUris: Set<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (List<AudioTrack>) -> Unit
+) {
+    val selectedTracks = remember { mutableStateListOf<AudioTrack>() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Add Tracks to Folder", fontWeight = FontWeight.Bold)
+        },
+        text = {
+            if (allTracks.isEmpty()) {
+                Text("No audio tracks found on device.")
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(320.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(allTracks.size) { i ->
+                        val track = allTracks[i]
+                        val isAlreadyInFolder = existingUris.contains(track.uri.toString())
+                        val isSelected = selectedTracks.contains(track)
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(enabled = !isAlreadyInFolder) {
+                                    if (isSelected) selectedTracks.remove(track)
+                                    else selectedTracks.add(track)
+                                }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = isSelected || isAlreadyInFolder,
+                                onCheckedChange = { checked ->
+                                    if (!isAlreadyInFolder) {
+                                        if (checked) selectedTracks.add(track)
+                                        else selectedTracks.remove(track)
+                                    }
+                                },
+                                enabled = !isAlreadyInFolder
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = track.displayTitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = if (isAlreadyInFolder) "Already in folder" else track.displayArtist,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isAlreadyInFolder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(selectedTracks.toList()) },
+                enabled = selectedTracks.isNotEmpty()
+            ) {
+                Text("Add (${selectedTracks.size})", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(24.dp)
+    )
+}

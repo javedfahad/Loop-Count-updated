@@ -1,0 +1,6 @@
+{
+  "name": "LoopCount",
+  "description": "A clean native local audio player with counted repetition and smart stop behaviors.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
