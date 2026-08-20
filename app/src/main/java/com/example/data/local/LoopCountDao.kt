@@ -62,6 +62,29 @@ interface LoopCountDao {
     @Query("DELETE FROM track_positions WHERE trackUri = :trackUri")
     suspend fun deleteTrackPosition(trackUri: String)
 
+    // --- Custom Track Titles (Renaming) ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveCustomTrackName(customName: TrackCustomNameEntity)
+
+    @Query("SELECT * FROM track_custom_names")
+    suspend fun getAllCustomTrackNamesSync(): List<TrackCustomNameEntity>
+
+    @Query("SELECT customTitle FROM track_custom_names WHERE trackUri = :trackUri")
+    suspend fun getCustomTrackName(trackUri: String): String?
+
+    @Query("DELETE FROM track_custom_names WHERE trackUri = :trackUri")
+    suspend fun deleteCustomTrackName(trackUri: String)
+
+    @Query("UPDATE folder_tracks SET trackTitle = :newTitle WHERE trackUri = :trackUri")
+    suspend fun updateTrackTitleInFolders(trackUri: String, newTitle: String)
+
+    // --- Deleted Tracks (to ensure deleted files/demos stay deleted) ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun markTrackDeleted(entity: DeletedTrackEntity)
+
+    @Query("SELECT trackUri FROM deleted_tracks")
+    suspend fun getDeletedTrackUrisSync(): List<String>
+
     // --- App Settings ---
     @Query("SELECT * FROM app_settings WHERE id = 1")
     fun getSettings(): Flow<AppSettingsEntity?>

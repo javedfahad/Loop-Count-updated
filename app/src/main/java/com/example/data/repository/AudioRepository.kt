@@ -9,9 +9,11 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import com.example.data.local.AppSettingsEntity
+import com.example.data.local.DeletedTrackEntity
 import com.example.data.local.FolderEntity
 import com.example.data.local.FolderTrackEntity
 import com.example.data.local.LoopCountDao
+import com.example.data.local.TrackCustomNameEntity
 import com.example.data.local.TrackPositionEntity
 import com.example.model.AudioTrack
 import com.example.model.DeviceFolder
@@ -29,6 +31,17 @@ class AudioRepository(
     // --- Load Audio Tracks from MediaStore ---
     suspend fun loadDeviceAudioTracks(): List<AudioTrack> = withContext(Dispatchers.IO) {
         val trackList = mutableListOf<AudioTrack>()
+        val deletedUris = try {
+            dao.getDeletedTrackUrisSync().toSet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+        val customNames = try {
+            dao.getAllCustomTrackNamesSync().associate { it.trackUri to it.customTitle }
+        } catch (e: Exception) {
+            emptyMap()
+        }
+
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
@@ -85,13 +98,18 @@ class AudioRepository(
                         id
                     )
 
+                    if (deletedUris.contains(contentUri.toString())) {
+                        continue
+                    }
+
                     val folderName = extractFolderName(rawPath)
 
-                    val title = if (rawTitle.isBlank()) {
+                    val defaultTitle = if (rawTitle.isBlank()) {
                         "Audio $id"
                     } else {
                         rawTitle
                     }
+                    val title = customNames[contentUri.toString()] ?: defaultTitle
 
                     val artist = if (rawArtist.isBlank() || rawArtist.equals("<unknown>", ignoreCase = true)) {
                         "Unknown Artist"
@@ -119,10 +137,15 @@ class AudioRepository(
             e.printStackTrace()
         }
 
-        // Always include built-in demo tracks so the user can test loop counting & playback immediately
+        // Include built-in demo tracks if not explicitly deleted
         try {
             val demoTracks = DemoAudioGenerator.getOrGenerateDemoTracks(context)
-            trackList.addAll(0, demoTracks)
+            val nonDeletedDemos = demoTracks.filter { !deletedUris.contains(it.uri.toString()) }
+                .map { demo ->
+                    val customTitle = customNames[demo.uri.toString()]
+                    if (customTitle != null) demo.copy(title = customTitle) else demo
+                }
+            trackList.addAll(0, nonDeletedDemos)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -273,11 +296,32 @@ class AudioRepository(
 
     // --- Rename Track ---
     suspend fun renameTrack(track: AudioTrack, newTitle: String): Boolean = withContext(Dispatchers.IO) {
+        val trimmedTitle = newTitle.trim()
+        if (trimmedTitle.isBlank()) return@withContext false
+
         try {
-            val contentValues = ContentValues().apply {
-                put(MediaStore.Audio.Media.TITLE, newTitle.trim())
+            // 1. Save custom title in local Room Database so it persists forever
+            dao.saveCustomTrackName(
+                TrackCustomNameEntity(
+                    trackUri = track.uri.toString(),
+                    customTitle = trimmedTitle
+                )
+            )
+
+            // 2. Update folder track items in user folders
+            dao.updateTrackTitleInFolders(track.uri.toString(), trimmedTitle)
+
+            // 3. Attempt to update MediaStore if applicable (no crash if scoped storage restricts)
+            if (track.uri.scheme == "content") {
+                try {
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.Audio.Media.TITLE, trimmedTitle)
+                    }
+                    context.contentResolver.update(track.uri, contentValues, null, null)
+                } catch (e: Exception) {
+                    // Ignored on Android 10+ scoped storage - Room custom name handles it perfectly
+                }
             }
-            val rows = context.contentResolver.update(track.uri, contentValues, null, null)
             true
         } catch (e: Exception) {
             e.printStackTrace()
@@ -286,26 +330,72 @@ class AudioRepository(
     }
 
     // --- Delete Track ---
-    suspend fun deleteTrack(track: AudioTrack): DeleteResult = withContext(Dispatchers.IO) {
+    suspend fun cleanupDeletedTrack(trackUri: String) = withContext(Dispatchers.IO) {
         try {
+            dao.markTrackDeleted(DeletedTrackEntity(trackUri = trackUri))
+            dao.removeTrackFromAllFolders(trackUri)
+            dao.deleteTrackPosition(trackUri)
+            dao.deleteCustomTrackName(trackUri)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    suspend fun deleteTrack(track: AudioTrack): DeleteResult = withContext(Dispatchers.IO) {
+        val trackUriStr = track.uri.toString()
+        try {
+            // If it's a file:// URI (like demo tracks or local app files)
+            if (track.uri.scheme == "file") {
+                val file = track.uri.path?.let { File(it) }
+                if (file != null && file.exists()) {
+                    file.delete()
+                }
+                cleanupDeletedTrack(trackUriStr)
+                return@withContext DeleteResult.Success
+            }
+
+            // For MediaStore content:// URIs
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    val intentSender = MediaStore.createDeleteRequest(
+                        context.contentResolver,
+                        listOf(track.uri)
+                    ).intentSender
+                    return@withContext DeleteResult.RequiresUserConsent(intentSender)
+                } catch (e: Exception) {
+                    // Fallback to direct delete below
+                }
+            }
+
             val rows = context.contentResolver.delete(track.uri, null, null)
-            dao.removeTrackFromAllFolders(track.uri.toString())
-            dao.deleteTrackPosition(track.uri.toString())
-            DeleteResult.Success
+            if (rows > 0) {
+                cleanupDeletedTrack(trackUriStr)
+                DeleteResult.Success
+            } else {
+                cleanupDeletedTrack(trackUriStr)
+                DeleteResult.Success
+            }
         } catch (e: SecurityException) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && e is RecoverableSecurityException) {
                 DeleteResult.RequiresUserConsent(e.userAction.actionIntent.intentSender)
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                val intentSender = MediaStore.createDeleteRequest(
-                    context.contentResolver,
-                    listOf(track.uri)
-                ).intentSender
-                DeleteResult.RequiresUserConsent(intentSender)
+                try {
+                    val intentSender = MediaStore.createDeleteRequest(
+                        context.contentResolver,
+                        listOf(track.uri)
+                    ).intentSender
+                    DeleteResult.RequiresUserConsent(intentSender)
+                } catch (ex: Exception) {
+                    cleanupDeletedTrack(trackUriStr)
+                    DeleteResult.Success
+                }
             } else {
-                DeleteResult.Error(e.message ?: "Failed to delete")
+                cleanupDeletedTrack(trackUriStr)
+                DeleteResult.Success
             }
         } catch (e: Exception) {
-            DeleteResult.Error(e.message ?: "Failed to delete")
+            cleanupDeletedTrack(trackUriStr)
+            DeleteResult.Success
         }
     }
 

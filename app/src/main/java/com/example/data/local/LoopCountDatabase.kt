@@ -10,9 +10,11 @@ import androidx.room.RoomDatabase
         FolderEntity::class,
         FolderTrackEntity::class,
         TrackPositionEntity::class,
+        TrackCustomNameEntity::class,
+        DeletedTrackEntity::class,
         AppSettingsEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class LoopCountDatabase : RoomDatabase() {

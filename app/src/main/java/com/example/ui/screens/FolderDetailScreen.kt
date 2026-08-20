@@ -6,6 +6,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -302,213 +307,220 @@ fun FolderDetailScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
-            // Action Banner Bento Card
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                )
-            ) {
-                Row(
+            val screenWidth = maxWidth
+            val gridColumns = if (screenWidth >= 600.dp) 2 else 1
+
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Action Banner Bento Card
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(vertical = 10.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    )
                 ) {
-                    Button(
-                        onClick = { onPlayFolder(folder.tracks, 0) },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        enabled = folder.tracks.isNotEmpty(),
-                        modifier = Modifier.testTag("folder_detail_play_all")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Play All", fontWeight = FontWeight.Bold)
-                    }
-
-                    OutlinedButton(
-                        onClick = { showTimerDialog = true },
-                        shape = RoundedCornerShape(14.dp),
-                        enabled = folder.tracks.isNotEmpty(),
-                        modifier = Modifier.testTag("folder_detail_play_for")
-                    ) {
-                        Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Play for...")
-                    }
-                }
-            }
-
-            if (folder.tracks.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 60.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.size(56.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "No tracks in this folder",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Tap + below to add local audio files",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    itemsIndexed(
-                        items = folder.tracks,
-                        key = { _, item -> item.uri.toString() }
-                    ) { index, track ->
-                        val isCurrent = currentTrack?.uri == track.uri
-
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .combinedClickable(
-                                    onClick = { onPlayTrack(track, folder.tracks) },
-                                    onLongClick = { onRemoveTrack(track.uri.toString()) }
-                                )
-                                .testTag("folder_track_${track.id}"),
-                            shape = RoundedCornerShape(16.dp),
-                            color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                            else MaterialTheme.colorScheme.surface,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                            )
+                        Button(
+                            onClick = { onPlayFolder(folder.tracks, 0) },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            enabled = folder.tracks.isNotEmpty(),
+                            modifier = Modifier.testTag("folder_detail_play_all")
                         ) {
-                            Row(
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Play All", fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { showTimerDialog = true },
+                            shape = RoundedCornerShape(14.dp),
+                            enabled = folder.tracks.isNotEmpty(),
+                            modifier = Modifier.testTag("folder_detail_play_for")
+                        ) {
+                            Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Play for...")
+                        }
+                    }
+                }
+
+                if (folder.tracks.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 60.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.MusicNote,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.size(56.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "No tracks in this folder",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Tap + below to add local audio files",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(gridColumns),
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(
+                            items = folder.tracks,
+                            key = { _, item -> item.uri.toString() }
+                        ) { index, track ->
+                            val isCurrent = currentTrack?.uri == track.uri
+
+                            Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Artwork thumbnail
-                                TrackArtwork(
-                                    track = track,
-                                    isPlaying = isCurrent && playbackState?.isPlaying == true,
-                                    shape = RoundedCornerShape(10.dp),
-                                    iconSize = 18.dp,
-                                    modifier = Modifier
-                                        .size(42.dp)
-                                        .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .combinedClickable(
+                                        onClick = { onPlayTrack(track, folder.tracks) },
+                                        onLongClick = { onRemoveTrack(track.uri.toString()) }
+                                    )
+                                    .testTag("folder_track_${track.id}"),
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                else MaterialTheme.colorScheme.surface,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                                 )
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                // Track title & artist
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = track.displayTitle,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = "${track.displayArtist} • ${track.formattedDuration}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                // Reorder buttons (Move Up / Move Down)
-                                IconButton(
-                                    onClick = {
-                                        if (index > 0) {
-                                            val mutable = folder.tracks.toMutableList()
-                                            val temp = mutable[index]
-                                            mutable[index] = mutable[index - 1]
-                                            mutable[index - 1] = temp
-                                            onReorder(mutable)
-                                        }
-                                    },
-                                    enabled = index > 0,
-                                    modifier = Modifier.size(32.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowUpward,
-                                        contentDescription = "Move up",
-                                        tint = if (index > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                        modifier = Modifier.size(18.dp)
+                                    // Artwork thumbnail
+                                    TrackArtwork(
+                                        track = track,
+                                        isPlaying = isCurrent && playbackState?.isPlaying == true,
+                                        shape = RoundedCornerShape(10.dp),
+                                        iconSize = 18.dp,
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(RoundedCornerShape(10.dp))
                                     )
-                                }
 
-                                IconButton(
-                                    onClick = {
-                                        if (index < folder.tracks.size - 1) {
-                                            val mutable = folder.tracks.toMutableList()
-                                            val temp = mutable[index]
-                                            mutable[index] = mutable[index + 1]
-                                            mutable[index + 1] = temp
-                                            onReorder(mutable)
-                                        }
-                                    },
-                                    enabled = index < folder.tracks.size - 1,
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowDownward,
-                                        contentDescription = "Move down",
-                                        tint = if (index < folder.tracks.size - 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
+                                    Spacer(modifier = Modifier.width(12.dp))
 
-                                // Delete from folder
-                                IconButton(
-                                    onClick = { onRemoveTrack(track.uri.toString()) },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Remove from folder",
-                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                                    // Track title & artist
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = track.displayTitle,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "${track.displayArtist} • ${track.formattedDuration}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    // Reorder buttons (Move Up / Move Down)
+                                    IconButton(
+                                        onClick = {
+                                            if (index > 0) {
+                                                val mutable = folder.tracks.toMutableList()
+                                                val temp = mutable[index]
+                                                mutable[index] = mutable[index - 1]
+                                                mutable[index - 1] = temp
+                                                onReorder(mutable)
+                                            }
+                                        },
+                                        enabled = index > 0,
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowUpward,
+                                            contentDescription = "Move up",
+                                            tint = if (index > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            if (index < folder.tracks.size - 1) {
+                                                val mutable = folder.tracks.toMutableList()
+                                                val temp = mutable[index]
+                                                mutable[index] = mutable[index + 1]
+                                                mutable[index + 1] = temp
+                                                onReorder(mutable)
+                                            }
+                                        },
+                                        enabled = index < folder.tracks.size - 1,
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDownward,
+                                            contentDescription = "Move down",
+                                            tint = if (index < folder.tracks.size - 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+
+                                    // Delete from folder
+                                    IconButton(
+                                        onClick = { onRemoveTrack(track.uri.toString()) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Remove from folder",
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    item {
-                        Spacer(modifier = Modifier.height(80.dp))
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Spacer(modifier = Modifier.height(80.dp))
+                        }
                     }
                 }
             }

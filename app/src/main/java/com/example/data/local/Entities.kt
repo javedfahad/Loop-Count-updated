@@ -33,6 +33,19 @@ data class TrackPositionEntity(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "track_custom_names")
+data class TrackCustomNameEntity(
+    @PrimaryKey val trackUri: String,
+    val customTitle: String,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "deleted_tracks")
+data class DeletedTrackEntity(
+    @PrimaryKey val trackUri: String,
+    val deletedAt: Long = System.currentTimeMillis()
+)
+
 @Entity(tableName = "app_settings")
 data class AppSettingsEntity(
     @PrimaryKey val id: Int = 1,

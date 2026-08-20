@@ -20,8 +20,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -482,11 +485,18 @@ fun HomeScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            val screenWidth = maxWidth
+            val gridColumns = when {
+                screenWidth >= 840.dp -> 3
+                screenWidth >= 600.dp -> 2
+                else -> 1
+            }
+
             if (selectedTabIndex == 0) {
                 // All Audios Tab
                 if (filteredTracks.isEmpty()) {
@@ -505,13 +515,15 @@ fun HomeScreen(
                         )
                     }
                 } else {
-                    LazyColumn(
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(gridColumns),
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (!hasStoragePermission) {
-                            item {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
                                 CompactPermissionCard(
                                     onRequestPermission = onRequestPermission,
                                     modifier = Modifier.padding(bottom = 6.dp)
@@ -540,21 +552,23 @@ fun HomeScreen(
                             )
                         }
 
-                        item {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
                             Spacer(modifier = Modifier.height(72.dp))
                         }
                     }
                 }
             } else {
                 // Folders Tab
-                LazyColumn(
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(gridColumns),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Custom Folders Section
                     if (userFolders.isNotEmpty()) {
-                        item {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
                             Text(
                                 text = "CUSTOM FOLDERS",
                                 fontSize = 11.sp,
@@ -593,7 +607,7 @@ fun HomeScreen(
 
                     // Device Folders Section
                     if (deviceFolders.isNotEmpty()) {
-                        item {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
                             Text(
                                 text = "DEVICE STORAGE FOLDERS",
                                 fontSize = 11.sp,
@@ -638,7 +652,7 @@ fun HomeScreen(
                     }
 
                     if (userFolders.isEmpty() && deviceFolders.isEmpty()) {
-                        item {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -669,7 +683,7 @@ fun HomeScreen(
                         }
                     }
 
-                    item {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
                         Spacer(modifier = Modifier.height(80.dp))
                     }
                 }

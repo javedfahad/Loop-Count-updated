@@ -163,25 +163,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun renameTrack(track: AudioTrack, newTitle: String) {
+        val trimmed = newTitle.trim()
+        if (trimmed.isBlank()) return
+
+        // 1. Optimistic UI update
+        _uiState.update { state ->
+            val updatedTracks = state.allTracks.map {
+                if (it.uri == track.uri) it.copy(title = trimmed) else it
+            }
+            state.copy(
+                allTracks = updatedTracks,
+                deviceFolders = repository.groupIntoDeviceFolders(updatedTracks),
+                message = "Renamed to \"$trimmed\""
+            )
+        }
+
         viewModelScope.launch {
-            if (newTitle.isNotBlank()) {
-                val success = repository.renameTrack(track, newTitle)
-                if (success) {
-                    refreshTracks()
-                    _uiState.update { it.copy(message = "Renamed to \"$newTitle\"") }
-                } else {
-                    _uiState.update { it.copy(message = "Unable to rename track") }
-                }
+            val success = repository.renameTrack(track, trimmed)
+            if (success) {
+                refreshTracks()
             }
         }
     }
 
     fun deleteTrack(track: AudioTrack, onConsentRequired: (IntentSender) -> Unit) {
+        // If current playing track is deleted, advance or stop
+        if (playerManager.state.value.currentTrack?.uri == track.uri) {
+            playerManager.pause()
+        }
+
         viewModelScope.launch {
             when (val result = repository.deleteTrack(track)) {
                 is DeleteResult.Success -> {
+                    // Optimistically remove from state immediately
+                    _uiState.update { state ->
+                        val remaining = state.allTracks.filter { it.uri != track.uri }
+                        state.copy(
+                            allTracks = remaining,
+                            deviceFolders = repository.groupIntoDeviceFolders(remaining),
+                            message = "Deleted \"${track.displayTitle}\""
+                        )
+                    }
                     refreshTracks()
-                    _uiState.update { it.copy(message = "Deleted \"${track.displayTitle}\"") }
                 }
                 is DeleteResult.RequiresUserConsent -> {
                     onConsentRequired(result.intentSender)
@@ -190,6 +213,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.update { it.copy(message = "Deletion failed: ${result.message}") }
                 }
             }
+        }
+    }
+
+    fun onTrackConsentDeleted(track: AudioTrack) {
+        viewModelScope.launch {
+            if (playerManager.state.value.currentTrack?.uri == track.uri) {
+                playerManager.pause()
+            }
+            repository.cleanupDeletedTrack(track.uri.toString())
+            _uiState.update { state ->
+                val remaining = state.allTracks.filter { it.uri != track.uri }
+                state.copy(
+                    allTracks = remaining,
+                    deviceFolders = repository.groupIntoDeviceFolders(remaining),
+                    message = "Deleted \"${track.displayTitle}\""
+                )
+            }
+            refreshTracks()
         }
     }
 

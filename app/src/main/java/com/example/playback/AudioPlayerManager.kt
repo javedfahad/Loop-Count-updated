@@ -454,24 +454,51 @@ class AudioPlayerManager(
             val nextRemaining = currentRemaining - 1
 
             if (nextRemaining > 0) {
-                // More repetitions remain -> update remaining and replay from 0
+                // More repetitions remain -> update remaining and replay current track from 0
                 _state.update { it.copy(remainingCount = nextRemaining) }
                 updateMediaMetadata()
                 player.seekTo(0)
                 player.play()
+                return
             } else {
-                // All repetitions completed! remaining = 0 -> STOP!
+                // All repetitions completed! Reset remaining count to 0 and repeatCountTotal to 0
                 _state.update {
                     it.copy(
-                        remainingCount = 0,
-                        isPlaying = false
+                        repeatCountTotal = 0,
+                        remainingCount = 0
                     )
                 }
                 updateMediaMetadata()
-                player.pause()
-                player.seekTo(0)
+
+                // Check if user ALSO selected "Stop After Finish"
+                if (currentState.stopAfterFinish) {
+                    // STOP after repeat sequence completes!
+                    player.pause()
+                    player.seekTo(0)
+                    _state.update {
+                        it.copy(
+                            isPlaying = false,
+                            stopAfterFinish = false
+                        )
+                    }
+                    updateMediaMetadata()
+                    return
+                } else {
+                    // Repeat sequence finished, but Stop is NOT enabled -> proceed to next song in queue/library!
+                    val queue = currentState.queue
+                    if (queue.isNotEmpty()) {
+                        val nextIndex = currentState.queueIndex + 1
+                        if (nextIndex < queue.size) {
+                            val nextTrack = queue[nextIndex]
+                            playTrack(nextTrack, queue, 0L)
+                            return
+                        }
+                    }
+                    // If queue ended, loop queue or load next device track
+                    next()
+                    return
+                }
             }
-            return
         }
 
         // 3. Repeat is OFF: Check Stop After Finish

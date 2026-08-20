@@ -89,12 +89,17 @@ class MainActivity : ComponentActivity() {
                 viewModel.setPermissionGranted(granted)
             }
 
+            var pendingDeleteTrack by remember { mutableStateOf<AudioTrack?>(null) }
+
             val deleteIntentLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.StartIntentSenderForResult()
             ) { result ->
                 if (result.resultCode == Activity.RESULT_OK) {
-                    viewModel.refreshTracks()
+                    pendingDeleteTrack?.let { track ->
+                        viewModel.onTrackConsentDeleted(track)
+                    }
                 }
+                pendingDeleteTrack = null
             }
 
             // Sync initial permission
@@ -212,6 +217,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onDeleteTrack = { track ->
                                             viewModel.deleteTrack(track) { intentSender ->
+                                                pendingDeleteTrack = track
                                                 val intentSenderRequest =
                                                     IntentSenderRequest.Builder(intentSender).build()
                                                 deleteIntentLauncher.launch(intentSenderRequest)

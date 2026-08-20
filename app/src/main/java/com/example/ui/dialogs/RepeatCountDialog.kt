@@ -201,7 +201,10 @@ fun RepeatCountDialog(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Stop playback naturally when count completes",
+                                text = if (selectedCount > 0 || (isCustom && customInputText.isNotBlank()))
+                                    "Stop after all repetitions complete"
+                                else
+                                    "Stop playback after this song finishes",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -215,7 +218,7 @@ fun RepeatCountDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Actions: Cancel & Start Repeat
+                // Actions: Cancel & Apply
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)
@@ -244,7 +247,7 @@ fun RepeatCountDialog(
                         ),
                         modifier = Modifier.testTag("repeat_start_button")
                     ) {
-                        Text("Start Repeat", fontWeight = FontWeight.Bold)
+                        Text("Apply", fontWeight = FontWeight.Bold)
                     }
                 }
             }
