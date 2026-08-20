@@ -7,6 +7,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -42,6 +44,9 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -90,7 +95,7 @@ fun FolderDetailScreen(
     onNext: (() -> Unit)? = null,
     onBack: () -> Unit,
     onPlayTrack: (AudioTrack, List<AudioTrack>) -> Unit,
-    onPlayFolder: (List<AudioTrack>, Int) -> Unit,
+    onPlayFolder: (List<AudioTrack>, Int, Boolean) -> Unit,
     onReorder: (List<AudioTrack>) -> Unit,
     onAddTracks: (List<AudioTrack>) -> Unit,
     onRemoveTrack: (String) -> Unit,
@@ -103,6 +108,10 @@ fun FolderDetailScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameInputText by remember { mutableStateOf(folder.name) }
     var showMenu by remember { mutableStateOf(false) }
+    var isShuffleSelected by remember { mutableStateOf(false) }
+
+    // Local tracks list state for instant UI reordering and sync
+    var localTracks by remember(folder.tracks) { mutableStateOf(folder.tracks) }
 
     androidx.compose.runtime.LaunchedEffect(folder.name) {
         renameInputText = folder.name
@@ -114,7 +123,7 @@ fun FolderDetailScreen(
             onDismiss = { showTimerDialog = false },
             onConfirm = { minutes ->
                 showTimerDialog = false
-                onPlayFolder(folder.tracks, minutes)
+                onPlayFolder(localTracks, minutes, isShuffleSelected)
             }
         )
     }
@@ -324,49 +333,132 @@ fun FolderDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 10.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
                     )
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .padding(horizontal = 8.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // 1. Play All Button
                         Button(
-                            onClick = { onPlayFolder(folder.tracks, 0) },
-                            shape = RoundedCornerShape(14.dp),
+                            onClick = { onPlayFolder(localTracks, 0, isShuffleSelected) },
+                            modifier = Modifier
+                                .weight(1.15f)
+                                .height(44.dp)
+                                .testTag("folder_detail_play_all"),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
-                            enabled = folder.tracks.isNotEmpty(),
-                            modifier = Modifier.testTag("folder_detail_play_all")
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            enabled = localTracks.isNotEmpty()
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Play All", fontWeight = FontWeight.Bold)
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "Play All",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1
+                            )
                         }
 
+                        // 2. Shuffle Toggle Button
+                        val shuffleContainerColor = if (isShuffleSelected)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surface
+                        val shuffleContentColor = if (isShuffleSelected)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        val shuffleBorder = if (!isShuffleSelected) androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        ) else null
+
+                        FilledTonalButton(
+                            onClick = { isShuffleSelected = !isShuffleSelected },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .testTag("folder_detail_shuffle"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = shuffleContainerColor,
+                                contentColor = shuffleContentColor
+                            ),
+                            border = shuffleBorder,
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            enabled = localTracks.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shuffle,
+                                contentDescription = "Shuffle",
+                                modifier = Modifier.size(16.dp),
+                                tint = if (isShuffleSelected)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "Shuffle",
+                                fontWeight = if (isShuffleSelected) FontWeight.Bold else FontWeight.Medium,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1
+                            )
+                        }
+
+                        // 3. Play For (Timer) Button
                         OutlinedButton(
                             onClick = { showTimerDialog = true },
-                            shape = RoundedCornerShape(14.dp),
-                            enabled = folder.tracks.isNotEmpty(),
-                            modifier = Modifier.testTag("folder_detail_play_for")
+                            modifier = Modifier
+                                .weight(1.15f)
+                                .height(44.dp)
+                                .testTag("folder_detail_play_for"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            enabled = localTracks.isNotEmpty()
                         ) {
-                            Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Play for...")
+                            Icon(
+                                Icons.Default.Timer,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "Play for...",
+                                fontWeight = FontWeight.Medium,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1
+                            )
                         }
                     }
                 }
 
-                if (folder.tracks.isEmpty()) {
+                if (localTracks.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -403,7 +495,7 @@ fun FolderDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         itemsIndexed(
-                            items = folder.tracks,
+                            items = localTracks,
                             key = { _, item -> item.uri.toString() }
                         ) { index, track ->
                             val isCurrent = currentTrack?.uri == track.uri
@@ -413,7 +505,7 @@ fun FolderDetailScreen(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(16.dp))
                                     .combinedClickable(
-                                        onClick = { onPlayTrack(track, folder.tracks) },
+                                        onClick = { onPlayTrack(track, localTracks) },
                                         onLongClick = { onRemoveTrack(track.uri.toString()) }
                                     )
                                     .testTag("folder_track_${track.id}"),
@@ -465,10 +557,11 @@ fun FolderDetailScreen(
                                     IconButton(
                                         onClick = {
                                             if (index > 0) {
-                                                val mutable = folder.tracks.toMutableList()
+                                                val mutable = localTracks.toMutableList()
                                                 val temp = mutable[index]
                                                 mutable[index] = mutable[index - 1]
                                                 mutable[index - 1] = temp
+                                                localTracks = mutable
                                                 onReorder(mutable)
                                             }
                                         },
@@ -485,21 +578,22 @@ fun FolderDetailScreen(
 
                                     IconButton(
                                         onClick = {
-                                            if (index < folder.tracks.size - 1) {
-                                                val mutable = folder.tracks.toMutableList()
+                                            if (index < localTracks.size - 1) {
+                                                val mutable = localTracks.toMutableList()
                                                 val temp = mutable[index]
                                                 mutable[index] = mutable[index + 1]
                                                 mutable[index + 1] = temp
+                                                localTracks = mutable
                                                 onReorder(mutable)
                                             }
                                         },
-                                        enabled = index < folder.tracks.size - 1,
+                                        enabled = index < localTracks.size - 1,
                                         modifier = Modifier.size(32.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.ArrowDownward,
                                             contentDescription = "Move down",
-                                            tint = if (index < folder.tracks.size - 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                            tint = if (index < localTracks.size - 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }

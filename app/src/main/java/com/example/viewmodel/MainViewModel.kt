@@ -296,17 +296,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Play Folder with optional timer ---
-    fun playFolder(tracks: List<AudioTrack>, timerMinutes: Int = 0) {
+    // --- Play Folder with optional timer and optional shuffle ---
+    fun playFolder(tracks: List<AudioTrack>, timerMinutes: Int = 0, shuffle: Boolean = false) {
         if (tracks.isEmpty()) {
             _uiState.update { it.copy(message = "This folder has no audio tracks") }
             return
         }
+        val playQueue = if (shuffle) tracks.shuffled() else tracks
         if (timerMinutes > 0) {
             playerManager.startFolderTimer(timerMinutes)
-            _uiState.update { it.copy(message = "Playing folder for $timerMinutes minutes") }
+            _uiState.update { it.copy(message = if (shuffle) "Playing folder shuffled for $timerMinutes minutes" else "Playing folder for $timerMinutes minutes") }
+        } else if (shuffle) {
+            _uiState.update { it.copy(message = "Playing folder in random shuffle mode") }
         }
-        playerManager.playTrack(tracks.first(), tracks, 0L)
+        playerManager.playTrack(playQueue.first(), playQueue, 0L)
     }
 
     // --- Settings ---

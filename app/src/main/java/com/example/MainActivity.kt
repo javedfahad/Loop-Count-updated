@@ -250,8 +250,8 @@ class MainActivity : ComponentActivity() {
                                         onPlayTrack = { track, queue ->
                                             viewModel.playTrack(track, queue)
                                         },
-                                        onPlayFolder = { tracks, minutes ->
-                                            viewModel.playFolder(tracks, minutes)
+                                        onPlayFolder = { tracks, minutes, shuffle ->
+                                            viewModel.playFolder(tracks, minutes, shuffle)
                                         },
                                         onReorder = { reordered ->
                                             if (currentFolder.id > 0) {
