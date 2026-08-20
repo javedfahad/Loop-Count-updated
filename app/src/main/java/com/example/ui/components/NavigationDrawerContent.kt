@@ -113,12 +113,20 @@ fun NavigationDrawerContent(
             Spacer(modifier = Modifier.weight(1f))
 
             // Footer
-            Text(
-                text = "LoopCount v1.0 • Native Local Audio",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
+            Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+                Text(
+                    text = "LoopCount v1.0",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "© 2026 Fahad Javed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
