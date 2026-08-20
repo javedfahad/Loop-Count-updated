@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material3.AlertDialog
@@ -58,6 +59,7 @@ fun TrackOptionsDialog(
     onPlay: () -> Unit,
     onResume: () -> Unit,
     onStopAfterThis: () -> Unit,
+    onRepeatOptions: (() -> Unit)? = null,
     onRename: (String) -> Unit,
     onDelete: () -> Unit,
     onAddToFolder: ((Long) -> Unit)? = null,
@@ -312,6 +314,16 @@ fun TrackOptionsDialog(
                         onDismiss()
                     },
                     testTag = "option_resume"
+                )
+
+                OptionMenuItem(
+                    icon = Icons.Default.Repeat,
+                    title = "Repeat & Stop Options...",
+                    onClick = {
+                        onDismiss()
+                        onRepeatOptions?.invoke()
+                    },
+                    testTag = "option_repeat_settings"
                 )
 
                 OptionMenuItem(

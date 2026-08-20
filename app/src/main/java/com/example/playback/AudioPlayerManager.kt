@@ -416,11 +416,33 @@ class AudioPlayerManager(
             )
         }
         updateMediaMetadata()
+        // During playback, applying any custom repeat or stop setting restarts the song from the beginning
+        exoPlayer?.let { player ->
+            if (player.mediaItemCount > 0) {
+                player.seekTo(0)
+                if (!player.isPlaying) {
+                    player.play()
+                }
+            }
+        }
+        _state.update { it.copy(currentPositionMs = 0L) }
     }
 
     fun setStopAfterCurrentTrack(enabled: Boolean) {
         _state.update { it.copy(stopAfterFinish = enabled) }
         updateMediaMetadata()
+        if (enabled) {
+            // During playback, applying any custom repeat or stop setting restarts the song from the beginning
+            exoPlayer?.let { player ->
+                if (player.mediaItemCount > 0) {
+                    player.seekTo(0)
+                    if (!player.isPlaying) {
+                        player.play()
+                    }
+                }
+            }
+            _state.update { it.copy(currentPositionMs = 0L) }
+        }
     }
 
     /**

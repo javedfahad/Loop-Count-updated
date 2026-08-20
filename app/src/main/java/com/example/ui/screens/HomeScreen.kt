@@ -85,6 +85,7 @@ import com.example.ui.components.LoopCountLogo
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.TrackItemCard
 import com.example.ui.dialogs.FolderOptionsDialog
+import com.example.ui.dialogs.RepeatCountDialog
 import com.example.ui.dialogs.TrackOptionsDialog
 import kotlinx.coroutines.launch
 
@@ -142,6 +143,7 @@ fun HomeScreen(
 
     // Dialog states
     var selectedTrackForOptions by remember { mutableStateOf<AudioTrack?>(null) }
+    var trackForRepeatDialog by remember { mutableStateOf<AudioTrack?>(null) }
     var selectedFolderForOptions by remember { mutableStateOf<Pair<String, Boolean>?>(null) } // Name, isUserFolder
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
@@ -217,8 +219,17 @@ fun HomeScreen(
             onResume = {
                 playerManager.playTrack(track, filteredTracks)
             },
+            onRepeatOptions = {
+                trackForRepeatDialog = track
+            },
             onStopAfterThis = {
-                playerManager.setStopAfterCurrentTrack(true)
+                val isCurrentPlayingTrack = playbackState.currentTrack?.uri == track.uri
+                if (isCurrentPlayingTrack) {
+                    playerManager.setStopAfterCurrentTrack(true)
+                } else {
+                    playerManager.playTrack(track, filteredTracks, startPositionMs = 0L)
+                    playerManager.setStopAfterCurrentTrack(true)
+                }
             },
             onRename = { newTitle ->
                 onRenameTrack(track, newTitle)
@@ -231,6 +242,25 @@ fun HomeScreen(
             },
             onCreateFolderWithTrack = { folderName ->
                 onCreateFolderWithTrack(folderName, track)
+            }
+        )
+    }
+
+    // Repeat & Stop Count Dialog from 3-dot menu or track selection
+    trackForRepeatDialog?.let { track ->
+        val isCurrentPlayingTrack = playbackState.currentTrack?.uri == track.uri
+        RepeatCountDialog(
+            initialCount = if (isCurrentPlayingTrack) playbackState.repeatCountTotal else 0,
+            initialStopAfterFinish = if (isCurrentPlayingTrack) playbackState.stopAfterFinish else false,
+            onDismiss = { trackForRepeatDialog = null },
+            onStartRepeat = { count, stopAfterFinish ->
+                if (isCurrentPlayingTrack) {
+                    playerManager.setRepeatCount(count, stopAfterFinish)
+                } else {
+                    playerManager.playTrack(track, filteredTracks, startPositionMs = 0L)
+                    playerManager.setRepeatCount(count, stopAfterFinish)
+                }
+                trackForRepeatDialog = null
             }
         )
     }

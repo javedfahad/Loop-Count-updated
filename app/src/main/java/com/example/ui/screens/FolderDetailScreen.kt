@@ -74,6 +74,8 @@ import com.example.playback.PlaybackState
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.TrackArtwork
 import com.example.ui.dialogs.FolderTimerDialog
+import com.example.ui.dialogs.RepeatCountDialog
+import com.example.ui.dialogs.TrackOptionsDialog
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
