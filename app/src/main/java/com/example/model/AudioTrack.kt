@@ -58,6 +58,6 @@ data class DeviceFolder(
 data class UserFolder(
     val id: Long,
     val name: String,
-    val createdAt: Long,
+    val createdAt: Long = System.currentTimeMillis(),
     val tracks: List<AudioTrack> = emptyList()
 )

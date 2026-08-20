@@ -75,7 +75,28 @@ class MainActivity : ComponentActivity() {
             val scope = rememberCoroutineScope()
             val snackbarHostState = remember { SnackbarHostState() }
 
-            var currentScreen by remember { mutableStateOf<Screen>(Screen.Splash) }
+            var screenStack by remember { mutableStateOf<List<Screen>>(listOf(Screen.Splash)) }
+            val currentScreen = screenStack.lastOrNull() ?: Screen.Home
+
+            fun navigateTo(screen: Screen) {
+                if (screen is Screen.Splash) {
+                    screenStack = listOf(Screen.Splash)
+                } else if (screen is Screen.Home) {
+                    screenStack = listOf(Screen.Home)
+                } else {
+                    if (screenStack.lastOrNull() != screen) {
+                        screenStack = screenStack + screen
+                    }
+                }
+            }
+
+            fun navigateBack() {
+                if (screenStack.size > 1) {
+                    screenStack = screenStack.dropLast(1)
+                } else if (screenStack.lastOrNull() !is Screen.Home) {
+                    screenStack = listOf(Screen.Home)
+                }
+            }
 
             // Check permissions
             val hasAudioPermission = remember(uiState.permissionGranted) {
@@ -136,12 +157,12 @@ class MainActivity : ComponentActivity() {
                 accent = uiState.accentColor
             ) {
                 // System Back gesture / button handling:
-                // If drawer is open, close it. If on a sub-screen (NowPlaying, FolderDetail, Appearance, About), return to Home screen.
+                // If drawer is open, close it. If on a sub-screen, pop to the previous screen (e.g. NowPlaying -> FolderDetail -> Home).
                 BackHandler(enabled = drawerState.isOpen) {
                     scope.launch { drawerState.close() }
                 }
-                BackHandler(enabled = currentScreen !is Screen.Home && currentScreen !is Screen.Splash && !drawerState.isOpen) {
-                    currentScreen = Screen.Home
+                BackHandler(enabled = screenStack.size > 1 && !drawerState.isOpen && currentScreen !is Screen.Splash) {
+                    navigateBack()
                 }
 
                 ModalNavigationDrawer(
@@ -150,10 +171,10 @@ class MainActivity : ComponentActivity() {
                     drawerContent = {
                         NavigationDrawerContent(
                             onNavigateToAppearance = {
-                                currentScreen = Screen.Appearance
+                                navigateTo(Screen.Appearance)
                             },
                             onNavigateToAbout = {
-                                currentScreen = Screen.About
+                                navigateTo(Screen.About)
                             },
                             onCloseDrawer = {
                                 scope.launch { drawerState.close() }
@@ -173,7 +194,7 @@ class MainActivity : ComponentActivity() {
                                 is Screen.Splash -> {
                                     SplashScreen(
                                         onSplashFinished = {
-                                            currentScreen = Screen.Home
+                                            navigateTo(Screen.Home)
                                         }
                                     )
                                 }
@@ -198,10 +219,10 @@ class MainActivity : ComponentActivity() {
                                             scope.launch { drawerState.open() }
                                         },
                                         onOpenNowPlaying = {
-                                            currentScreen = Screen.NowPlaying
+                                            navigateTo(Screen.NowPlaying)
                                         },
                                         onOpenFolderDetail = { folder ->
-                                            currentScreen = Screen.FolderDetail(folder)
+                                            navigateTo(Screen.FolderDetail(folder))
                                         },
                                         onCreateFolder = { name ->
                                             viewModel.createUserFolder(name)
@@ -233,9 +254,17 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 is Screen.FolderDetail -> {
-                                    // Keep folder synced with user folders if it's a custom folder
-                                    val currentFolder = uiState.userFolders.find { it.id == screen.folder.id }
-                                        ?: screen.folder
+                                    // Keep folder synced with user folders or device folders
+                                    val currentFolder = when {
+                                        screen.folder.id > 0 -> {
+                                            uiState.userFolders.find { it.id == screen.folder.id } ?: screen.folder
+                                        }
+                                        else -> {
+                                            uiState.deviceFolders.find { it.name.equals(screen.folder.name, ignoreCase = true) }?.let { deviceFolder ->
+                                                UserFolder(id = -1, name = deviceFolder.name, tracks = deviceFolder.tracks)
+                                            } ?: screen.folder
+                                        }
+                                    }
 
                                     FolderDetailScreen(
                                         folder = currentFolder,
@@ -243,10 +272,10 @@ class MainActivity : ComponentActivity() {
                                         currentTrack = playbackState.currentTrack,
                                         isPlaying = playbackState.isPlaying,
                                         playbackState = playbackState,
-                                        onOpenNowPlaying = { currentScreen = Screen.NowPlaying },
+                                        onOpenNowPlaying = { navigateTo(Screen.NowPlaying) },
                                         onPlayPause = { viewModel.playerManager.togglePlayPause() },
                                         onNext = { viewModel.playerManager.next() },
-                                        onBack = { currentScreen = Screen.Home },
+                                        onBack = { navigateBack() },
                                         onPlayTrack = { track, queue ->
                                             viewModel.playTrack(track, queue)
                                         },
@@ -270,6 +299,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onDeleteFolder = { folderId ->
                                             viewModel.deleteUserFolder(folderId)
+                                            navigateBack()
                                         },
                                         onRenameFolder = { folderId, newName ->
                                             viewModel.renameUserFolder(folderId, newName)
@@ -281,7 +311,7 @@ class MainActivity : ComponentActivity() {
                                     NowPlayingScreen(
                                         playbackState = playbackState,
                                         playerManager = viewModel.playerManager,
-                                        onBack = { currentScreen = Screen.Home }
+                                        onBack = { navigateBack() }
                                     )
                                 }
 
@@ -291,13 +321,13 @@ class MainActivity : ComponentActivity() {
                                         currentAccent = uiState.accentColor,
                                         onThemeModeSelected = { viewModel.setThemeMode(it) },
                                         onAccentSelected = { viewModel.setAccentColor(it) },
-                                        onBack = { currentScreen = Screen.Home }
+                                        onBack = { navigateBack() }
                                     )
                                 }
 
                                 is Screen.About -> {
                                     AboutScreen(
-                                        onBack = { currentScreen = Screen.Home }
+                                        onBack = { navigateBack() }
                                     )
                                 }
                             }
