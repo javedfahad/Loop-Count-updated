@@ -1,11 +1,20 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,6 +34,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +65,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -67,6 +81,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +89,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AudioTrack
@@ -116,28 +132,29 @@ fun HomeScreen(
     onAddTrackToFolder: (Long, AudioTrack) -> Unit = { _, _ -> },
     onCreateFolderWithTrack: (String, AudioTrack) -> Unit = { _, _ -> }
 ) {
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
+    val allAudiosGridState = rememberLazyGridState()
+    val foldersGridState = rememberLazyGridState()
+
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
     var sortMode by remember { mutableStateOf(SortMode.TITLE) }
     var showSortMenu by remember { mutableStateOf(false) }
 
-    // Infinite rotation for loading state
-    val infiniteTransition = rememberInfiniteTransition(label = "refresh_rotation")
-    val refreshRotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "refresh_angle"
-    )
+    // Memoized sorted device folders list to avoid main-thread map iteration on recomposition
+    val sortedDeviceFolderList = remember(deviceFolders) {
+        deviceFolders.toList().sortedBy { it.first }
+    }
 
-    // Auto-refresh when entering Folders tab
-    LaunchedEffect(selectedTabIndex) {
-        if (selectedTabIndex == 1) {
-            onRefreshTracks()
+    val filteredUserFolders = remember(userFolders, searchQuery) {
+        if (searchQuery.isBlank()) userFolders
+        else userFolders.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
+
+    val filteredDeviceFolderList = remember(sortedDeviceFolderList, searchQuery) {
+        if (searchQuery.isBlank()) sortedDeviceFolderList
+        else sortedDeviceFolderList.filter { (folderName, _) ->
+            folderName.contains(searchQuery, ignoreCase = true)
         }
     }
 
@@ -214,10 +231,10 @@ fun HomeScreen(
             userFolders = userFolders,
             onDismiss = { selectedTrackForOptions = null },
             onPlay = {
-                playerManager.playTrack(track, filteredTracks)
+                playerManager.playTrack(track, filteredTracks, startPositionMs = 0L)
             },
             onResume = {
-                playerManager.playTrack(track, filteredTracks)
+                playerManager.resumeTrack(track, filteredTracks)
             },
             onRepeatOptions = {
                 trackForRepeatDialog = track
@@ -273,6 +290,7 @@ fun HomeScreen(
         } else {
             deviceFolders[folderName] ?: emptyList()
         }
+        val folderKey = if (isUserFolder) "user_${userFolderObj?.id}" else "device_$folderName"
 
         FolderOptionsDialog(
             folderName = folderName,
@@ -280,12 +298,17 @@ fun HomeScreen(
             onDismiss = { selectedFolderForOptions = null },
             onPlay = {
                 if (tracksInFolder.isNotEmpty()) {
-                    playerManager.playTrack(tracksInFolder.first(), tracksInFolder)
+                    playerManager.playTrack(tracksInFolder.first(), tracksInFolder, startPositionMs = 0L, folderKey = folderKey)
+                }
+            },
+            onResume = {
+                if (tracksInFolder.isNotEmpty()) {
+                    playerManager.resumeFolder(folderKey, tracksInFolder)
                 }
             },
             onPlayFor = { minutes ->
                 if (tracksInFolder.isNotEmpty()) {
-                    playerManager.playTrack(tracksInFolder.first(), tracksInFolder)
+                    playerManager.playTrack(tracksInFolder.first(), tracksInFolder, startPositionMs = 0L, folderKey = folderKey)
                     playerManager.startFolderTimer(minutes)
                 }
             },
@@ -301,215 +324,143 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             Column {
-                if (isSearchActive) {
-                    TopAppBar(
-                        navigationIcon = {
-                            IconButton(
-                                onClick = {
-                                    isSearchActive = false
-                                    searchQuery = ""
-                                },
-                                modifier = Modifier.testTag("search_close_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Exit search"
-                                )
-                            }
-                        },
-                        title = {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                placeholder = { Text("Search audio files, folders...", fontSize = 14.sp) },
-                                singleLine = true,
-                                trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Default.Clear, contentDescription = "Clear")
-                                        }
-                                    }
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("search_text_field")
+                TopAppBar(
+                    navigationIcon = {
+                        IconButton(
+                            onClick = onOpenDrawer,
+                            modifier = Modifier.testTag("nav_drawer_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Open navigation drawer"
                             )
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.background
-                        )
+                        }
+                    },
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            LoopCountLogo(size = 28.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "LoopCount",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
                     )
-                } else {
-                    TopAppBar(
-                        navigationIcon = {
-                            IconButton(
-                                onClick = onOpenDrawer,
-                                modifier = Modifier.testTag("nav_drawer_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Menu,
-                                    contentDescription = "Open navigation drawer"
-                                )
-                            }
-                        },
-                        title = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(end = 4.dp)
-                            ) {
-                                LoopCountLogo(size = 30.dp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "LoopCount",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 19.sp,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1
-                                )
-                            }
-                        },
-                        actions = {
-                            IconButton(
-                                onClick = { isSearchActive = true },
-                                modifier = Modifier.testTag("search_toggle_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Search"
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { showSortMenu = true },
-                                modifier = Modifier.testTag("sort_menu_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.SortByAlpha,
-                                    contentDescription = "Sort tracks"
-                                )
-                            }
-
-                            DropdownMenu(
-                                expanded = showSortMenu,
-                                onDismissRequest = { showSortMenu = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Sort by Title") },
-                                    onClick = {
-                                        sortMode = SortMode.TITLE
-                                        showSortMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Sort by Artist") },
-                                    onClick = {
-                                        sortMode = SortMode.ARTIST
-                                        showSortMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Sort by Duration") },
-                                    onClick = {
-                                        sortMode = SortMode.DURATION
-                                        showSortMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Sort by Recently Added") },
-                                    onClick = {
-                                        sortMode = SortMode.DATE_ADDED
-                                        showSortMenu = false
-                                    }
-                                )
-                            }
-
-                            if (selectedTabIndex == 0) {
-                                IconButton(
-                                    onClick = onRefreshTracks,
-                                    enabled = !isLoading,
-                                    modifier = Modifier.testTag("refresh_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Refresh library",
-                                        modifier = if (isLoading) Modifier.graphicsLayer(rotationZ = refreshRotation) else Modifier
-                                    )
-                                }
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.background
-                        )
-                    )
-                }
+                )
 
                 if (isLoading) {
                     LinearProgressIndicator(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(3.dp),
+                            .height(2.dp),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                     )
                 }
 
-                // Tabs: All Audios & Folders
-                PrimaryTabRow(
-                    selectedTabIndex = selectedTabIndex,
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                // Sleek, compact segmented pill tabs (eliminates gap)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.65f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 6.dp)
                 ) {
-                    Tab(
-                        selected = selectedTabIndex == 0,
-                        onClick = { selectedTabIndex = 0 },
-                        text = {
-                            Text(
-                                text = "All Audios (${filteredTracks.size})",
-                                fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Medium
-                            )
-                        },
-                        modifier = Modifier.testTag("tab_all_audios")
-                    )
-                    Tab(
-                        selected = selectedTabIndex == 1,
-                        onClick = { selectedTabIndex = 1 },
-                        text = {
-                            val totalFolders = userFolders.size + deviceFolders.size
-                            Text(
-                                text = "Folders ($totalFolders)",
-                                fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Medium
-                            )
-                        },
-                        modifier = Modifier.testTag("tab_folders")
-                    )
-                }
-            }
-        },
-        floatingActionButton = {
-            if (selectedTabIndex == 1) {
-                FloatingActionButton(
-                    onClick = { showCreateFolderDialog = true },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = CircleShape,
-                    modifier = Modifier.testTag("create_folder_fab")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CreateNewFolder,
-                        contentDescription = "Create new folder"
-                    )
+                    Row(
+                        modifier = Modifier.padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val allAudiosSelected = selectedTabIndex == 0
+                        Surface(
+                            onClick = { selectedTabIndex = 0 },
+                            shape = RoundedCornerShape(11.dp),
+                            color = if (allAudiosSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .testTag("tab_all_audios")
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "All Audios (${filteredTracks.size})",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (allAudiosSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (allAudiosSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        val foldersSelected = selectedTabIndex == 1
+                        val totalFolders = userFolders.size + deviceFolders.size
+                        Surface(
+                            onClick = { selectedTabIndex = 1 },
+                            shape = RoundedCornerShape(11.dp),
+                            color = if (foldersSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .testTag("tab_folders")
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "Folders ($totalFolders)",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (foldersSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (foldersSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                 }
             }
         },
         bottomBar = {
-            if (playbackState.currentTrack != null) {
-                MiniPlayerBar(
-                    playbackState = playbackState,
-                    onClick = onOpenNowPlaying,
-                    onPlayPause = { playerManager.togglePlayPause() },
-                    onNext = { playerManager.next() }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+            ) {
+                // When music plays, the mini player smoothly slides up ABOVE the bottom dock
+                AnimatedVisibility(
+                    visible = playbackState.currentTrack != null,
+                    enter = fadeIn(animationSpec = tween(200)) + slideInVertically(
+                        animationSpec = tween(200),
+                        initialOffsetY = { it }
+                    ),
+                    exit = fadeOut(animationSpec = tween(150)) + slideOutVertically(
+                        animationSpec = tween(150),
+                        targetOffsetY = { it }
+                    )
+                ) {
+                    MiniPlayerBar(
+                        playbackState = playbackState,
+                        onClick = onOpenNowPlaying,
+                        onPlayPause = { playerManager.togglePlayPause() },
+                        onNext = { playerManager.next() },
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
+
+                // Permanent Bottom Dock (Search, Filter/Sort, Refresh & New Folder)
+                BottomOneHandedDock(
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { searchQuery = it },
+                    isSearchActive = isSearchActive,
+                    onSearchActiveChange = { isSearchActive = it },
+                    sortMode = sortMode,
+                    onSortModeChange = { sortMode = it },
+                    isLoading = isLoading,
+                    onRefresh = onRefreshTracks,
+                    selectedTabIndex = selectedTabIndex,
+                    onCreateFolderClick = { showCreateFolderDialog = true }
                 )
             }
         },
@@ -546,9 +497,10 @@ fun HomeScreen(
                     }
                 } else {
                     LazyVerticalGrid(
+                        state = allAudiosGridState,
                         columns = GridCells.Fixed(gridColumns),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -583,21 +535,22 @@ fun HomeScreen(
                         }
 
                         item(span = { GridItemSpan(maxLineSpan) }) {
-                            Spacer(modifier = Modifier.height(72.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
                 }
             } else {
                 // Folders Tab
                 LazyVerticalGrid(
+                    state = foldersGridState,
                     columns = GridCells.Fixed(gridColumns),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Custom Folders Section
-                    if (userFolders.isNotEmpty()) {
+                    if (filteredUserFolders.isNotEmpty()) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Text(
                                 text = "CUSTOM FOLDERS",
@@ -610,7 +563,7 @@ fun HomeScreen(
                         }
 
                         items(
-                            items = userFolders,
+                            items = filteredUserFolders,
                             key = { "user_${it.id}" }
                         ) { folder ->
                             FolderItemCard(
@@ -636,7 +589,7 @@ fun HomeScreen(
                     }
 
                     // Device Folders Section
-                    if (deviceFolders.isNotEmpty()) {
+                    if (filteredDeviceFolderList.isNotEmpty()) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Text(
                                 text = "DEVICE STORAGE FOLDERS",
@@ -648,9 +601,8 @@ fun HomeScreen(
                             )
                         }
 
-                        val sortedDeviceFolderList = deviceFolders.toList().sortedBy { it.first }
                         items(
-                            items = sortedDeviceFolderList,
+                            items = filteredDeviceFolderList,
                             key = { "device_${it.first}" }
                         ) { (folderName, folderTracks) ->
                             FolderItemCard(
@@ -681,7 +633,7 @@ fun HomeScreen(
                         }
                     }
 
-                    if (userFolders.isEmpty() && deviceFolders.isEmpty()) {
+                    if (filteredUserFolders.isEmpty() && filteredDeviceFolderList.isEmpty()) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Box(
                                 modifier = Modifier
@@ -698,13 +650,13 @@ fun HomeScreen(
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Text(
-                                        text = "No audio folders detected",
+                                        text = if (searchQuery.isNotBlank()) "No matching folders found" else "No audio folders detected",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = "Tap + button to create a custom playlist folder",
+                                        text = if (searchQuery.isNotBlank()) "Try another search term" else "Tap + button below to create a custom folder",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -714,7 +666,7 @@ fun HomeScreen(
                     }
 
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        Spacer(modifier = Modifier.height(80.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
             }
@@ -898,4 +850,274 @@ fun CompactPermissionCard(
         }
     }
 }
+
+@Composable
+private fun RotatingRefreshIconButton(
+    isLoading: Boolean,
+    onClick: () -> Unit
+) {
+    if (isLoading) {
+        val infiniteTransition = rememberInfiniteTransition(label = "refresh_rotation")
+        val refreshRotation by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 900, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "refresh_angle"
+        )
+        IconButton(
+            onClick = onClick,
+            enabled = false,
+            modifier = Modifier
+                .graphicsLayer { rotationZ = refreshRotation }
+                .testTag("refresh_button")
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Refreshing...",
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    } else {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier.testTag("refresh_button")
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Refresh library",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun BottomOneHandedDock(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    isSearchActive: Boolean,
+    onSearchActiveChange: (Boolean) -> Unit,
+    sortMode: SortMode,
+    onSortModeChange: (SortMode) -> Unit,
+    isLoading: Boolean,
+    onRefresh: () -> Unit,
+    selectedTabIndex: Int,
+    onCreateFolderClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showSortMenu by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 6.dp),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 4.dp,
+        shadowElevation = 3.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (isSearchActive) {
+                IconButton(
+                    onClick = {
+                        onSearchActiveChange(false)
+                        onSearchQueryChange("")
+                    },
+                    modifier = Modifier.testTag("search_close_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Close search",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    placeholder = {
+                        Text(
+                            text = if (selectedTabIndex == 0) "Search audios..." else "Search folders...",
+                            fontSize = 14.sp
+                        )
+                    },
+                    singleLine = true,
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { onSearchQueryChange("") }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear search",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("search_text_field")
+                )
+            } else {
+                Surface(
+                    onClick = { onSearchActiveChange(true) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .testTag("search_toggle_button")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(19.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (searchQuery.isNotEmpty()) searchQuery else if (selectedTabIndex == 0) "Search audio files..." else "Search folders...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (searchQuery.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Box {
+                    IconButton(
+                        onClick = { showSortMenu = true },
+                        modifier = Modifier
+                            .size(44.dp)
+                            .testTag("sort_menu_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SortByAlpha,
+                            contentDescription = "Sort tracks",
+                            tint = if (sortMode != SortMode.TITLE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Sort by Title") },
+                            trailingIcon = {
+                                if (sortMode == SortMode.TITLE) Icon(
+                                    Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                onSortModeChange(SortMode.TITLE)
+                                showSortMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Sort by Artist") },
+                            trailingIcon = {
+                                if (sortMode == SortMode.ARTIST) Icon(
+                                    Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                onSortModeChange(SortMode.ARTIST)
+                                showSortMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Sort by Duration") },
+                            trailingIcon = {
+                                if (sortMode == SortMode.DURATION) Icon(
+                                    Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                onSortModeChange(SortMode.DURATION)
+                                showSortMenu = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Sort by Recently Added") },
+                            trailingIcon = {
+                                if (sortMode == SortMode.DATE_ADDED) Icon(
+                                    Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                onSortModeChange(SortMode.DATE_ADDED)
+                                showSortMenu = false
+                            }
+                        )
+                    }
+                }
+
+                RotatingRefreshIconButton(
+                    isLoading = isLoading,
+                    onClick = onRefresh
+                )
+
+                if (selectedTabIndex == 1) {
+                    IconButton(
+                        onClick = onCreateFolderClick,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = CircleShape
+                            )
+                            .testTag("create_folder_fab")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CreateNewFolder,
+                            contentDescription = "Create new folder",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 

@@ -150,10 +150,10 @@ class MediaPlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val subtext = when {
-            state.isRepeatActive -> "🔁 ${state.remainingCount} loops remaining"
-            state.stopAfterFinish -> "⏹ Stop after this track"
-            state.isFolderTimerActive -> "⏳ Timer active"
+        val dynamicSubtext = when {
+            state.isRepeatActive -> "Remaining: ${state.remainingCount}"
+            state.stopAfterFinish -> "Stop after this track"
+            state.isFolderTimerActive -> "Timer active"
             else -> track.displayArtist
         }
 
@@ -163,17 +163,17 @@ class MediaPlaybackService : MediaSessionService() {
             android.R.drawable.ic_media_play
         }
 
-        val lockscreenTitle = if (state.isRepeatActive) {
-            "${track.displayTitle} [↺ ${state.remainingCount} left]"
+        val contentText = if (state.isRepeatActive) {
+            "Remaining: ${state.remainingCount}"
         } else {
-            track.displayTitle
+            track.displayArtist
         }
 
         val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(lockscreenTitle)
-            .setContentText("${track.displayArtist} • $subtext")
-            .setSubText(if (state.isRepeatActive) "${state.remainingCount} loops left" else "LoopCount")
+            .setSmallIcon(R.drawable.ic_stat_playback)
+            .setContentTitle(track.displayTitle)
+            .setContentText(contentText)
+            .setSubText(if (state.isRepeatActive) "Remaining: ${state.remainingCount}" else "LoopCount")
             .setContentIntent(contentIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(state.isPlaying)
@@ -189,13 +189,28 @@ class MediaPlaybackService : MediaSessionService() {
         val notification = notificationBuilder.build()
         try {
             if (state.isPlaying) {
-                startForeground(NOTIFICATION_ID, notification)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
             } else {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_DETACH)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(false)
+                }
                 val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                 notificationManager?.notify(NOTIFICATION_ID, notification)
             }
         } catch (e: Exception) {
-            // Handle foreground service safely
+            // Handle foreground service safely on strict OEM ROMs (e.g. Nothing OS / Android 14+)
+            e.printStackTrace()
         }
     }
 
@@ -206,7 +221,6 @@ class MediaPlaybackService : MediaSessionService() {
     override fun onDestroy() {
         stateObserverJob?.cancel()
         mediaSession?.run {
-            player.release()
             release()
             mediaSession = null
         }

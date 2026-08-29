@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
@@ -96,6 +97,7 @@ fun FolderDetailScreen(
     onBack: () -> Unit,
     onPlayTrack: (AudioTrack, List<AudioTrack>) -> Unit,
     onPlayFolder: (List<AudioTrack>, Int, Boolean) -> Unit,
+    onResumeFolder: ((List<AudioTrack>) -> Unit)? = null,
     onReorder: (List<AudioTrack>) -> Unit,
     onAddTracks: (List<AudioTrack>) -> Unit,
     onRemoveTrack: (String) -> Unit,
@@ -246,21 +248,31 @@ fun FolderDetailScreen(
                         )
                     }
 
-                    if (folder.id > 0) {
-                        IconButton(
-                            onClick = { showMenu = true },
-                            modifier = Modifier.testTag("folder_detail_more_menu")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More folder options"
-                            )
-                        }
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.testTag("folder_detail_more_menu")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More folder options"
+                        )
+                    }
 
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Resume where you left") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Replay, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            },
+                            onClick = {
+                                showMenu = false
+                                onResumeFolder?.invoke(localTracks)
+                            }
+                        )
+                        if (folder.id > 0) {
                             DropdownMenuItem(
                                 text = { Text("Rename Folder") },
                                 leadingIcon = {
@@ -343,46 +355,76 @@ fun FolderDetailScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(horizontal = 6.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // 1. Play All Button
                         Button(
                             onClick = { onPlayFolder(localTracks, 0, isShuffleSelected) },
                             modifier = Modifier
-                                .weight(1.15f)
-                                .height(44.dp)
+                                .weight(1f)
+                                .height(42.dp)
                                 .testTag("folder_detail_play_all"),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                             enabled = localTracks.isNotEmpty()
                         ) {
                             Icon(
                                 Icons.Default.PlayArrow,
                                 contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                "Play All",
+                                "Play",
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1
                             )
                         }
 
-                        // 2. Shuffle Toggle Button
+                        // 2. Resume Button
+                        FilledTonalButton(
+                            onClick = { onResumeFolder?.invoke(localTracks) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                                .testTag("folder_detail_resume"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                            enabled = localTracks.isNotEmpty()
+                        ) {
+                            Icon(
+                                Icons.Default.Replay,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                "Resume",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1
+                            )
+                        }
+
+                        // 3. Shuffle Toggle Button
                         val shuffleContainerColor = if (isShuffleSelected)
-                            MaterialTheme.colorScheme.primaryContainer
+                            MaterialTheme.colorScheme.secondaryContainer
                         else
                             MaterialTheme.colorScheme.surface
                         val shuffleContentColor = if (isShuffleSelected)
-                            MaterialTheme.colorScheme.onPrimaryContainer
+                            MaterialTheme.colorScheme.onSecondaryContainer
                         else
                             MaterialTheme.colorScheme.onSurfaceVariant
                         val shuffleBorder = if (!isShuffleSelected) androidx.compose.foundation.BorderStroke(
@@ -394,7 +436,7 @@ fun FolderDetailScreen(
                             onClick = { isShuffleSelected = !isShuffleSelected },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(44.dp)
+                                .height(42.dp)
                                 .testTag("folder_detail_shuffle"),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(
@@ -402,7 +444,7 @@ fun FolderDetailScreen(
                                 contentColor = shuffleContentColor
                             ),
                             border = shuffleBorder,
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                             enabled = localTracks.isNotEmpty()
                         ) {
                             Icon(
@@ -410,11 +452,11 @@ fun FolderDetailScreen(
                                 contentDescription = "Shuffle",
                                 modifier = Modifier.size(16.dp),
                                 tint = if (isShuffleSelected)
-                                    MaterialTheme.colorScheme.primary
+                                    MaterialTheme.colorScheme.secondary
                                 else
                                     MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
                                 "Shuffle",
                                 fontWeight = if (isShuffleSelected) FontWeight.Bold else FontWeight.Medium,
@@ -423,12 +465,12 @@ fun FolderDetailScreen(
                             )
                         }
 
-                        // 3. Play For (Timer) Button
+                        // 4. Play For (Timer) Button
                         OutlinedButton(
                             onClick = { showTimerDialog = true },
                             modifier = Modifier
-                                .weight(1.15f)
-                                .height(44.dp)
+                                .weight(1f)
+                                .height(42.dp)
                                 .testTag("folder_detail_play_for"),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
@@ -438,7 +480,7 @@ fun FolderDetailScreen(
                                 1.dp,
                                 MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
                             ),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                             enabled = localTracks.isNotEmpty()
                         ) {
                             Icon(
@@ -447,9 +489,9 @@ fun FolderDetailScreen(
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                "Play for...",
+                                "Timer",
                                 fontWeight = FontWeight.Medium,
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1

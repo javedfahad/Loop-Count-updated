@@ -91,4 +91,17 @@ interface LoopCountDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveSettings(settings: AppSettingsEntity)
+
+    // --- Folder Positions (Resume Folder Feature) ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveFolderPosition(position: FolderPositionEntity)
+
+    @Query("SELECT * FROM folder_positions WHERE folderKey = :folderKey")
+    suspend fun getFolderPosition(folderKey: String): FolderPositionEntity?
+
+    @Query("SELECT * FROM folder_positions")
+    suspend fun getAllFolderPositionsSync(): List<FolderPositionEntity>
+
+    @Query("DELETE FROM folder_positions WHERE folderKey = :folderKey")
+    suspend fun deleteFolderPosition(folderKey: String)
 }

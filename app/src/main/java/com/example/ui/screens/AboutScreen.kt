@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timer
@@ -190,19 +191,28 @@ fun AboutScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Feature 5: Playback Speed & Pitch
+            // Feature 5: Resume Audio & Folders
+            FeatureCard(
+                icon = Icons.Default.Replay,
+                title = "5. Resume Where You Left Off",
+                description = "Seamless position persistence for both individual audio tracks and folders. LoopCount automatically saves your playback timestamp and active playlist track so you can resume audiobooks, lectures, and study folders with 1 tap."
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Feature 6: Playback Speed & Pitch
             FeatureCard(
                 icon = Icons.Default.Speed,
-                title = "5. Speed Control & Bookmarks",
+                title = "6. Speed Control & Bookmarks",
                 description = "Adjust playback speeds from 0.5× to 2.0× for precise dictation or rapid review. Save timestamp bookmarks with custom notes to jump directly to key audio passages."
             )
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Feature 6: Theme Customization & Privacy
+            // Feature 7: Theme Customization & Privacy
             FeatureCard(
                 icon = Icons.Default.Palette,
-                title = "6. Theme Styles & Offline Privacy",
+                title = "7. Theme Styles & Offline Privacy",
                 description = "Customize dark, light, or OLED true black modes with vivid accents. LoopCount operates completely offline without data collection or tracking."
             )
 
@@ -231,6 +241,14 @@ fun AboutScreen(
 
             GuideTipCard(
                 stepNumber = "3",
+                headline = "Resume Any Track or Folder",
+                explanation = "Tap the 3-dot options menu on any audio file or folder to select 'Resume where you left', or use the 1-tap 'Resume' button in folder view."
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            GuideTipCard(
+                stepNumber = "4",
                 headline = "Seamless Background Play",
                 explanation = "Playback continues seamlessly in the background with lock-screen notification controls so you can listen while multitasking or with your screen turned off."
             )

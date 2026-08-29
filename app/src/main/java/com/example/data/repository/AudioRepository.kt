@@ -11,6 +11,7 @@ import android.provider.MediaStore
 import com.example.data.local.AppSettingsEntity
 import com.example.data.local.DeletedTrackEntity
 import com.example.data.local.FolderEntity
+import com.example.data.local.FolderPositionEntity
 import com.example.data.local.FolderTrackEntity
 import com.example.data.local.LoopCountDao
 import com.example.data.local.TrackCustomNameEntity
@@ -292,6 +293,29 @@ class AudioRepository(
 
     suspend fun getSavedPosition(trackUri: String): Long = withContext(Dispatchers.IO) {
         dao.getTrackPosition(trackUri) ?: 0L
+    }
+
+    // --- Folder Playback Positions (Resume Folder Feature) ---
+    suspend fun saveFolderPosition(folderKey: String, trackUri: String, trackTitle: String, positionMs: Long) = withContext(Dispatchers.IO) {
+        if (folderKey.isNotBlank() && trackUri.isNotBlank()) {
+            dao.saveFolderPosition(
+                FolderPositionEntity(
+                    folderKey = folderKey,
+                    trackUri = trackUri,
+                    trackTitle = trackTitle,
+                    positionMs = positionMs,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    suspend fun getFolderPosition(folderKey: String): FolderPositionEntity? = withContext(Dispatchers.IO) {
+        if (folderKey.isBlank()) null else dao.getFolderPosition(folderKey)
+    }
+
+    suspend fun deleteFolderPosition(folderKey: String) = withContext(Dispatchers.IO) {
+        dao.deleteFolderPosition(folderKey)
     }
 
     // --- Rename Track ---

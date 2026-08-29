@@ -1,8 +1,11 @@
 package com.example.ui.dialogs
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +24,7 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FolderSpecial
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
@@ -58,7 +64,7 @@ fun TrackOptionsDialog(
     onDismiss: () -> Unit,
     onPlay: () -> Unit,
     onResume: () -> Unit,
-    onStopAfterThis: () -> Unit,
+    onStopAfterThis: () -> Unit = {},
     onRepeatOptions: (() -> Unit)? = null,
     onRename: (String) -> Unit,
     onDelete: () -> Unit,
@@ -266,34 +272,60 @@ fun TrackOptionsDialog(
         onDismissRequest = onDismiss
     ) {
         Surface(
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .widthIn(max = 340.dp)
+                .wrapContentHeight()
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                // Header
-                Text(
-                    text = track.displayTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "${track.displayArtist} • ${track.formattedDuration}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Header with compact icon badge
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = track.displayTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "${track.displayArtist} • ${track.formattedDuration}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                 Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Menu items
                 OptionMenuItem(
@@ -308,7 +340,8 @@ fun TrackOptionsDialog(
 
                 OptionMenuItem(
                     icon = Icons.Default.Replay,
-                    title = "Resume",
+                    title = "Resume where you left",
+                    subtitle = "Continue from saved playback position",
                     onClick = {
                         onResume()
                         onDismiss()
@@ -324,16 +357,6 @@ fun TrackOptionsDialog(
                         onRepeatOptions?.invoke()
                     },
                     testTag = "option_repeat_settings"
-                )
-
-                OptionMenuItem(
-                    icon = Icons.Default.StopCircle,
-                    title = "Stop after this playback",
-                    onClick = {
-                        onStopAfterThis()
-                        onDismiss()
-                    },
-                    testTag = "option_stop_after"
                 )
 
                 OptionMenuItem(
@@ -365,20 +388,21 @@ fun TrackOptionsDialog(
                     testTag = "option_delete"
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                Spacer(modifier = Modifier.height(4.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
 
                 // Cancel Button
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 0.dp, bottom = 0.dp, end = 4.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(
                         onClick = onDismiss,
-                        modifier = Modifier.testTag("option_cancel")
+                        modifier = Modifier.testTag("option_cancel"),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                     ) {
-                        Text("Cancel", fontWeight = FontWeight.SemiBold)
+                        Text("Cancel", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
                 }
             }
@@ -392,6 +416,7 @@ fun OptionMenuItem(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
     titleColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
     iconTint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
     testTag: String = ""
@@ -399,9 +424,9 @@ fun OptionMenuItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .padding(horizontal = 10.dp, vertical = 7.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -409,14 +434,27 @@ fun OptionMenuItem(
             imageVector = icon,
             contentDescription = title,
             tint = iconTint,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(19.dp)
         )
-        Spacer(modifier = Modifier.width(14.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            color = titleColor
-        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp,
+                color = titleColor
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }

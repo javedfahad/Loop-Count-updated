@@ -52,3 +52,12 @@ data class AppSettingsEntity(
     val themeMode: String = "SYSTEM",
     val accentColor: String = "PURPLE"
 )
+
+@Entity(tableName = "folder_positions")
+data class FolderPositionEntity(
+    @PrimaryKey val folderKey: String,
+    val trackUri: String,
+    val trackTitle: String = "",
+    val positionMs: Long = 0L,
+    val updatedAt: Long = System.currentTimeMillis()
+)

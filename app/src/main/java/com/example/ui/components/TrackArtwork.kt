@@ -80,6 +80,8 @@ fun TrackArtwork(
                 model = ImageRequest.Builder(context)
                     .data(imageUri)
                     .crossfade(true)
+                    .size(if (showDetailsOnFallback) 512 else 128) // Downsample thumbnails to prevent huge bitmap cache
+                    .allowHardware(true)
                     .build(),
                 contentDescription = track?.displayTitle ?: "Album Art",
                 contentScale = ContentScale.Crop,

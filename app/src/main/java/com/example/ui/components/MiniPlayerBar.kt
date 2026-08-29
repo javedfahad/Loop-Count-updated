@@ -55,7 +55,7 @@ fun MiniPlayerBar(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onClick)
             .testTag("mini_player_bar"),

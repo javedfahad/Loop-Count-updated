@@ -123,10 +123,15 @@ class MainActivity : ComponentActivity() {
                 pendingDeleteTrack = null
             }
 
-            // Sync initial permission
+            // Sync initial permission and request notification permission on Android 13+
             LaunchedEffect(Unit) {
                 val granted = checkAudioPermission()
                 viewModel.setPermissionGranted(granted)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                        permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
+                    }
+                }
             }
 
             // Handle messages
@@ -266,6 +271,8 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
 
+                                    val folderKey = if (currentFolder.id > 0) "user_${currentFolder.id}" else "device_${currentFolder.name}"
+
                                     FolderDetailScreen(
                                         folder = currentFolder,
                                         allTracks = uiState.allTracks,
@@ -277,10 +284,13 @@ class MainActivity : ComponentActivity() {
                                         onNext = { viewModel.playerManager.next() },
                                         onBack = { navigateBack() },
                                         onPlayTrack = { track, queue ->
-                                            viewModel.playTrack(track, queue)
+                                            viewModel.playerManager.playTrack(track, queue, startPositionMs = 0L, folderKey = folderKey)
                                         },
                                         onPlayFolder = { tracks, minutes, shuffle ->
-                                            viewModel.playFolder(tracks, minutes, shuffle)
+                                            viewModel.playFolder(folderKey, tracks, minutes, shuffle)
+                                        },
+                                        onResumeFolder = { tracks ->
+                                            viewModel.resumeFolder(folderKey, tracks)
                                         },
                                         onReorder = { reordered ->
                                             if (currentFolder.id > 0) {
@@ -321,6 +331,7 @@ class MainActivity : ComponentActivity() {
                                         currentAccent = uiState.accentColor,
                                         onThemeModeSelected = { viewModel.setThemeMode(it) },
                                         onAccentSelected = { viewModel.setAccentColor(it) },
+                                        onClearCache = { viewModel.clearAppCache() },
                                         onBack = { navigateBack() }
                                     )
                                 }

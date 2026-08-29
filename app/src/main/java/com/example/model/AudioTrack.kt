@@ -2,7 +2,9 @@ package com.example.model
 
 import android.content.ContentUris
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 
+@Immutable
 data class AudioTrack(
     val id: Long,
     val uri: Uri,
@@ -48,6 +50,7 @@ data class AudioTrack(
     }
 }
 
+@Immutable
 data class DeviceFolder(
     val name: String,
     val path: String,
@@ -55,6 +58,7 @@ data class DeviceFolder(
     val tracks: List<AudioTrack> = emptyList()
 )
 
+@Immutable
 data class UserFolder(
     val id: Long,
     val name: String,

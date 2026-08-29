@@ -38,6 +38,7 @@ class AudioPlayerManager(
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var exoPlayer: ExoPlayer? = null
     private var positionUpdateJob: Job? = null
+    private var activeFolderKey: String? = null
 
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
@@ -170,6 +171,7 @@ class AudioPlayerManager(
     private fun startPositionTracker() {
         positionUpdateJob?.cancel()
         positionUpdateJob = scope.launch {
+            var tickCount = 0
             while (isActive) {
                 exoPlayer?.let { player ->
                     if (player.isPlaying) {
@@ -180,6 +182,12 @@ class AudioPlayerManager(
                                 currentPositionMs = pos,
                                 durationMs = if (dur > 0) dur else it.durationMs
                             )
+                        }
+
+                        // Save position every ~3.2 seconds (8 ticks * 400ms)
+                        tickCount++
+                        if (tickCount % 8 == 0) {
+                            saveCurrentTrackPosition()
                         }
 
                         // Check folder timer
@@ -197,19 +205,36 @@ class AudioPlayerManager(
         }
     }
 
-    private fun saveCurrentTrackPosition() {
+    fun saveCurrentTrackPosition() {
         val currentTrack = _state.value.currentTrack ?: return
         val pos = exoPlayer?.currentPosition ?: return
-        if (pos > 1000L) {
+        if (pos >= 0L) {
+            val fKey = activeFolderKey
             scope.launch(Dispatchers.IO) {
                 repository.saveTrackPosition(currentTrack.uri.toString(), pos)
+                if (!fKey.isNullOrBlank()) {
+                    repository.saveFolderPosition(
+                        folderKey = fKey,
+                        trackUri = currentTrack.uri.toString(),
+                        trackTitle = currentTrack.displayTitle,
+                        positionMs = pos
+                    )
+                }
             }
         }
     }
 
     // --- Core Playback Methods ---
 
-    fun playTrack(track: AudioTrack, queue: List<AudioTrack> = listOf(track), startPositionMs: Long = 0L) {
+    fun playTrack(
+        track: AudioTrack,
+        queue: List<AudioTrack> = listOf(track),
+        startPositionMs: Long = 0L,
+        folderKey: String? = null
+    ) {
+        if (folderKey != null) {
+            activeFolderKey = folderKey
+        }
         val player = exoPlayer ?: return
         val queueIndex = queue.indexOfFirst { it.uri == track.uri }.let { if (it >= 0) it else 0 }
 
@@ -243,10 +268,52 @@ class AudioPlayerManager(
         player.play()
     }
 
-    fun resumeTrack(track: AudioTrack, queue: List<AudioTrack> = listOf(track)) {
+    fun resumeTrack(
+        track: AudioTrack,
+        queue: List<AudioTrack> = listOf(track),
+        folderKey: String? = null
+    ) {
         scope.launch {
             val savedPos = repository.getSavedPosition(track.uri.toString())
-            playTrack(track, queue, startPositionMs = savedPos)
+            playTrack(track, queue, startPositionMs = savedPos, folderKey = folderKey)
+        }
+    }
+
+    fun resumeFolder(
+        folderKey: String,
+        tracks: List<AudioTrack>,
+        timerMinutes: Int = 0,
+        shuffle: Boolean = false
+    ) {
+        if (tracks.isEmpty()) return
+        scope.launch {
+            activeFolderKey = folderKey
+            val savedHistory = repository.getFolderPosition(folderKey)
+            val trackToPlay = if (savedHistory != null) {
+                tracks.find { it.uri.toString() == savedHistory.trackUri } ?: tracks.first()
+            } else {
+                tracks.first()
+            }
+            val startPos = if (savedHistory != null && savedHistory.trackUri == trackToPlay.uri.toString()) {
+                savedHistory.positionMs
+            } else {
+                repository.getSavedPosition(trackToPlay.uri.toString())
+            }
+
+            val playQueue = if (shuffle) {
+                val shuffled = tracks.shuffled().toMutableList()
+                shuffled.remove(trackToPlay)
+                shuffled.add(0, trackToPlay)
+                shuffled
+            } else {
+                tracks
+            }
+
+            if (timerMinutes > 0) {
+                startFolderTimer(timerMinutes)
+            }
+
+            playTrack(trackToPlay, playQueue, startPositionMs = startPos, folderKey = folderKey)
         }
     }
 
@@ -583,25 +650,19 @@ class AudioPlayerManager(
     private fun buildMediaItem(track: AudioTrack): MediaItem {
         val currentState = _state.value
         val loopSubtitle = when {
-            currentState.isRepeatActive -> "🔁 ${currentState.remainingCount} loops remaining"
-            currentState.stopAfterFinish -> "⏹ Stop after this track"
-            currentState.isFolderTimerActive -> "⏳ Timer active"
+            currentState.isRepeatActive -> "Remaining: ${currentState.remainingCount}"
+            currentState.stopAfterFinish -> "Stop after this track"
+            currentState.isFolderTimerActive -> "Timer active"
             else -> track.displayArtist
         }
 
-        val displayTitle = if (currentState.isRepeatActive) {
-            "${track.displayTitle} [↺ ${currentState.remainingCount} left]"
-        } else {
-            track.displayTitle
-        }
-
         val metadata = MediaMetadata.Builder()
-            .setTitle(displayTitle)
+            .setTitle(track.displayTitle)
             .setArtist(track.displayArtist)
             .setSubtitle(loopSubtitle)
             .setDescription(loopSubtitle)
             .setAlbumTitle(track.album.ifBlank { "LoopCount" })
-            .setDisplayTitle(displayTitle)
+            .setDisplayTitle(track.displayTitle)
             .build()
 
         return MediaItem.Builder()

@@ -297,7 +297,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Play Folder with optional timer and optional shuffle ---
-    fun playFolder(tracks: List<AudioTrack>, timerMinutes: Int = 0, shuffle: Boolean = false) {
+    fun playFolder(folderKey: String? = null, tracks: List<AudioTrack>, timerMinutes: Int = 0, shuffle: Boolean = false) {
         if (tracks.isEmpty()) {
             _uiState.update { it.copy(message = "This folder has no audio tracks") }
             return
@@ -309,7 +309,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else if (shuffle) {
             _uiState.update { it.copy(message = "Playing folder in random shuffle mode") }
         }
-        playerManager.playTrack(playQueue.first(), playQueue, 0L)
+        playerManager.playTrack(playQueue.first(), playQueue, 0L, folderKey = folderKey)
+    }
+
+    fun resumeFolder(folderKey: String, tracks: List<AudioTrack>, timerMinutes: Int = 0, shuffle: Boolean = false) {
+        if (tracks.isEmpty()) {
+            _uiState.update { it.copy(message = "This folder has no audio tracks") }
+            return
+        }
+        viewModelScope.launch {
+            val history = repository.getFolderPosition(folderKey)
+            val trackName = history?.trackTitle?.ifBlank { null }
+            if (trackName != null) {
+                _uiState.update { it.copy(message = "Resuming \"$trackName\"") }
+            } else {
+                _uiState.update { it.copy(message = "Resuming folder playback") }
+            }
+        }
+        playerManager.resumeFolder(folderKey, tracks, timerMinutes, shuffle)
+    }
+
+    suspend fun getSavedTrackPosition(trackUri: String): Long {
+        return repository.getSavedPosition(trackUri)
+    }
+
+    suspend fun getFolderPosition(folderKey: String): com.example.data.local.FolderPositionEntity? {
+        return repository.getFolderPosition(folderKey)
     }
 
     // --- Settings ---
@@ -324,6 +349,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.update { it.copy(accentColor = accent) }
             repository.saveSettings(_uiState.value.themeMode.name, accent.name)
+        }
+    }
+
+    fun clearAppCache() {
+        viewModelScope.launch {
+            app.clearAppCache()
+            _uiState.update { it.copy(message = "App cache cleared successfully") }
         }
     }
 
