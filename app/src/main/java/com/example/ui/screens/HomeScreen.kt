@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,6 +42,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -86,9 +90,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -164,6 +172,12 @@ fun HomeScreen(
     var selectedFolderForOptions by remember { mutableStateOf<Pair<String, Boolean>?>(null) } // Name, isUserFolder
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
+
+    // Intercept back button when search is active to dismiss search
+    BackHandler(enabled = isSearchActive) {
+        isSearchActive = false
+        searchQuery = ""
+    }
 
     val filteredTracks = remember(tracks, searchQuery, sortMode) {
         val filtered = if (searchQuery.isBlank()) {
@@ -426,6 +440,7 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .imePadding()
                     .navigationBarsPadding()
             ) {
                 // When music plays, the mini player smoothly slides up ABOVE the bottom dock
@@ -909,210 +924,260 @@ fun BottomOneHandedDock(
     modifier: Modifier = Modifier
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+
+    LaunchedEffect(isSearchActive) {
+        if (isSearchActive) {
+            try {
+                searchFocusRequester.requestFocus()
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 6.dp),
         shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 4.dp,
-        shadowElevation = 3.dp,
+        color = if (isSearchActive) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = if (isSearchActive) 8.dp else 4.dp,
+        shadowElevation = if (isSearchActive) 6.dp else 3.dp,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            if (isSearchActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
         )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            if (isSearchActive) {
-                IconButton(
-                    onClick = {
-                        onSearchActiveChange(false)
-                        onSearchQueryChange("")
-                    },
-                    modifier = Modifier.testTag("search_close_button")
+        AnimatedContent(
+            targetState = isSearchActive,
+            transitionSpec = {
+                (fadeIn(animationSpec = tween(180)) + scaleIn(initialScale = 0.95f, animationSpec = tween(180)))
+                    .togetherWith(fadeOut(animationSpec = tween(140)) + scaleOut(targetScale = 0.95f, animationSpec = tween(140)))
+            },
+            label = "search_dock_transition"
+        ) { searchActive ->
+            if (searchActive) {
+                // Active Pop-up Search Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Close search",
-                        tint = MaterialTheme.colorScheme.onSurface
+                    IconButton(
+                        onClick = {
+                            focusManager.clearFocus()
+                            onSearchActiveChange(false)
+                            onSearchQueryChange("")
+                        },
+                        modifier = Modifier.testTag("search_close_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Close search",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        placeholder = {
+                            Text(
+                                text = if (selectedTabIndex == 0) "Search audios by title or artist..." else "Search folders by name...",
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { onSearchQueryChange("") },
+                                    modifier = Modifier.testTag("search_clear_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Clear search",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = {
+                            focusManager.clearFocus()
+                        }),
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(searchFocusRequester)
+                            .testTag("search_text_field")
                     )
                 }
-
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    placeholder = {
-                        Text(
-                            text = if (selectedTabIndex == 0) "Search audios..." else "Search folders...",
-                            fontSize = 14.sp
-                        )
-                    },
-                    singleLine = true,
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { onSearchQueryChange("") }) {
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Clear search",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("search_text_field")
-                )
             } else {
-                Surface(
-                    onClick = { onSearchActiveChange(true) },
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                    ),
+                // Idle Dock at Same Position
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp)
-                        .testTag("search_toggle_button")
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(
+                    Surface(
+                        onClick = { onSearchActiveChange(true) },
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        ),
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .weight(1f)
+                            .height(44.dp)
+                            .testTag("search_toggle_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(19.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (searchQuery.isNotEmpty()) searchQuery else if (selectedTabIndex == 0) "Search audio files..." else "Search folders...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (searchQuery.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Box {
-                    IconButton(
-                        onClick = { showSortMenu = true },
-                        modifier = Modifier
-                            .size(44.dp)
-                            .testTag("sort_menu_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SortByAlpha,
-                            contentDescription = "Sort tracks",
-                            tint = if (sortMode != SortMode.TITLE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Sort by Title") },
-                            trailingIcon = {
-                                if (sortMode == SortMode.TITLE) Icon(
-                                    Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            },
-                            onClick = {
-                                onSortModeChange(SortMode.TITLE)
-                                showSortMenu = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Sort by Artist") },
-                            trailingIcon = {
-                                if (sortMode == SortMode.ARTIST) Icon(
-                                    Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            },
-                            onClick = {
-                                onSortModeChange(SortMode.ARTIST)
-                                showSortMenu = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Sort by Duration") },
-                            trailingIcon = {
-                                if (sortMode == SortMode.DURATION) Icon(
-                                    Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            },
-                            onClick = {
-                                onSortModeChange(SortMode.DURATION)
-                                showSortMenu = false
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Sort by Recently Added") },
-                            trailingIcon = {
-                                if (sortMode == SortMode.DATE_ADDED) Icon(
-                                    Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            },
-                            onClick = {
-                                onSortModeChange(SortMode.DATE_ADDED)
-                                showSortMenu = false
-                            }
-                        )
-                    }
-                }
-
-                RotatingRefreshIconButton(
-                    isLoading = isLoading,
-                    onClick = onRefresh
-                )
-
-                if (selectedTabIndex == 1) {
-                    IconButton(
-                        onClick = onCreateFolderClick,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = CircleShape
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(19.dp)
                             )
-                            .testTag("create_folder_fab")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CreateNewFolder,
-                            contentDescription = "Create new folder",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(20.dp)
-                        )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (searchQuery.isNotEmpty()) searchQuery else if (selectedTabIndex == 0) "Search audio files..." else "Search folders...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (searchQuery.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Box {
+                        IconButton(
+                            onClick = { showSortMenu = true },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .testTag("sort_menu_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SortByAlpha,
+                                contentDescription = "Sort tracks",
+                                tint = if (sortMode != SortMode.TITLE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Sort by Title") },
+                                trailingIcon = {
+                                    if (sortMode == SortMode.TITLE) Icon(
+                                        Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    onSortModeChange(SortMode.TITLE)
+                                    showSortMenu = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Sort by Artist") },
+                                trailingIcon = {
+                                    if (sortMode == SortMode.ARTIST) Icon(
+                                        Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    onSortModeChange(SortMode.ARTIST)
+                                    showSortMenu = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Sort by Duration") },
+                                trailingIcon = {
+                                    if (sortMode == SortMode.DURATION) Icon(
+                                        Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    onSortModeChange(SortMode.DURATION)
+                                    showSortMenu = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Sort by Recently Added") },
+                                trailingIcon = {
+                                    if (sortMode == SortMode.DATE_ADDED) Icon(
+                                        Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    onSortModeChange(SortMode.DATE_ADDED)
+                                    showSortMenu = false
+                                }
+                            )
+                        }
+                    }
+
+                    RotatingRefreshIconButton(
+                        isLoading = isLoading,
+                        onClick = onRefresh
+                    )
+
+                    if (selectedTabIndex == 1) {
+                        IconButton(
+                            onClick = onCreateFolderClick,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = CircleShape
+                                )
+                                .testTag("create_folder_fab")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CreateNewFolder,
+                                contentDescription = "Create new folder",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
