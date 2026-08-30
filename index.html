@@ -129,10 +129,57 @@
             border-radius: 999px;
         }
 
-        .nav-btn:hover {
-            background: var(--primary);
-            color: #0F0D13 !important;
-            box-shadow: 0 0 16px var(--primary-glow);
+        .nav-btn-primary {
+            background: var(--primary-gradient);
+            border: none;
+            color: #FFFFFF !important;
+            padding: 9px 20px;
+            border-radius: 999px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 16px var(--primary-glow);
+        }
+
+        .nav-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 22px var(--primary-glow);
+        }
+
+        .hero-cta-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+        }
+
+        .download-main-btn {
+            background: var(--primary-gradient);
+            color: #FFFFFF;
+            font-size: 1.08rem;
+            font-weight: 700;
+            padding: 16px 36px;
+            border-radius: 16px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 8px 28px var(--primary-glow);
+            transition: all 0.25s ease;
+        }
+
+        .download-main-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 34px var(--primary-glow);
+        }
+
+        .download-main-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
         }
 
         /* Hero */
@@ -560,6 +607,12 @@
                     <a href="#features">Features</a>
                     <a href="#privacy">Privacy Policy</a>
                     <a href="#contact" class="nav-btn">Contact & Feedback</a>
+                    <a href="loopcount.apk" download class="nav-btn-primary">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+                        </svg>
+                        Download APK
+                    </a>
                 </nav>
             </div>
         </div>
@@ -576,6 +629,15 @@
             </div>
             <h1>Master Any Phrase with <span>LoopCount</span></h1>
             <p>The ultimate audio looper built for dancers, musicians, language learners, and athletes. Accurate repetitions, custom pauses, and absolute privacy.</p>
+            <div class="hero-cta-group">
+                <a href="loopcount.apk" download class="download-main-btn">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+                    </svg>
+                    Download LoopCount APK (v1.0.0)
+                </a>
+                <a href="#features" class="nav-btn" style="padding: 15px 28px; font-size: 1rem;">Explore Features</a>
+            </div>
         </section>
 
         <!-- Waveform UI Card -->
