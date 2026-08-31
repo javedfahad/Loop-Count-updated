@@ -815,7 +815,7 @@ class AudioPlayerManager(
             .setArtist(track.displayArtist)
             .setSubtitle(loopSubtitle)
             .setDescription(loopSubtitle)
-            .setAlbumTitle(track.album.ifBlank { "LoopCount" })
+            .setAlbumTitle(track.album.ifBlank { "Loopify Music" })
             .setDisplayTitle(track.displayTitle)
             .build()
 

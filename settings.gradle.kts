@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "LoopCount"
+rootProject.name = "LoopifyMusic"
 
 include(":app")

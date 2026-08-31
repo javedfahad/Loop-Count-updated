@@ -20,10 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.components.LoopCountLogo
+import com.example.ui.components.LoopifyLogo
 import kotlinx.coroutines.delay
 
 @Composable
@@ -36,20 +38,27 @@ fun SplashScreen(
     LaunchedEffect(Unit) {
         alpha.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+            animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing)
         )
         scale.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+            animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing)
         )
-        delay(400) // Quick and responsive opening
+        delay(420)
         onSplashFinished()
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface
+                    )
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -59,24 +68,25 @@ fun SplashScreen(
                 .scale(scale.value)
                 .alpha(alpha.value)
         ) {
-            LoopCountLogo(
-                size = 88.dp,
-                backgroundColor = MaterialTheme.colorScheme.primary
+            LoopifyLogo(
+                size = 96.dp,
+                animated = true
             )
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(22.dp))
             Text(
-                text = "LoopCount",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
+                text = "Loopify Music",
+                fontSize = 30.sp,
+                fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground,
                 letterSpacing = (-0.5).sp
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Counted Audio Repetition",
+                text = "Master Every Beat & Repeat",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 0.5.sp
             )
         }
     }

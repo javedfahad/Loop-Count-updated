@@ -139,7 +139,7 @@ fun FolderDetailScreen(
             onDismissRequest = { showDeleteConfirmDialog = false },
             title = { Text("Delete Folder", fontWeight = FontWeight.Bold) },
             text = {
-                Text("Delete \"${folder.name}\"? This removes the folder list from LoopCount. Your original audio files on the device will not be deleted.")
+                Text("Delete \"${folder.name}\"? This removes the folder list from Loopify Music. Your original audio files on the device will not be deleted.")
             },
             confirmButton = {
                 TextButton(

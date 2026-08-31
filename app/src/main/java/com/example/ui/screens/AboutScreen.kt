@@ -52,7 +52,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.components.LoopCountLogo
+import com.example.ui.components.LoopifyLogo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +64,7 @@ fun AboutScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "About LoopCount",
+                        text = "About Loopify Music",
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -98,25 +98,25 @@ fun AboutScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // App Identity Hero
-            LoopCountLogo(
-                size = 76.dp,
-                backgroundColor = MaterialTheme.colorScheme.primary
+            LoopifyLogo(
+                size = 80.dp,
+                animated = true
             )
             Spacer(modifier = Modifier.height(14.dp))
             Text(
-                text = "LoopCount",
+                text = "Loopify Music",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Precision Counted Audio Repetition & Memorisation Player",
+                text = "Precision Counted Audio Repetition & Music Player",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "Version 1.0 • 100% Offline & Private",
+                text = "Version 1.0.0 • 100% Offline & Private",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )
@@ -135,14 +135,14 @@ fun AboutScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
-                        text = "Why LoopCount?",
+                        text = "Why Loopify Music?",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "LoopCount is specifically engineered for students, language learners, musicians, speech coaches, and recitation memorizers who need to repeat audio tracks an exact number of times or for a designated duration without manually pressing replay.",
+                        text = "Loopify Music is engineered for students, language learners, musicians, speech coaches, and recitation memorizers who need to repeat audio tracks an exact number of times or for a designated duration without manually pressing replay.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 20.sp
@@ -197,7 +197,7 @@ fun AboutScreen(
             FeatureCard(
                 icon = Icons.Default.Replay,
                 title = "5. Resume Where You Left Off",
-                description = "Seamless position persistence for both individual audio tracks and folders. LoopCount automatically saves your playback timestamp and active playlist track so you can resume audiobooks, lectures, and study folders with 1 tap."
+                description = "Seamless position persistence for both individual audio tracks and folders. Loopify Music automatically saves your playback timestamp and active playlist track so you can resume audiobooks, lectures, and study folders with 1 tap."
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -233,7 +233,7 @@ fun AboutScreen(
             FeatureCard(
                 icon = Icons.Default.Palette,
                 title = "9. Theme Styles & Offline Privacy",
-                description = "Customize dark, light, or OLED true black modes with vivid accents. LoopCount operates completely offline without data collection or tracking."
+                description = "Customize dark, light, or OLED true black modes with vivid accents. Loopify Music operates completely offline without data collection or tracking."
             )
 
             Spacer(modifier = Modifier.height(24.dp))

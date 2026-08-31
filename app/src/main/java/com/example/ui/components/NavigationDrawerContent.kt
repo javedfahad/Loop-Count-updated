@@ -60,20 +60,19 @@ fun NavigationDrawerContent(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    LoopCountLogo(
-                        size = 46.dp,
-                        backgroundColor = MaterialTheme.colorScheme.primary
+                    LoopifyLogo(
+                        size = 46.dp
                     )
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
-                            text = "LoopCount",
-                            style = MaterialTheme.typography.titleLarge,
+                            text = "Loopify Music",
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
-                            text = "Audio Player",
+                            text = "Precision Looper",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                         )
@@ -101,7 +100,7 @@ fun NavigationDrawerContent(
 
             DrawerNavItem(
                 icon = Icons.Default.Info,
-                title = "About LoopCount",
+                title = "About Loopify Music",
                 subtitle = "Version & Feature Guide",
                 onClick = {
                     onCloseDrawer()
@@ -115,7 +114,7 @@ fun NavigationDrawerContent(
             // Footer
             Column(modifier = Modifier.padding(horizontal = 8.dp)) {
                 Text(
-                    text = "LoopCount v1.0",
+                    text = "Loopify Music v1.0.0",
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)

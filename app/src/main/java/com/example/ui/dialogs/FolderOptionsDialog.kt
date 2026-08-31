@@ -124,7 +124,7 @@ fun FolderOptionsDialog(
             onDismissRequest = { isConfirmingDelete = false },
             title = { Text("Delete Folder", fontWeight = FontWeight.Bold) },
             text = {
-                Text("Delete \"$folderName\"? This removes the custom folder list from LoopCount. Your original audio files on the device will not be deleted.")
+                Text("Delete \"$folderName\"? This removes the custom folder list from Loopify Music. Your original audio files on the device will not be deleted.")
             },
             confirmButton = {
                 TextButton(

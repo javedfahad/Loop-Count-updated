@@ -113,7 +113,7 @@ import com.example.model.UserFolder
 import com.example.playback.AudioPlayerManager
 import com.example.playback.PlaybackState
 import com.example.ui.components.FolderItemCard
-import com.example.ui.components.LoopCountLogo
+import com.example.ui.components.LoopifyLogo
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.TrackItemCard
 import com.example.ui.dialogs.FolderOptionsDialog
@@ -398,12 +398,12 @@ fun HomeScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            LoopCountLogo(size = 28.dp)
-                            Spacer(modifier = Modifier.width(8.dp))
+                            LoopifyLogo(size = 30.dp)
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "LoopCount",
+                                text = "Loopify Music",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
+                                fontSize = 19.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1
                             )
@@ -791,7 +791,7 @@ fun PermissionRequestBanner(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "LoopCount needs permission to read audio files stored on your device to enable loop counting and playback.",
+                text = "Loopify Music needs permission to read audio files stored on your device to enable loop counting and playback.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center

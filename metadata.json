@@ -1,6 +1,6 @@
 {
-  "name": "LoopCount",
-  "description": "A clean native local audio player with counted repetition and smart stop behaviors.",
+  "name": "Loopify Music",
+  "description": "Precision Audio Looper & Smart Music Player with counted repetitions, zero-duplicate playlists, and background playback.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

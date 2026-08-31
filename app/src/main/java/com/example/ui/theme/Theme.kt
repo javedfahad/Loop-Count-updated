@@ -153,7 +153,7 @@ fun getBentoColorScheme(isDark: Boolean, accent: ThemeAccent) = when (accent) {
 }
 
 @Composable
-fun LoopCountTheme(
+fun LoopifyMusicTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     accent: ThemeAccent = ThemeAccent.PURPLE,
     content: @Composable () -> Unit
@@ -171,4 +171,13 @@ fun LoopCountTheme(
         typography = Typography,
         content = content
     )
+}
+
+@Composable
+fun LoopCountTheme(
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    accent: ThemeAccent = ThemeAccent.PURPLE,
+    content: @Composable () -> Unit
+) {
+    LoopifyMusicTheme(themeMode = themeMode, accent = accent, content = content)
 }

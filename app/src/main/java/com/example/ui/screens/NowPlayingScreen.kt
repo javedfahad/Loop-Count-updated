@@ -104,7 +104,7 @@ fun NowPlayingScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = track?.displayTitle ?: "LoopCount",
+                            text = track?.displayTitle ?: "Loopify Music",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
