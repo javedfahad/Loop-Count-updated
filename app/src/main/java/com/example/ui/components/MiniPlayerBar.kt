@@ -111,7 +111,22 @@ fun MiniPlayerBar(
                             modifier = Modifier.weight(1f, fill = false)
                         )
 
-                        if (playbackState.isRepeatActive) {
+                        if (playbackState.isMagicRemixActive) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.tertiary)
+                                    .padding(horizontal = 6.dp, vertical = 1.dp)
+                            ) {
+                                Text(
+                                    text = "✨ #${playbackState.magicTransitionCount} • ${playbackState.magicSliceRemainingSeconds}s",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onTertiary
+                                )
+                            }
+                        } else if (playbackState.isRepeatActive) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Box(
                                 modifier = Modifier

@@ -14,6 +14,7 @@ import com.example.data.local.FolderEntity
 import com.example.data.local.FolderPositionEntity
 import com.example.data.local.FolderTrackEntity
 import com.example.data.local.LoopCountDao
+import com.example.data.local.PersistentStorageManager
 import com.example.data.local.TrackCustomNameEntity
 import com.example.data.local.TrackPositionEntity
 import com.example.model.AudioTrack
@@ -29,6 +30,132 @@ class AudioRepository(
     private val context: Context,
     private val dao: LoopCountDao
 ) {
+    private val persistentStorage = PersistentStorageManager(context)
+
+    suspend fun restoreAndSyncPersistentStorage() = withContext(Dispatchers.IO) {
+        try {
+            // 1. Sync User Folders
+            val dbFolders = dao.getAllFoldersSync()
+            if (dbFolders.isEmpty()) {
+                val backupFolders = persistentStorage.loadFolders()
+                if (backupFolders.isNotEmpty()) {
+                    for (folder in backupFolders) {
+                        val folderId = dao.insertFolder(FolderEntity(id = if (folder.id > 0) folder.id else 0L, name = folder.name, createdAt = folder.createdAt))
+                        val entities = folder.tracks.mapIndexed { idx, tr ->
+                            FolderTrackEntity(
+                                folderId = folderId,
+                                trackUri = tr.uri.toString(),
+                                trackId = tr.id,
+                                orderIndex = idx,
+                                trackTitle = tr.title,
+                                trackArtist = tr.artist,
+                                trackDurationMs = tr.durationMs,
+                                trackAlbum = tr.album,
+                                albumId = tr.albumId
+                            )
+                        }
+                        dao.insertFolderTracks(entities)
+                    }
+                }
+            } else {
+                syncFoldersToPersistentFile()
+            }
+
+            // 2. Sync Folder Resume Positions
+            val dbFolderPositions = dao.getAllFolderPositionsSync()
+            if (dbFolderPositions.isEmpty()) {
+                val backupFolderPositions = persistentStorage.loadFolderPositions()
+                for (pos in backupFolderPositions) {
+                    dao.saveFolderPosition(pos)
+                }
+            } else {
+                val map = dbFolderPositions.associateBy { it.folderKey }
+                persistentStorage.saveFolderPositions(map)
+            }
+
+            // 3. Sync Track Positions
+            val dbTrackPositions = dao.getAllTrackPositionsSync()
+            if (dbTrackPositions.isEmpty()) {
+                val backupTrackPositions = persistentStorage.loadTrackPositions()
+                for ((uri, pos) in backupTrackPositions) {
+                    dao.saveTrackPosition(TrackPositionEntity(trackUri = uri, positionMs = pos))
+                }
+            } else {
+                val map = dbTrackPositions.associate { it.trackUri to it.positionMs }
+                persistentStorage.saveTrackPositions(map)
+            }
+
+            // 4. Sync Custom Track Names
+            val dbCustomNames = dao.getAllCustomTrackNamesSync()
+            if (dbCustomNames.isEmpty()) {
+                val backupNames = persistentStorage.loadCustomNames()
+                for ((uri, name) in backupNames) {
+                    dao.saveCustomTrackName(TrackCustomNameEntity(trackUri = uri, customTitle = name))
+                }
+            } else {
+                val map = dbCustomNames.associate { it.trackUri to it.customTitle }
+                persistentStorage.saveCustomNames(map)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private suspend fun syncFoldersToPersistentFile() {
+        try {
+            val entities = dao.getAllFoldersSync()
+            val userFolders = entities.map { entity ->
+                val tracks = dao.getTracksForFolderSync(entity.id)
+                UserFolder(
+                    id = entity.id,
+                    name = entity.name,
+                    createdAt = entity.createdAt,
+                    tracks = tracks.map { ft ->
+                        AudioTrack(
+                            id = ft.trackId,
+                            uri = Uri.parse(ft.trackUri),
+                            title = ft.trackTitle,
+                            artist = ft.trackArtist,
+                            album = ft.trackAlbum,
+                            durationMs = ft.trackDurationMs,
+                            folderName = entity.name,
+                            albumId = ft.albumId
+                        )
+                    }
+                )
+            }
+            persistentStorage.saveFolders(userFolders)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private suspend fun syncFolderPositionsToPersistentFile() {
+        try {
+            val positions = dao.getAllFolderPositionsSync().associateBy { it.folderKey }
+            persistentStorage.saveFolderPositions(positions)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private suspend fun syncTrackPositionsToPersistentFile() {
+        try {
+            val positions = dao.getAllTrackPositionsSync().associate { it.trackUri to it.positionMs }
+            persistentStorage.saveTrackPositions(positions)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private suspend fun syncCustomNamesToPersistentFile() {
+        try {
+            val names = dao.getAllCustomTrackNamesSync().associate { it.trackUri to it.customTitle }
+            persistentStorage.saveCustomNames(names)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
     // --- Load Audio Tracks from MediaStore ---
     suspend fun loadDeviceAudioTracks(): List<AudioTrack> = withContext(Dispatchers.IO) {
         val trackList = mutableListOf<AudioTrack>()
@@ -222,19 +349,23 @@ class AudioRepository(
     }
 
     suspend fun createUserFolder(name: String): Long = withContext(Dispatchers.IO) {
-        dao.insertFolder(FolderEntity(name = name.trim()))
+        val id = dao.insertFolder(FolderEntity(name = name.trim()))
+        syncFoldersToPersistentFile()
+        id
     }
 
     suspend fun renameUserFolder(folderId: Long, newName: String) = withContext(Dispatchers.IO) {
         val folder = dao.getFolderById(folderId)
         if (folder != null) {
             dao.updateFolder(folder.copy(name = newName.trim()))
+            syncFoldersToPersistentFile()
         }
     }
 
     suspend fun deleteUserFolder(folderId: Long) = withContext(Dispatchers.IO) {
         dao.clearFolderTracks(folderId)
         dao.deleteFolder(folderId)
+        syncFoldersToPersistentFile()
     }
 
     suspend fun addTracksToUserFolder(folderId: Long, tracks: List<AudioTrack>) = withContext(Dispatchers.IO) {
@@ -254,6 +385,7 @@ class AudioRepository(
             )
         }
         dao.insertFolderTracks(entities)
+        syncFoldersToPersistentFile()
     }
 
     suspend fun removeTrackFromUserFolder(folderId: Long, trackUri: String) = withContext(Dispatchers.IO) {
@@ -261,6 +393,7 @@ class AudioRepository(
         // Re-index remaining tracks
         val remaining = dao.getTracksForFolderSync(folderId)
         dao.updateFolderTrackOrder(folderId, remaining)
+        syncFoldersToPersistentFile()
     }
 
     suspend fun updateFolderTrackOrder(folderId: Long, tracks: List<AudioTrack>) = withContext(Dispatchers.IO) {
@@ -278,6 +411,7 @@ class AudioRepository(
             )
         }
         dao.updateFolderTrackOrder(folderId, entities)
+        syncFoldersToPersistentFile()
     }
 
     // --- Track Playback Positions (Resume Feature) ---
@@ -289,10 +423,17 @@ class AudioRepository(
                 updatedAt = System.currentTimeMillis()
             )
         )
+        syncTrackPositionsToPersistentFile()
     }
 
     suspend fun getSavedPosition(trackUri: String): Long = withContext(Dispatchers.IO) {
-        dao.getTrackPosition(trackUri) ?: 0L
+        val dbPos = dao.getTrackPosition(trackUri)
+        if (dbPos != null && dbPos > 0) {
+            dbPos
+        } else {
+            val map = persistentStorage.loadTrackPositions()
+            map[trackUri] ?: 0L
+        }
     }
 
     // --- Folder Playback Positions (Resume Folder Feature) ---
@@ -307,15 +448,24 @@ class AudioRepository(
                     updatedAt = System.currentTimeMillis()
                 )
             )
+            syncFolderPositionsToPersistentFile()
         }
     }
 
     suspend fun getFolderPosition(folderKey: String): FolderPositionEntity? = withContext(Dispatchers.IO) {
-        if (folderKey.isBlank()) null else dao.getFolderPosition(folderKey)
+        if (folderKey.isBlank()) return@withContext null
+        val dbPos = dao.getFolderPosition(folderKey)
+        if (dbPos != null) {
+            dbPos
+        } else {
+            val list = persistentStorage.loadFolderPositions()
+            list.find { it.folderKey == folderKey }
+        }
     }
 
     suspend fun deleteFolderPosition(folderKey: String) = withContext(Dispatchers.IO) {
         dao.deleteFolderPosition(folderKey)
+        syncFolderPositionsToPersistentFile()
     }
 
     // --- Rename Track ---
@@ -331,9 +481,11 @@ class AudioRepository(
                     customTitle = trimmedTitle
                 )
             )
+            syncCustomNamesToPersistentFile()
 
             // 2. Update folder track items in user folders
             dao.updateTrackTitleInFolders(track.uri.toString(), trimmedTitle)
+            syncFoldersToPersistentFile()
 
             // 3. Attempt to update MediaStore if applicable (no crash if scoped storage restricts)
             if (track.uri.scheme == "content") {

@@ -39,6 +39,8 @@ class AudioPlayerManager(
     private var exoPlayer: ExoPlayer? = null
     private var positionUpdateJob: Job? = null
     private var activeFolderKey: String? = null
+    private var magicTracksList: List<AudioTrack> = emptyList()
+    private var magicLastTrackUri: String? = null
 
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
@@ -184,9 +186,9 @@ class AudioPlayerManager(
                             )
                         }
 
-                        // Save position every ~3.2 seconds (8 ticks * 400ms)
+                        // Save position every ~1 second (4 ticks * 250ms)
                         tickCount++
-                        if (tickCount % 8 == 0) {
+                        if (tickCount % 4 == 0) {
                             saveCurrentTrackPosition()
                         }
 
@@ -198,9 +200,38 @@ class AudioPlayerManager(
                                 _state.update { it.copy(folderTimerExpired = true) }
                             }
                         }
+
+                        // Magic Remix Dynamic Slicing & Smooth Crossfade
+                        if (currentState.isMagicRemixActive) {
+                            val sliceElapsed = (System.currentTimeMillis() - currentState.magicSliceStartTimeMs).coerceAtLeast(0L)
+                            _state.update { it.copy(magicSliceElapsedMs = sliceElapsed) }
+
+                            val totalSlice = currentState.magicSliceDurationMs
+                            if (totalSlice > 0) {
+                                if (sliceElapsed < 800L) {
+                                    // Fade in at start of slice (0.4f -> 1.0f)
+                                    val fadeRatio = (sliceElapsed / 800f).coerceIn(0f, 1f)
+                                    val vol = 0.4f + (0.6f * fadeRatio)
+                                    exoPlayer?.volume = vol
+                                } else if (sliceElapsed >= totalSlice - 1200L) {
+                                    // Fade out at end of slice (1.0f -> 0.35f)
+                                    val fadeOutRemaining = (totalSlice - sliceElapsed).coerceAtLeast(0L)
+                                    val fadeRatio = (fadeOutRemaining / 1200f).coerceIn(0f, 1f)
+                                    val vol = 0.35f + (0.65f * fadeRatio)
+                                    exoPlayer?.volume = vol
+                                } else {
+                                    exoPlayer?.volume = 1.0f
+                                }
+
+                                if (sliceElapsed >= totalSlice) {
+                                    exoPlayer?.volume = 1.0f
+                                    nextMagicSlice()
+                                }
+                            }
+                        }
                     }
                 }
-                delay(400)
+                delay(250)
             }
         }
     }
@@ -230,10 +261,15 @@ class AudioPlayerManager(
         track: AudioTrack,
         queue: List<AudioTrack> = listOf(track),
         startPositionMs: Long = 0L,
-        folderKey: String? = null
+        folderKey: String? = null,
+        isInternalMagicCall: Boolean = false
     ) {
         if (folderKey != null) {
             activeFolderKey = folderKey
+        }
+        if (!isInternalMagicCall) {
+            _state.update { it.copy(isMagicRemixActive = false) }
+            exoPlayer?.volume = 1.0f
         }
         val player = exoPlayer ?: return
         val queueIndex = queue.indexOfFirst { it.uri == track.uri }.let { if (it >= 0) it else 0 }
@@ -266,6 +302,104 @@ class AudioPlayerManager(
             player.seekTo(startPositionMs)
         }
         player.play()
+    }
+
+    // --- MAGIC REMIX (Continuous Non-Stop DJ Mashup Engine) ---
+
+    fun playMagicRemix(
+        folderName: String,
+        tracks: List<AudioTrack>
+    ) {
+        if (tracks.isEmpty()) return
+        magicTracksList = tracks
+        val randomTrack = tracks.random()
+        magicLastTrackUri = randomTrack.uri.toString()
+
+        val (sliceDuration, startPos) = calculateSliceParameters(randomTrack)
+
+        _state.update {
+            it.copy(
+                isMagicRemixActive = true,
+                magicFolderName = folderName,
+                magicSliceDurationMs = sliceDuration,
+                magicSliceStartTimeMs = System.currentTimeMillis(),
+                magicSliceElapsedMs = 0L,
+                magicTransitionCount = 1,
+                repeatCountTotal = 0,
+                remainingCount = 0,
+                stopAfterFinish = false,
+                isFolderTimerActive = false
+            )
+        }
+
+        playTrack(
+            track = randomTrack,
+            queue = tracks,
+            startPositionMs = startPos,
+            folderKey = folderName,
+            isInternalMagicCall = true
+        )
+    }
+
+    private fun nextMagicSlice() {
+        if (!_state.value.isMagicRemixActive || magicTracksList.isEmpty()) return
+
+        // Pick next random track (preferring a different track if more than 1)
+        val candidateTracks = if (magicTracksList.size > 1) {
+            magicTracksList.filter { it.uri.toString() != magicLastTrackUri }
+        } else {
+            magicTracksList
+        }
+        val nextTrack = (candidateTracks.ifEmpty { magicTracksList }).random()
+        magicLastTrackUri = nextTrack.uri.toString()
+
+        val (sliceDuration, startPos) = calculateSliceParameters(nextTrack)
+
+        _state.update {
+            it.copy(
+                magicSliceDurationMs = sliceDuration,
+                magicSliceStartTimeMs = System.currentTimeMillis(),
+                magicSliceElapsedMs = 0L,
+                magicTransitionCount = it.magicTransitionCount + 1
+            )
+        }
+
+        playTrack(
+            track = nextTrack,
+            queue = magicTracksList,
+            startPositionMs = startPos,
+            folderKey = _state.value.magicFolderName,
+            isInternalMagicCall = true
+        )
+    }
+
+    private fun calculateSliceParameters(track: AudioTrack): Pair<Long, Long> {
+        // Random slice duration: short teaser (~10-15s), hook (~20-32s), verse (~35-46s), groove (~50-60s)
+        val sliceDurMs = when (kotlin.random.Random.nextInt(4)) {
+            0 -> kotlin.random.Random.nextLong(10_000L, 16_000L)
+            1 -> kotlin.random.Random.nextLong(20_000L, 33_000L)
+            2 -> kotlin.random.Random.nextLong(35_000L, 46_000L)
+            else -> kotlin.random.Random.nextLong(50_000L, 62_000L)
+        }
+
+        val trackDur = track.durationMs
+        val effectiveSlice = if (trackDur > 0) sliceDurMs.coerceAtMost(trackDur) else sliceDurMs
+
+        val startPos = if (trackDur > effectiveSlice + 15_000L) {
+            val minStart = (trackDur * 0.10f).toLong().coerceAtLeast(5_000L)
+            val maxStart = (trackDur - effectiveSlice - 4_000L).coerceAtLeast(minStart)
+            if (maxStart > minStart) {
+                kotlin.random.Random.nextLong(minStart, maxStart)
+            } else {
+                minStart
+            }
+        } else if (trackDur > effectiveSlice) {
+            kotlin.random.Random.nextLong(0L, trackDur - effectiveSlice)
+        } else {
+            0L
+        }
+
+        return Pair(effectiveSlice, startPos)
     }
 
     fun resumeTrack(
@@ -330,6 +464,7 @@ class AudioPlayerManager(
     }
 
     fun pause() {
+        saveCurrentTrackPosition()
         exoPlayer?.pause()
     }
 
@@ -342,12 +477,15 @@ class AudioPlayerManager(
     }
 
     fun stop() {
+        saveCurrentTrackPosition()
         exoPlayer?.stop()
+        exoPlayer?.volume = 1.0f
         _state.update {
             it.copy(
                 isPlaying = false,
                 isFolderTimerActive = false,
                 folderTimerExpired = false,
+                isMagicRemixActive = false,
                 currentPositionMs = 0L
             )
         }
@@ -356,6 +494,7 @@ class AudioPlayerManager(
     fun seekTo(positionMs: Long) {
         exoPlayer?.seekTo(positionMs.coerceAtLeast(0L))
         _state.update { it.copy(currentPositionMs = positionMs) }
+        saveCurrentTrackPosition()
     }
 
     fun seekForward10() {
@@ -364,6 +503,7 @@ class AudioPlayerManager(
         val target = (current + 10_000L).coerceAtMost(player.duration.coerceAtLeast(0L))
         player.seekTo(target)
         _state.update { it.copy(currentPositionMs = target) }
+        saveCurrentTrackPosition()
     }
 
     fun seekBackward10() {
@@ -372,10 +512,17 @@ class AudioPlayerManager(
         val target = (current - 10_000L).coerceAtLeast(0L)
         player.seekTo(target)
         _state.update { it.copy(currentPositionMs = target) }
+        saveCurrentTrackPosition()
     }
 
     fun next() {
         val currentState = _state.value
+        if (currentState.isMagicRemixActive) {
+            exoPlayer?.volume = 1.0f
+            nextMagicSlice()
+            return
+        }
+
         val queue = currentState.queue
         if (queue.isNotEmpty()) {
             var nextIndex = currentState.queueIndex + 1
@@ -406,6 +553,13 @@ class AudioPlayerManager(
     }
 
     fun previous() {
+        val currentState = _state.value
+        if (currentState.isMagicRemixActive) {
+            exoPlayer?.volume = 1.0f
+            nextMagicSlice()
+            return
+        }
+
         val player = exoPlayer ?: return
         val currentPos = player.currentPosition
         // If played more than 3 seconds, previous restarts the current song
@@ -415,7 +569,6 @@ class AudioPlayerManager(
             return
         }
 
-        val currentState = _state.value
         val queue = currentState.queue
         if (queue.isNotEmpty()) {
             var prevIndex = currentState.queueIndex - 1
@@ -650,6 +803,7 @@ class AudioPlayerManager(
     private fun buildMediaItem(track: AudioTrack): MediaItem {
         val currentState = _state.value
         val loopSubtitle = when {
+            currentState.isMagicRemixActive -> "✨ Magic Remix • ${currentState.magicFolderName ?: "Folder"}"
             currentState.isRepeatActive -> "Remaining: ${currentState.remainingCount}"
             currentState.stopAfterFinish -> "Stop after this track"
             currentState.isFolderTimerActive -> "Timer active"

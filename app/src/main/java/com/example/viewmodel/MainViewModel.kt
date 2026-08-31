@@ -14,6 +14,7 @@ import com.example.playback.AudioPlayerManager
 import com.example.playback.PlaybackState
 import com.example.ui.theme.ThemeAccent
 import com.example.ui.theme.ThemeMode
+import com.example.util.toProperTitleCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +48,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
     init {
+        // Restore from persistent file storage if needed and keep synced
+        viewModelScope.launch {
+            repository.restoreAndSyncPersistentStorage()
+        }
+
         // Collect custom folders
         viewModelScope.launch {
             repository.getUserFolders().collect { folders ->
@@ -122,6 +128,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setSelectedTab(tab: Int) {
+        _uiState.update { it.copy(selectedTab = tab) }
+    }
+
     // --- Search Filtering ---
     fun getFilteredTracks(): List<AudioTrack> {
         val query = _uiState.value.searchQuery.trim().lowercase()
@@ -163,7 +173,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun renameTrack(track: AudioTrack, newTitle: String) {
-        val trimmed = newTitle.trim()
+        val trimmed = newTitle.toProperTitleCase()
         if (trimmed.isBlank()) return
 
         // 1. Optimistic UI update
@@ -236,21 +246,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Custom Folder Actions ---
     fun createUserFolder(name: String) {
+        val formattedName = name.toProperTitleCase()
+        if (formattedName.isBlank()) return
         viewModelScope.launch {
-            if (name.isNotBlank()) {
-                repository.createUserFolder(name)
-                _uiState.update { it.copy(message = "Created folder \"$name\"") }
-            }
+            repository.createUserFolder(formattedName)
+            _uiState.update { it.copy(message = "Created folder \"$formattedName\"") }
         }
     }
 
     fun createUserFolderWithTrack(name: String, track: AudioTrack) {
+        val formattedName = name.toProperTitleCase()
+        if (formattedName.isBlank()) return
         viewModelScope.launch {
-            if (name.isNotBlank()) {
-                val folderId = repository.createUserFolder(name)
-                repository.addTracksToUserFolder(folderId, listOf(track))
-                _uiState.update { it.copy(message = "Created folder \"$name\" and added track") }
-            }
+            val folderId = repository.createUserFolder(formattedName)
+            repository.addTracksToUserFolder(folderId, listOf(track))
+            _uiState.update { it.copy(message = "Created folder \"$formattedName\" and added track") }
         }
     }
 
@@ -262,11 +272,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun renameUserFolder(folderId: Long, newName: String) {
+        val formattedName = newName.toProperTitleCase()
+        if (formattedName.isBlank()) return
         viewModelScope.launch {
-            if (newName.isNotBlank()) {
-                repository.renameUserFolder(folderId, newName)
-                _uiState.update { it.copy(message = "Folder renamed to \"$newName\"") }
-            }
+            repository.renameUserFolder(folderId, formattedName)
+            _uiState.update { it.copy(message = "Folder renamed to \"$formattedName\"") }
         }
     }
 
@@ -327,6 +337,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         playerManager.resumeFolder(folderKey, tracks, timerMinutes, shuffle)
+    }
+
+    fun playMagicRemix(folderName: String, tracks: List<AudioTrack>) {
+        if (tracks.isEmpty()) {
+            _uiState.update { it.copy(message = "This folder has no audio tracks for Magic Remix") }
+            return
+        }
+        _uiState.update { it.copy(message = "✨ Magic Remix started! Continuous mashup mode active") }
+        playerManager.playMagicRemix(folderName, tracks)
     }
 
     suspend fun getSavedTrackPosition(trackUri: String): Long {

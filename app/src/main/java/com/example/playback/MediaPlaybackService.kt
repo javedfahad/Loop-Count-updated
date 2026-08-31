@@ -151,6 +151,7 @@ class MediaPlaybackService : MediaSessionService() {
         )
 
         val dynamicSubtext = when {
+            state.isMagicRemixActive -> "✨ Magic Remix • #${state.magicTransitionCount}"
             state.isRepeatActive -> "Remaining: ${state.remainingCount}"
             state.stopAfterFinish -> "Stop after this track"
             state.isFolderTimerActive -> "Timer active"
@@ -163,17 +164,17 @@ class MediaPlaybackService : MediaSessionService() {
             android.R.drawable.ic_media_play
         }
 
-        val contentText = if (state.isRepeatActive) {
-            "Remaining: ${state.remainingCount}"
-        } else {
-            track.displayArtist
+        val contentText = when {
+            state.isMagicRemixActive -> "✨ Magic Remix: ${state.magicFolderName ?: "Folder"} • #${state.magicTransitionCount}"
+            state.isRepeatActive -> "Remaining: ${state.remainingCount}"
+            else -> track.displayArtist
         }
 
         val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_playback)
             .setContentTitle(track.displayTitle)
             .setContentText(contentText)
-            .setSubText(if (state.isRepeatActive) "Remaining: ${state.remainingCount}" else "LoopCount")
+            .setSubText(dynamicSubtext)
             .setContentIntent(contentIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(state.isPlaying)

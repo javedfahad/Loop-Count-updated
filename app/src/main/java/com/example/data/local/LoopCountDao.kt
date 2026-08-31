@@ -9,6 +9,9 @@ interface LoopCountDao {
     @Query("SELECT * FROM user_folders ORDER BY createdAt ASC")
     fun getAllFolders(): Flow<List<FolderEntity>>
 
+    @Query("SELECT * FROM user_folders ORDER BY createdAt ASC")
+    suspend fun getAllFoldersSync(): List<FolderEntity>
+
     @Query("SELECT * FROM user_folders WHERE id = :folderId")
     suspend fun getFolderById(folderId: Long): FolderEntity?
 
@@ -55,6 +58,9 @@ interface LoopCountDao {
     // --- Track Positions ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveTrackPosition(position: TrackPositionEntity)
+
+    @Query("SELECT * FROM track_positions")
+    suspend fun getAllTrackPositionsSync(): List<TrackPositionEntity>
 
     @Query("SELECT positionMs FROM track_positions WHERE trackUri = :trackUri")
     suspend fun getTrackPosition(trackUri: String): Long?

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.MoreVert
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -82,6 +84,7 @@ import com.example.ui.components.TrackArtwork
 import com.example.ui.dialogs.FolderTimerDialog
 import com.example.ui.dialogs.RepeatCountDialog
 import com.example.ui.dialogs.TrackOptionsDialog
+import com.example.util.toProperTitleCase
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -98,6 +101,7 @@ fun FolderDetailScreen(
     onPlayTrack: (AudioTrack, List<AudioTrack>) -> Unit,
     onPlayFolder: (List<AudioTrack>, Int, Boolean) -> Unit,
     onResumeFolder: ((List<AudioTrack>) -> Unit)? = null,
+    onMagicRemix: ((List<AudioTrack>) -> Unit)? = null,
     onReorder: (List<AudioTrack>) -> Unit,
     onAddTracks: (List<AudioTrack>) -> Unit,
     onRemoveTrack: (String) -> Unit,
@@ -175,7 +179,7 @@ fun FolderDetailScreen(
                 TextButton(
                     onClick = {
                         if (renameInputText.isNotBlank()) {
-                            onRenameFolder?.invoke(folder.id, renameInputText.trim())
+                            onRenameFolder?.invoke(folder.id, renameInputText.toProperTitleCase())
                             showRenameDialog = false
                         }
                     },
@@ -262,6 +266,16 @@ fun FolderDetailScreen(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("Magic Remix ✨") },
+                            leadingIcon = {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            },
+                            onClick = {
+                                showMenu = false
+                                onMagicRemix?.invoke(localTracks)
+                            }
+                        )
                         DropdownMenuItem(
                             text = { Text("Resume where you left") },
                             leadingIcon = {
@@ -495,6 +509,93 @@ fun FolderDetailScreen(
                                 fontWeight = FontWeight.Medium,
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1
+                            )
+                        }
+                    }
+                }
+
+                // Magic Remix Banner / Quick Action
+                if (localTracks.isNotEmpty()) {
+                    val isRemixActiveForThisFolder = playbackState?.isMagicRemixActive == true &&
+                            (playbackState.magicFolderName == folder.name || playbackState.magicFolderName == null)
+
+                    if (isRemixActiveForThisFolder) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 10.dp)
+                                .testTag("folder_detail_magic_remix_active_banner"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "✨ Magic Remix Active • Cut #${playbackState?.magicTransitionCount ?: 1}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = "Next drop in ${playbackState?.magicSliceRemainingSeconds ?: 0}s • Non-stop mashup",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                                FilledTonalButton(
+                                    onClick = { onNext?.invoke() },
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Text("Next Cut", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    } else {
+                        FilledTonalButton(
+                            onClick = { onMagicRemix?.invoke(localTracks) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(42.dp)
+                                .padding(bottom = 6.dp)
+                                .testTag("folder_detail_magic_remix_button"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "✨ Magic Remix (Non-stop DJ Mashup)",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge
                             )
                         }
                     }

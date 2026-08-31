@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.Folder
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.util.toProperTitleCase
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +62,7 @@ fun FolderOptionsDialog(
     onPlay: () -> Unit,
     onResume: () -> Unit = onPlay,
     resumeSubtitle: String? = null,
+    onMagicRemix: (() -> Unit)? = null,
     onPlayFor: (Int) -> Unit, // in minutes
     onRename: (String) -> Unit,
     onDelete: () -> Unit
@@ -98,7 +101,7 @@ fun FolderOptionsDialog(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onRename(renameText)
+                        onRename(renameText.toProperTitleCase())
                         isRenaming = false
                         onDismiss()
                     }
@@ -222,6 +225,19 @@ fun FolderOptionsDialog(
                     },
                     testTag = "folder_opt_resume"
                 )
+
+                if (onMagicRemix != null) {
+                    OptionMenuItem(
+                        icon = Icons.Default.AutoAwesome,
+                        title = "Magic Remix ✨",
+                        subtitle = "Non-stop DJ mashup cutting through random song drops",
+                        onClick = {
+                            onMagicRemix()
+                            onDismiss()
+                        },
+                        testTag = "folder_opt_magic_remix"
+                    )
+                }
 
                 OptionMenuItem(
                     icon = Icons.Default.Timer,

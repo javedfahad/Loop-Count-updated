@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -195,19 +196,27 @@ fun NowPlayingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Bento Repeat Status Card (Interactive)
+                        // Bento Repeat / Magic Remix Status Card (Interactive)
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(20.dp))
-                                .clickable { showRepeatDialog = true }
+                                .clickable {
+                                    if (playbackState.isMagicRemixActive) {
+                                        playerManager.next()
+                                    } else {
+                                        showRepeatDialog = true
+                                    }
+                                }
                                 .testTag("now_playing_repeat_card"),
                             shape = RoundedCornerShape(20.dp),
-                            color = if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primaryContainer
+                            color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiaryContainer
+                            else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primaryContainer
                             else MaterialTheme.colorScheme.surfaceVariant,
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp,
-                                if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                                if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
+                                else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                                 else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                             )
                         ) {
@@ -224,15 +233,17 @@ fun NowPlayingScreen(
                                             .size(36.dp)
                                             .clip(CircleShape)
                                             .background(
-                                                if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary
+                                                if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiary
+                                                else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary
                                                 else MaterialTheme.colorScheme.surface
                                             ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Repeat,
-                                            contentDescription = "Repeat",
-                                            tint = if (playbackState.isRepeatActive) MaterialTheme.colorScheme.onPrimary
+                                            imageVector = if (playbackState.isMagicRemixActive) Icons.Default.AutoAwesome else Icons.Default.Repeat,
+                                            contentDescription = if (playbackState.isMagicRemixActive) "Magic Remix" else "Repeat",
+                                            tint = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.onTertiary
+                                            else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.onPrimary
                                             else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -240,74 +251,100 @@ fun NowPlayingScreen(
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
                                         Text(
-                                            text = "REPEAT COUNT",
+                                            text = if (playbackState.isMagicRemixActive) "MAGIC REMIX ACTIVE" else "REPEAT COUNT",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             letterSpacing = 1.sp,
-                                            color = if (playbackState.isRepeatActive) MaterialTheme.colorScheme.onPrimaryContainer
+                                            color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.onTertiaryContainer
+                                            else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.onPrimaryContainer
                                             else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                         Text(
-                                            text = playbackState.repeatDisplayLabel,
+                                            text = if (playbackState.isMagicRemixActive) "Drop #${playbackState.magicTransitionCount} • Non-stop mashup"
+                                            else playbackState.repeatDisplayLabel,
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary
+                                            color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.onTertiaryContainer
+                                            else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary
                                             else MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                 }
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                if (playbackState.isRepeatActive) {
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.primary
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (playbackState.isMagicRemixActive) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.tertiary
                                         ) {
-                                            Text(
-                                                text = "LEFT: ",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-                                            )
-                                            Text(
-                                                text = "${playbackState.remainingCount}",
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = MaterialTheme.colorScheme.onPrimary
-                                            )
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "NEXT: ",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onTertiary.copy(alpha = 0.8f)
+                                                )
+                                                Text(
+                                                    text = "${playbackState.magicSliceRemainingSeconds}s",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = MaterialTheme.colorScheme.onTertiary
+                                                )
+                                            }
+                                        }
+                                    } else if (playbackState.isRepeatActive) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.primary
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "LEFT: ",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                                                )
+                                                Text(
+                                                    text = "${playbackState.remainingCount}",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                )
+                                            }
                                         }
                                     }
-                                }
 
-                                if (playbackState.stopAfterFinish) {
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.secondaryContainer
-                                    ) {
+                                    if (playbackState.stopAfterFinish && !playbackState.isMagicRemixActive) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.secondaryContainer
+                                        ) {
+                                            Text(
+                                                text = "⏹ Stop",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                            )
+                                        }
+                                    } else if (!playbackState.isRepeatActive && !playbackState.isMagicRemixActive) {
                                         Text(
-                                            text = "⏹ Stop",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                            text = "Tap to set repeat",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.primary
                                         )
                                     }
-                                } else if (!playbackState.isRepeatActive) {
-                                    Text(
-                                        text = "Tap to set repeat",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
                                 }
-                            }
                             }
                         }
 
@@ -499,14 +536,22 @@ fun NowPlayingScreen(
                             .fillMaxWidth()
                             .widthIn(max = 480.dp)
                             .clip(RoundedCornerShape(20.dp))
-                            .clickable { showRepeatDialog = true }
+                            .clickable {
+                                if (playbackState.isMagicRemixActive) {
+                                    playerManager.next()
+                                } else {
+                                    showRepeatDialog = true
+                                }
+                            }
                             .testTag("now_playing_repeat_card"),
                         shape = RoundedCornerShape(20.dp),
-                        color = if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primaryContainer
+                        color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiaryContainer
+                        else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primaryContainer
                         else MaterialTheme.colorScheme.surfaceVariant,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                            if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
+                            else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                             else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                         )
                     ) {
@@ -523,15 +568,17 @@ fun NowPlayingScreen(
                                         .size(36.dp)
                                         .clip(CircleShape)
                                         .background(
-                                            if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary
+                                            if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiary
+                                            else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary
                                             else MaterialTheme.colorScheme.surface
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Repeat,
-                                        contentDescription = "Repeat",
-                                        tint = if (playbackState.isRepeatActive) MaterialTheme.colorScheme.onPrimary
+                                        imageVector = if (playbackState.isMagicRemixActive) Icons.Default.AutoAwesome else Icons.Default.Repeat,
+                                        contentDescription = if (playbackState.isMagicRemixActive) "Magic Remix" else "Repeat",
+                                        tint = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.onTertiary
+                                        else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.onPrimary
                                         else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -539,18 +586,21 @@ fun NowPlayingScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = "REPEAT COUNT",
+                                        text = if (playbackState.isMagicRemixActive) "MAGIC REMIX ACTIVE" else "REPEAT COUNT",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 1.sp,
-                                        color = if (playbackState.isRepeatActive) MaterialTheme.colorScheme.onPrimaryContainer
+                                        color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.onTertiaryContainer
+                                        else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.onPrimaryContainer
                                         else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Text(
-                                        text = playbackState.repeatDisplayLabel,
+                                        text = if (playbackState.isMagicRemixActive) "Drop #${playbackState.magicTransitionCount} • Non-stop mashup"
+                                        else playbackState.repeatDisplayLabel,
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary
+                                        color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.onTertiaryContainer
+                                        else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
@@ -560,7 +610,30 @@ fun NowPlayingScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                if (playbackState.isRepeatActive) {
+                                if (playbackState.isMagicRemixActive) {
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "NEXT: ",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onTertiary.copy(alpha = 0.8f)
+                                            )
+                                            Text(
+                                                text = "${playbackState.magicSliceRemainingSeconds}s",
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = MaterialTheme.colorScheme.onTertiary
+                                            )
+                                        }
+                                    }
+                                } else if (playbackState.isRepeatActive) {
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.primary
@@ -585,7 +658,7 @@ fun NowPlayingScreen(
                                     }
                                 }
 
-                                if (playbackState.stopAfterFinish) {
+                                if (playbackState.stopAfterFinish && !playbackState.isMagicRemixActive) {
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.secondaryContainer
@@ -598,7 +671,7 @@ fun NowPlayingScreen(
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                                         )
                                     }
-                                } else if (!playbackState.isRepeatActive) {
+                                } else if (!playbackState.isRepeatActive && !playbackState.isMagicRemixActive) {
                                     Text(
                                         text = "Tap to set repeat",
                                         fontSize = 12.sp,

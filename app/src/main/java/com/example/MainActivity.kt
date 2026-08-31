@@ -211,6 +211,8 @@ class MainActivity : ComponentActivity() {
                                         deviceFolders = uiState.deviceFolders.associate { it.name to it.tracks },
                                         playbackState = playbackState,
                                         playerManager = viewModel.playerManager,
+                                        selectedTab = uiState.selectedTab,
+                                        onTabSelected = { viewModel.setSelectedTab(it) },
                                         isLoading = uiState.isLoading,
                                         hasStoragePermission = hasAudioPermission,
                                         onRequestPermission = requestPermissions,
@@ -227,6 +229,7 @@ class MainActivity : ComponentActivity() {
                                             navigateTo(Screen.NowPlaying)
                                         },
                                         onOpenFolderDetail = { folder ->
+                                            viewModel.setSelectedTab(1)
                                             navigateTo(Screen.FolderDetail(folder))
                                         },
                                         onCreateFolder = { name ->
@@ -291,6 +294,9 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onResumeFolder = { tracks ->
                                             viewModel.resumeFolder(folderKey, tracks)
+                                        },
+                                        onMagicRemix = { tracks ->
+                                            viewModel.playMagicRemix(currentFolder.name, tracks)
                                         },
                                         onReorder = { reordered ->
                                             if (currentFolder.id > 0) {

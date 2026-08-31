@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AudioTrack
 import com.example.model.UserFolder
+import com.example.util.toProperTitleCase
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,7 +97,7 @@ fun TrackOptionsDialog(
                 TextButton(
                     onClick = {
                         if (newFolderText.isNotBlank()) {
-                            onCreateFolderWithTrack?.invoke(newFolderText.trim())
+                            onCreateFolderWithTrack?.invoke(newFolderText.toProperTitleCase())
                             isCreatingFolder = false
                             isPickingFolder = false
                             onDismiss()
@@ -220,7 +221,7 @@ fun TrackOptionsDialog(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onRename(renameText)
+                        onRename(renameText.toProperTitleCase())
                         isRenaming = false
                         onDismiss()
                     },
