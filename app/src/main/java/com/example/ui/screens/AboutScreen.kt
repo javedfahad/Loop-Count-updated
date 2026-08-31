@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreateNewFolder
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -209,10 +211,28 @@ fun AboutScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Feature 7: Theme Customization & Privacy
+            // Feature 7: Zero-Duplicate Smart Storage
+            FeatureCard(
+                icon = Icons.Default.Storage,
+                title = "7. Zero-Duplicate Storage Engine",
+                description = "Custom folders and playlists save lightweight pointer references without copying or duplicating your audio files. The entire app uses under 2 MB, keeping your phone storage completely free."
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Feature 8: Title Case Formatting & Magic Remix
+            FeatureCard(
+                icon = Icons.Default.AutoAwesome,
+                title = "8. Smart Formatting & Magic Remix",
+                description = "Automatic Title Case cleans up folder and track names no matter how they are typed. Enjoy playlist shuffle, continuous loop modes, and flexible audio organization."
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Feature 9: Theme Customization & Privacy
             FeatureCard(
                 icon = Icons.Default.Palette,
-                title = "7. Theme Styles & Offline Privacy",
+                title = "9. Theme Styles & Offline Privacy",
                 description = "Customize dark, light, or OLED true black modes with vivid accents. LoopCount operates completely offline without data collection or tracking."
             )
 
@@ -254,52 +274,6 @@ fun AboutScreen(
             )
 
             Spacer(modifier = Modifier.height(28.dp))
-
-            // Section: App Icon Store Asset
-            SectionHeader(title = "GOOGLE PLAY STORE ICON ASSET (512x512)")
-            Spacer(modifier = Modifier.height(10.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    LoopCountLogo(
-                        size = 120.dp,
-                        backgroundColor = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "LoopCount 512×512 HD Icon",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Dimensions: 512 x 512 px • Format: 32-bit PNG",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "File saved in project at:\napp/src/main/assets/loopcount_app_icon_512.png",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        lineHeight = 18.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             // Copyright & Proprietary Rights
             Surface(
