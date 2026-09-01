@@ -8,8 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
-import com.example.ui.components.LoopCountLogo
-import com.example.ui.theme.LoopCountTheme
+import com.example.ui.components.LoopifyLogo
+import com.example.ui.theme.LoopifyMusicTheme
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -29,9 +29,9 @@ class GreetingScreenshotTest {
   @Test
   fun app_logo_screenshot() {
     composeTestRule.setContent {
-      LoopCountTheme {
+      LoopifyMusicTheme {
         Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-          LoopCountLogo(size = 96.dp)
+          LoopifyLogo(size = 96.dp)
         }
       }
     }
