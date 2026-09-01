@@ -6,7 +6,7 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Deep Space Obsidian & Indigo Radial Surface -->
+    <!-- Deep Space Midnight Obsidian Canvas -->
     <path
         android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
@@ -16,39 +16,35 @@
                 android:endX="54"
                 android:endY="108"
                 android:type="linear">
-                <item android:color="#120A24" android:offset="0.0" />
-                <item android:color="#0B0518" android:offset="0.5" />
+                <item android:color="#1A0A30" android:offset="0.0" />
+                <item android:color="#0D0418" android:offset="0.5" />
                 <item android:color="#040108" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Center Luminous Resonance Aura -->
+    <!-- Center Radiant Neon Aurora Flare -->
     <path
-        android:pathData="M54,54m-44,0a44,44 0 1,1 88,0a44,44 0 1,1 -88,0">
+        android:pathData="M54,54m-46,0a46,46 0 1,1 92,0a46,46 0 1,1 -92,0">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:startX="54"
                 android:startY="54"
-                android:endX="98"
-                android:endY="98"
+                android:endX="100"
+                android:endY="100"
                 android:type="radial"
-                android:gradientRadius="44">
-                <item android:color="#361066" android:offset="0.0" />
-                <item android:color="#1A0738" android:offset="0.6" />
+                android:gradientRadius="46">
+                <item android:color="#3D126E" android:offset="0.0" />
+                <item android:color="#200742" android:offset="0.55" />
                 <item android:color="#00000000" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Subtle acoustic orbit guides -->
+    <!-- Subtle Orbit Wave Lines -->
     <path
         android:pathData="M54,54m-38,0a38,38 0 1,1 76,0a38,38 0 1,1 -76,0"
         android:strokeWidth="0.8"
-        android:strokeColor="#24143D" />
+        android:strokeColor="#2E1452" />
 
-    <path
-        android:pathData="M54,54m-30,0a30,30 0 1,1 60,0a30,30 0 1,1 -60,0"
-        android:strokeWidth="0.6"
-        android:strokeColor="#301A52" />
 </vector>

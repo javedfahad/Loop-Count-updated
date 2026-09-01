@@ -229,8 +229,8 @@ fun FolderOptionsDialog(
                 if (onMagicRemix != null) {
                     OptionMenuItem(
                         icon = Icons.Default.AutoAwesome,
-                        title = "Magic Remix ✨",
-                        subtitle = "Non-stop DJ mashup cutting through random song drops",
+                        title = "Magic Remix (Beta) ✨",
+                        subtitle = "Experimental (In Development) • Non-stop DJ mashup",
                         onClick = {
                             onMagicRemix()
                             onDismiss()

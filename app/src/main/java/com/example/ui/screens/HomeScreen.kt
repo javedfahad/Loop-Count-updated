@@ -1,8 +1,8 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -11,15 +11,13 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -32,6 +30,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -39,41 +38,48 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DrawerState
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -81,7 +87,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -93,13 +99,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -148,8 +152,11 @@ fun HomeScreen(
     onDeleteFolder: (Long) -> Unit,
     onRenameTrack: (AudioTrack, String) -> Unit,
     onDeleteTrack: (AudioTrack) -> Unit,
+    onDeleteMultipleTracks: ((List<AudioTrack>) -> Unit)? = null,
     onAddTrackToFolder: (Long, AudioTrack) -> Unit = { _, _ -> },
-    onCreateFolderWithTrack: (String, AudioTrack) -> Unit = { _, _ -> }
+    onAddMultipleTracksToFolder: ((Long, List<AudioTrack>) -> Unit)? = null,
+    onCreateFolderWithTrack: (String, AudioTrack) -> Unit = { _, _ -> },
+    onCreateFolderWithMultipleTracks: ((String, List<AudioTrack>) -> Unit)? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = selectedTab.coerceIn(0, 1), pageCount = { 2 })
@@ -162,6 +169,14 @@ fun HomeScreen(
     var sortMode by remember { mutableStateOf(SortMode.TITLE) }
     var showSortMenu by remember { mutableStateOf(false) }
 
+    // Multi-select state
+    var isMultiSelectMode by rememberSaveable { mutableStateOf(false) }
+    val selectedTracks = remember { mutableStateListOf<AudioTrack>() }
+
+    // Dialog states
+    var showBatchAddToFolderDialog by remember { mutableStateOf(false) }
+    var showBatchDeleteConfirmDialog by remember { mutableStateOf(false) }
+
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -173,6 +188,10 @@ fun HomeScreen(
 
     LaunchedEffect(pagerState.currentPage) {
         onTabSelected(pagerState.currentPage)
+        if (isMultiSelectMode) {
+            isMultiSelectMode = false
+            selectedTracks.clear()
+        }
     }
 
     // Memoized sorted device folders list to avoid main-thread map iteration on recomposition
@@ -192,20 +211,24 @@ fun HomeScreen(
         }
     }
 
-    // Dialog states
+    // Dialog states for single item
     var selectedTrackForOptions by remember { mutableStateOf<AudioTrack?>(null) }
     var trackForRepeatDialog by remember { mutableStateOf<AudioTrack?>(null) }
     var selectedFolderForOptions by remember { mutableStateOf<Pair<String, Boolean>?>(null) } // Name, isUserFolder
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
 
-    // Intercept back button/gesture when search is active or has text:
-    // A single back click or swipe immediately clears search, keyboard and restores normal screen
-    BackHandler(enabled = isSearchActive || searchQuery.isNotEmpty()) {
-        focusManager.clearFocus(force = true)
-        keyboardController?.hide()
-        isSearchActive = false
-        searchQuery = ""
+    // Intercept back button when in multi-select mode or search mode
+    BackHandler(enabled = isMultiSelectMode || isSearchActive || searchQuery.isNotEmpty()) {
+        if (isMultiSelectMode) {
+            isMultiSelectMode = false
+            selectedTracks.clear()
+        } else {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+            isSearchActive = false
+            searchQuery = ""
+        }
     }
 
     // When swiping tabs, dismiss active search and reset to normal view
@@ -229,11 +252,174 @@ fun HomeScreen(
             }
         }
         when (sortMode) {
-            SortMode.TITLE -> filtered.sortedBy { it.displayTitle.lowercase() }
-            SortMode.ARTIST -> filtered.sortedBy { it.displayArtist.lowercase() }
-            SortMode.DURATION -> filtered.sortedByDescending { it.durationMs }
-            SortMode.DATE_ADDED -> filtered.sortedByDescending { it.dateAdded }
+            SortMode.TITLE -> filtered.sortedWith(
+                compareBy<AudioTrack> { it.displayTitle.lowercase() }
+                    .thenBy { it.displayArtist.lowercase() }
+                    .thenByDescending { it.id }
+            )
+            SortMode.ARTIST -> filtered.sortedWith(
+                compareBy<AudioTrack> { it.displayArtist.lowercase() }
+                    .thenBy { it.displayTitle.lowercase() }
+                    .thenByDescending { it.id }
+            )
+            SortMode.DURATION -> filtered.sortedWith(
+                compareByDescending<AudioTrack> { it.durationMs }
+                    .thenBy { it.displayTitle.lowercase() }
+                    .thenByDescending { it.id }
+            )
+            SortMode.DATE_ADDED -> filtered.sortedWith(
+                compareByDescending<AudioTrack> { it.dateAdded }
+                    .thenByDescending { it.id }
+                    .thenBy { it.displayTitle.lowercase() }
+            )
         }
+    }
+
+    // Scroll smoothly back to top whenever user changes sort or search
+    LaunchedEffect(sortMode) {
+        if (filteredTracks.isNotEmpty()) {
+            allAudiosGridState.scrollToItem(0)
+        }
+    }
+    LaunchedEffect(searchQuery) {
+        if (filteredTracks.isNotEmpty()) {
+            allAudiosGridState.scrollToItem(0)
+        }
+    }
+
+    // Batch Add To Folder Dialog
+    if (showBatchAddToFolderDialog) {
+        var createNewInBatch by remember { mutableStateOf(false) }
+        var batchFolderName by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showBatchAddToFolderDialog = false },
+            title = { Text("Add ${selectedTracks.size} Songs to Folder", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (createNewInBatch) {
+                        OutlinedTextField(
+                            value = batchFolderName,
+                            onValueChange = { batchFolderName = it },
+                            label = { Text("New Folder Name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        Text("Select a folder or create a new one:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            item {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { createNewInBatch = true }
+                                        .padding(vertical = 8.dp, horizontal = 6.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("+ Create New Folder", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                            items(userFolders.size) { idx ->
+                                val uf = userFolders[idx]
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            val toAdd = selectedTracks.toList()
+                                            onAddMultipleTracksToFolder?.invoke(uf.id, toAdd) ?: run {
+                                                toAdd.forEach { onAddTrackToFolder(uf.id, it) }
+                                            }
+                                            showBatchAddToFolderDialog = false
+                                            isMultiSelectMode = false
+                                            selectedTracks.clear()
+                                        }
+                                        .padding(vertical = 8.dp, horizontal = 6.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(uf.name, fontWeight = FontWeight.Medium)
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        Text("${uf.tracks.size} tracks", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (createNewInBatch) {
+                    TextButton(
+                        onClick = {
+                            if (batchFolderName.isNotBlank()) {
+                                val toAdd = selectedTracks.toList()
+                                onCreateFolderWithMultipleTracks?.invoke(batchFolderName.toProperTitleCase(), toAdd) ?: run {
+                                    onCreateFolder(batchFolderName.toProperTitleCase())
+                                }
+                                showBatchAddToFolderDialog = false
+                                isMultiSelectMode = false
+                                selectedTracks.clear()
+                            }
+                        },
+                        enabled = batchFolderName.isNotBlank()
+                    ) {
+                        Text("Create & Add", fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatchAddToFolderDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    // Batch Delete Dialog
+    if (showBatchDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showBatchDeleteConfirmDialog = false },
+            title = { Text("Delete ${selectedTracks.size} Songs", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("Are you sure you want to delete ${selectedTracks.size} selected songs? This action cannot be undone.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val toDelete = selectedTracks.toList()
+                        onDeleteMultipleTracks?.invoke(toDelete) ?: run {
+                            toDelete.forEach { onDeleteTrack(it) }
+                        }
+                        showBatchDeleteConfirmDialog = false
+                        isMultiSelectMode = false
+                        selectedTracks.clear()
+                    },
+                    modifier = Modifier.testTag("confirm_batch_delete_tracks_btn")
+                ) {
+                    Text("Delete Songs", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatchDeleteConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 
     // Create folder dialog
@@ -312,6 +498,12 @@ fun HomeScreen(
             },
             onCreateFolderWithTrack = { folderName ->
                 onCreateFolderWithTrack(folderName, track)
+            },
+            onSelectMultiple = {
+                isMultiSelectMode = true
+                if (!selectedTracks.any { it.uri == track.uri }) {
+                    selectedTracks.add(track)
+                }
             }
         )
     }
@@ -382,37 +574,119 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             Column {
-                TopAppBar(
-                    navigationIcon = {
-                        IconButton(
-                            onClick = onOpenDrawer,
-                            modifier = Modifier.testTag("nav_drawer_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Open navigation drawer"
-                            )
-                        }
-                    },
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            LoopifyLogo(size = 30.dp)
-                            Spacer(modifier = Modifier.width(10.dp))
+                if (isMultiSelectMode) {
+                    // Contextual Multi-Select Bar
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(
+                                onClick = {
+                                    isMultiSelectMode = false
+                                    selectedTracks.clear()
+                                },
+                                modifier = Modifier.testTag("home_exit_multi_select")
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Close multi select")
+                            }
+                        },
+                        title = {
                             Text(
-                                text = "Loopify Music",
+                                text = "${selectedTracks.size} Selected",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 19.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
+                        },
+                        actions = {
+                            // Select All / Deselect All
+                            IconButton(
+                                onClick = {
+                                    if (selectedTracks.size == filteredTracks.size) {
+                                        selectedTracks.clear()
+                                    } else {
+                                        selectedTracks.clear()
+                                        selectedTracks.addAll(filteredTracks)
+                                    }
+                                },
+                                modifier = Modifier.testTag("home_select_all_btn")
+                            ) {
+                                Icon(Icons.Default.SelectAll, contentDescription = "Select all tracks")
+                            }
+
+                            // Play Selected
+                            if (selectedTracks.isNotEmpty()) {
+                                IconButton(
+                                    onClick = {
+                                        playerManager.playTrack(selectedTracks.first(), selectedTracks.toList())
+                                        isMultiSelectMode = false
+                                        selectedTracks.clear()
+                                    },
+                                    modifier = Modifier.testTag("home_play_selected_btn")
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "Play selected")
+                                }
+                            }
+
+                            // Add to Folder
+                            if (selectedTracks.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { showBatchAddToFolderDialog = true },
+                                    modifier = Modifier.testTag("home_add_selected_to_folder_btn")
+                                ) {
+                                    Icon(Icons.Default.PlaylistAdd, contentDescription = "Add to folder")
+                                }
+                            }
+
+                            // Delete Selected
+                            if (selectedTracks.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { showBatchDeleteConfirmDialog = true },
+                                    modifier = Modifier.testTag("home_delete_selected_btn")
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Delete selected",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
                     )
-                )
+                } else {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(
+                                onClick = onOpenDrawer,
+                                modifier = Modifier.testTag("nav_drawer_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "Open navigation drawer"
+                                )
+                            }
+                        },
+                        title = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                LoopifyLogo(size = 30.dp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Loopify Music",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 19.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        )
+                    )
+                }
 
                 if (isLoading) {
                     LinearProgressIndicator(
@@ -425,62 +699,64 @@ fun HomeScreen(
                 }
 
                 // Sleek, compact segmented pill tabs (eliminates gap)
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.65f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                if (!isMultiSelectMode) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.65f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 6.dp)
                     ) {
-                        val allAudiosSelected = selectedTabIndex == 0
-                        Surface(
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(0)
-                                }
-                            },
-                            shape = RoundedCornerShape(11.dp),
-                            color = if (allAudiosSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(36.dp)
-                                .testTag("tab_all_audios")
+                        Row(
+                            modifier = Modifier.padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "All Audios",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = if (allAudiosSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (allAudiosSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            val allAudiosSelected = selectedTabIndex == 0
+                            Surface(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(0)
+                                    }
+                                },
+                                shape = RoundedCornerShape(11.dp),
+                                color = if (allAudiosSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(36.dp)
+                                    .testTag("tab_all_audios")
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "All Audios",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = if (allAudiosSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (allAudiosSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
-                        }
 
-                        val foldersSelected = selectedTabIndex == 1
-                        Surface(
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(1)
+                            val foldersSelected = selectedTabIndex == 1
+                            Surface(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(1)
+                                    }
+                                },
+                                shape = RoundedCornerShape(11.dp),
+                                color = if (foldersSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(36.dp)
+                                    .testTag("tab_folders")
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "Folders",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = if (foldersSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (foldersSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
-                            },
-                            shape = RoundedCornerShape(11.dp),
-                            color = if (foldersSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(36.dp)
-                                .testTag("tab_folders")
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "Folders",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = if (foldersSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (foldersSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
                         }
                     }
@@ -494,7 +770,7 @@ fun HomeScreen(
                     .imePadding()
                     .navigationBarsPadding()
             ) {
-                // When music plays, the mini player smoothly slides up ABOVE the bottom dock
+                // When music plays, the mini player smoothly slides up ABOVE the bottom dock with comfortable clearance
                 AnimatedVisibility(
                     visible = playbackState.currentTrack != null,
                     enter = fadeIn(animationSpec = tween(200)) + slideInVertically(
@@ -511,23 +787,117 @@ fun HomeScreen(
                         onClick = onOpenNowPlaying,
                         onPlayPause = { playerManager.togglePlayPause() },
                         onNext = { playerManager.next() },
-                        modifier = Modifier.padding(bottom = 2.dp)
+                        modifier = Modifier.padding(bottom = 4.dp)
                     )
                 }
 
-                // Permanent Bottom Dock (Search, Filter/Sort, Refresh & New Folder)
-                BottomOneHandedDock(
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { searchQuery = it },
-                    isSearchActive = isSearchActive,
-                    onSearchActiveChange = { isSearchActive = it },
-                    sortMode = sortMode,
-                    onSortModeChange = { sortMode = it },
-                    isLoading = isLoading,
-                    onRefresh = onRefreshTracks,
-                    selectedTabIndex = selectedTabIndex,
-                    onCreateFolderClick = { showCreateFolderDialog = true }
-                )
+                // Permanent Bottom Dock (Search, Filter/Sort, Refresh & New Folder / New Song)
+                if (!isMultiSelectMode) {
+                    BottomOneHandedDock(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it },
+                        isSearchActive = isSearchActive,
+                        onSearchActiveChange = { isSearchActive = it },
+                        sortMode = sortMode,
+                        onSortModeChange = { sortMode = it },
+                        isLoading = isLoading,
+                        onRefresh = onRefreshTracks,
+                        selectedTabIndex = selectedTabIndex,
+                        onCreateFolderClick = { showCreateFolderDialog = true }
+                    )
+                } else {
+                    // Floating Multi-Select Batch Operations Bar
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        tonalElevation = 6.dp,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                // Select All / Deselect button
+                                TextButton(
+                                    onClick = {
+                                        if (selectedTracks.size == filteredTracks.size) {
+                                            selectedTracks.clear()
+                                            isMultiSelectMode = false
+                                        } else {
+                                            selectedTracks.clear()
+                                            selectedTracks.addAll(filteredTracks)
+                                        }
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.testTag("multi_select_all_btn")
+                                ) {
+                                    Text(
+                                        text = if (selectedTracks.size == filteredTracks.size) "Deselect" else "All (${filteredTracks.size})",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // Play Selected
+                                FilledTonalButton(
+                                    onClick = {
+                                        if (selectedTracks.isNotEmpty()) {
+                                            val listToPlay = selectedTracks.toList()
+                                            playerManager.playTrack(listToPlay.first(), listToPlay)
+                                            isMultiSelectMode = false
+                                            selectedTracks.clear()
+                                        }
+                                    },
+                                    enabled = selectedTracks.isNotEmpty(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.testTag("multi_select_play_btn")
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("Play (${selectedTracks.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                // Add to Folder
+                                Button(
+                                    onClick = { showBatchAddToFolderDialog = true },
+                                    enabled = selectedTracks.isNotEmpty(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.testTag("multi_select_add_folder_btn")
+                                ) {
+                                    Icon(Icons.Default.PlaylistAdd, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("Folder", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            // Done / Close Multi-Select
+                            IconButton(
+                                onClick = {
+                                    isMultiSelectMode = false
+                                    selectedTracks.clear()
+                                },
+                                modifier = Modifier.size(36.dp).testTag("multi_select_close_btn")
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Close multi-select", modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
             }
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -570,7 +940,7 @@ fun HomeScreen(
                             state = allAudiosGridState,
                             columns = GridCells.Fixed(gridColumns),
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 140.dp),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -583,29 +953,98 @@ fun HomeScreen(
                                 }
                             }
 
+                            // Subheader controls: Track count and Sort indicator chip
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "${filteredTracks.size} songs",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.7f),
+                                            border = androidx.compose.foundation.BorderStroke(
+                                                0.5.dp,
+                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                            )
+                                        ) {
+                                            Text(
+                                                text = when (sortMode) {
+                                                    SortMode.TITLE -> "Title A-Z"
+                                                    SortMode.ARTIST -> "Artist"
+                                                    SortMode.DURATION -> "Duration"
+                                                    SortMode.DATE_ADDED -> "Recently Added"
+                                                },
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             items(
                                 items = filteredTracks,
-                                key = { it.id }
+                                key = { "${it.uri}_${it.id}" }
                             ) { track ->
-                                val isCurrent = playbackState.currentTrack?.id == track.id
+                                val isCurrent = playbackState.currentTrack?.uri == track.uri
+                                val isSelected = selectedTracks.any { it.uri == track.uri }
+
                                 TrackItemCard(
                                     track = track,
                                     isPlaying = playbackState.isPlaying,
                                     isCurrentTrack = isCurrent,
+                                    isSelectionMode = isMultiSelectMode,
+                                    isSelected = isSelected,
                                     onClick = {
-                                        playerManager.playTrack(track, filteredTracks)
+                                        if (isMultiSelectMode) {
+                                            if (isSelected) {
+                                                selectedTracks.removeAll { it.uri == track.uri }
+                                                if (selectedTracks.isEmpty()) isMultiSelectMode = false
+                                            } else {
+                                                selectedTracks.add(track)
+                                            }
+                                        } else {
+                                            playerManager.playTrack(track, filteredTracks)
+                                        }
                                     },
                                     onLongClick = {
-                                        selectedTrackForOptions = track
+                                        if (!isMultiSelectMode) {
+                                            isMultiSelectMode = true
+                                            selectedTracks.add(track)
+                                        }
                                     },
                                     onOptionsClick = {
                                         selectedTrackForOptions = track
+                                    },
+                                    onSelectionToggle = { checked ->
+                                        if (checked) {
+                                            if (!selectedTracks.any { it.uri == track.uri }) selectedTracks.add(track)
+                                        } else {
+                                            selectedTracks.removeAll { it.uri == track.uri }
+                                            if (selectedTracks.isEmpty()) isMultiSelectMode = false
+                                        }
                                     }
                                 )
                             }
 
                             item(span = { GridItemSpan(maxLineSpan) }) {
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(100.dp))
                             }
                         }
                     }
@@ -615,7 +1054,7 @@ fun HomeScreen(
                         state = foldersGridState,
                         columns = GridCells.Fixed(gridColumns),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 140.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
@@ -705,40 +1144,144 @@ fun HomeScreen(
 
                         if (filteredUserFolders.isEmpty() && filteredDeviceFolderList.isEmpty()) {
                             item(span = { GridItemSpan(maxLineSpan) }) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 60.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(
-                                            imageVector = Icons.Default.Folder,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                            modifier = Modifier.size(56.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Text(
-                                            text = if (searchQuery.isNotBlank()) "No matching folders found" else "No audio folders detected",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text(
-                                            text = if (searchQuery.isNotBlank()) "Try another search term" else "Tap + button below to create a custom folder",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
+                                EmptyFoldersPlaceholder(
+                                    isSearching = searchQuery.isNotBlank(),
+                                    onCreateFolder = { showCreateFolderDialog = true }
+                                )
                             }
                         }
 
                         item(span = { GridItemSpan(maxLineSpan) }) {
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(100.dp))
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyTracksPlaceholder(
+    isSearching: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.padding(horizontal = 32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                modifier = Modifier.size(72.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (isSearching) Icons.Default.Search else Icons.Default.GraphicEq,
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Text(
+                text = if (isSearching) "No matching songs" else "No audio tracks found",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = if (isSearching)
+                    "Try searching for another artist, song title, or album"
+                else
+                    "Scan your device storage for audio files or check app permissions",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+
+            if (!isSearching) {
+                Button(
+                    onClick = onRefresh,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Scan Storage")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyFoldersPlaceholder(
+    isSearching: Boolean,
+    onCreateFolder: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.size(64.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = if (isSearching) "No matching folders" else "No custom folders yet",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = if (isSearching)
+                    "Check folder name spelling or clear search"
+                else
+                    "Create custom folders to organize your favorite repeat loops and playlists",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+
+            if (!isSearching) {
+                Button(
+                    onClick = onCreateFolder,
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Create Folder")
                 }
             }
         }
@@ -751,108 +1294,43 @@ fun PermissionRequestBanner(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-        ),
-        tonalElevation = 2.dp
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(54.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AudioFile,
-                    contentDescription = "Audio permission",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
+            Icon(
+                imageVector = Icons.Default.MusicNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(14.dp))
             Text(
-                text = "Audio Permission Needed",
-                style = MaterialTheme.typography.titleLarge,
+                text = "Audio Permission Required",
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Loopify Music needs permission to read audio files stored on your device to enable loop counting and playback.",
+                text = "Grant audio access to load music from your device storage, or use built-in demo loops.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
+            Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = onRequestPermission,
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ),
-                modifier = Modifier.testTag("grant_permission_button")
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Grant Storage Permission", fontWeight = FontWeight.Bold)
+                Text("Grant Permission", fontWeight = FontWeight.Bold)
             }
-        }
-    }
-}
-
-@Composable
-fun EmptyTracksPlaceholder(
-    isSearching: Boolean,
-    onRefresh: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = Icons.Default.MusicNote,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.size(56.dp)
-        )
-        Spacer(modifier = Modifier.height(14.dp))
-        Text(
-            text = if (isSearching) "No matching audio tracks" else "No audio files found on device",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = if (isSearching) "Try a different search term" else "Add MP3, AAC, WAV, or FLAC audio files to your device storage",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = onRefresh,
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier.testTag("empty_refresh_button")
-        ) {
-            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Scan Storage")
         }
     }
 }
@@ -864,104 +1342,65 @@ fun CompactPermissionCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f)
-        )
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AudioFile,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Scan Device Audio",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = "Grant storage permission to find your local music files",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Button(
-                onClick = onRequestPermission,
-                shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                modifier = Modifier.testTag("compact_grant_permission_button")
-            ) {
-                Text("Grant", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Icon(
+                Icons.Default.MusicNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Permission needed for full library",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onRequestPermission) {
+                Text("Grant", fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun RotatingRefreshIconButton(
+fun RotatingRefreshIconButton(
     isLoading: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    if (isLoading) {
-        val infiniteTransition = rememberInfiniteTransition(label = "refresh_rotation")
-        val refreshRotation by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 900, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "refresh_angle"
+    val infiniteTransition = rememberInfiniteTransition(label = "refresh_rotation")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation_angle"
+    )
+
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+            .size(44.dp)
+            .testTag("refresh_icon_button")
+    ) {
+        Icon(
+            imageVector = Icons.Default.Refresh,
+            contentDescription = "Refresh library",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.graphicsLayer {
+                rotationZ = if (isLoading) rotation else 0f
+            }
         )
-        IconButton(
-            onClick = onClick,
-            enabled = false,
-            modifier = Modifier
-                .graphicsLayer { rotationZ = refreshRotation }
-                .testTag("refresh_button")
-        ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Refreshing...",
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-    } else {
-        IconButton(
-            onClick = onClick,
-            modifier = Modifier.testTag("refresh_button")
-        ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Refresh library",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
     }
 }
 
@@ -976,126 +1415,81 @@ fun BottomOneHandedDock(
     isLoading: Boolean,
     onRefresh: () -> Unit,
     selectedTabIndex: Int,
-    onCreateFolderClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onCreateFolderClick: () -> Unit
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
-    val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(isSearchActive) {
         if (isSearchActive) {
-            try {
-                searchFocusRequester.requestFocus()
-            } catch (_: Exception) {
-            }
+            searchFocusRequester.requestFocus()
+            keyboardController?.show()
         }
     }
 
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 6.dp),
         shape = RoundedCornerShape(22.dp),
-        color = if (isSearchActive) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = if (isSearchActive) 8.dp else 4.dp,
-        shadowElevation = if (isSearchActive) 6.dp else 3.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (isSearchActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-        )
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.95f),
+        tonalElevation = 6.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 6.dp)
     ) {
-        AnimatedContent(
-            targetState = isSearchActive,
-            transitionSpec = {
-                (fadeIn(animationSpec = tween(180)) + scaleIn(initialScale = 0.95f, animationSpec = tween(180)))
-                    .togetherWith(fadeOut(animationSpec = tween(140)) + scaleOut(targetScale = 0.95f, animationSpec = tween(140)))
-            },
-            label = "search_dock_transition"
-        ) { searchActive ->
-            if (searchActive) {
-                // Active Pop-up Search Bar
+        Box(modifier = Modifier.fillMaxWidth()) {
+            if (isSearchActive) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        keyboardController?.hide()
-                                        focusManager.clearFocus(force = true)
-                                        onSearchActiveChange(false)
-                                        onSearchQueryChange("")
-                                    }
-                                )
-                            }
-                            .clickable {
-                                keyboardController?.hide()
-                                focusManager.clearFocus(force = true)
-                                onSearchActiveChange(false)
-                                onSearchQueryChange("")
-                            }
-                            .testTag("search_close_button"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Close search",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = onSearchQueryChange,
                         placeholder = {
                             Text(
-                                text = if (selectedTabIndex == 0) "Search audios by title or artist..." else "Search folders by name...",
-                                fontSize = 14.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                text = if (selectedTabIndex == 0) "Search songs or artists..." else "Search folders...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
                         },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
-                                contentDescription = null,
+                                contentDescription = "Search",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
                         trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .pointerInput(Unit) {
-                                            detectTapGestures(
-                                                onPress = {
-                                                    onSearchQueryChange("")
-                                                }
-                                            )
-                                        }
-                                        .clickable {
-                                            onSearchQueryChange("")
-                                        }
-                                        .testTag("search_clear_button"),
-                                    contentAlignment = Alignment.Center
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { onSearchQueryChange("") },
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Clear search",
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = {
+                                        keyboardController?.hide()
+                                        focusManager.clearFocus(force = true)
+                                        onSearchActiveChange(false)
+                                        onSearchQueryChange("")
+                                    },
+                                    modifier = Modifier.size(30.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Clear,
-                                        contentDescription = "Clear search",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Close search",
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
@@ -1129,7 +1523,6 @@ fun BottomOneHandedDock(
                     )
                 }
             } else {
-                // Idle Dock at Same Position
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1279,5 +1672,3 @@ fun BottomOneHandedDock(
         }
     }
 }
-
-

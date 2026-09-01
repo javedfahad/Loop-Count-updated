@@ -1,10 +1,8 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,11 +13,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,8 +29,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.example.model.AudioTrack
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -46,18 +40,21 @@ fun TrackItemCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onOptionsClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onSelectionToggle: ((Boolean) -> Unit)? = null
 ) {
-    val cardBg = if (isCurrentTrack) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-    } else {
-        MaterialTheme.colorScheme.surface
+    val cardBg = when {
+        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+        isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        else -> MaterialTheme.colorScheme.surface
     }
 
-    val borderColor = if (isCurrentTrack) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-    } else {
-        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+    val borderColor = when {
+        isSelected -> MaterialTheme.colorScheme.primary
+        isCurrentTrack -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
     }
 
     Surface(
@@ -71,8 +68,8 @@ fun TrackItemCard(
             .testTag("track_item_${track.id}"),
         shape = RoundedCornerShape(18.dp),
         color = cardBg,
-        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
-        tonalElevation = if (isCurrentTrack) 3.dp else 1.dp
+        border = androidx.compose.foundation.BorderStroke(if (isSelected) 1.5.dp else 1.dp, borderColor),
+        tonalElevation = if (isSelected || isCurrentTrack) 3.dp else 1.dp
     ) {
         Row(
             modifier = Modifier
@@ -80,18 +77,28 @@ fun TrackItemCard(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Artwork thumbnail
-            TrackArtwork(
-                track = track,
-                isPlaying = isCurrentTrack && isPlaying,
-                shape = RoundedCornerShape(12.dp),
-                iconSize = 22.dp,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-            )
-
-            Spacer(modifier = Modifier.width(14.dp))
+            if (isSelectionMode) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = onSelectionToggle,
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.padding(end = 4.dp)
+                )
+            } else {
+                // Artwork thumbnail
+                TrackArtwork(
+                    track = track,
+                    isPlaying = isCurrentTrack && isPlaying,
+                    shape = RoundedCornerShape(12.dp),
+                    iconSize = 22.dp,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+                Spacer(modifier = Modifier.width(14.dp))
+            }
 
             // Track details
             Column(
@@ -101,8 +108,8 @@ fun TrackItemCard(
                 Text(
                     text = track.displayTitle,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.SemiBold,
-                    color = if (isCurrentTrack) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (isCurrentTrack || isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                    color = if (isCurrentTrack || isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -126,19 +133,21 @@ fun TrackItemCard(
                 }
             }
 
-            // More options button
-            IconButton(
-                onClick = onOptionsClick,
-                modifier = Modifier
-                    .size(36.dp)
-                    .testTag("track_options_${track.id}")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Options for ${track.displayTitle}",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
+            // More options button (when not in multi-selection)
+            if (!isSelectionMode) {
+                IconButton(
+                    onClick = onOptionsClick,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("track_options_${track.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Options for ${track.displayTitle}",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }

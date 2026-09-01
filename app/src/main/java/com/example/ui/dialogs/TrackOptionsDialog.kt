@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
@@ -70,7 +71,8 @@ fun TrackOptionsDialog(
     onRename: (String) -> Unit,
     onDelete: () -> Unit,
     onAddToFolder: ((Long) -> Unit)? = null,
-    onCreateFolderWithTrack: ((String) -> Unit)? = null
+    onCreateFolderWithTrack: ((String) -> Unit)? = null,
+    onSelectMultiple: (() -> Unit)? = null
 ) {
     var isRenaming by remember { mutableStateOf(false) }
     var isConfirmingDelete by remember { mutableStateOf(false) }
@@ -367,6 +369,17 @@ fun TrackOptionsDialog(
                         isPickingFolder = true
                     },
                     testTag = "option_add_to_folder"
+                )
+
+                OptionMenuItem(
+                    icon = Icons.Default.Checklist,
+                    title = "Select Multiple",
+                    subtitle = "Enter batch selection mode",
+                    onClick = {
+                        onDismiss()
+                        onSelectMultiple?.invoke()
+                    },
+                    testTag = "option_select_multiple"
                 )
 
                 OptionMenuItem(

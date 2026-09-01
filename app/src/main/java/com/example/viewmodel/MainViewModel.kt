@@ -244,6 +244,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteMultipleTracks(tracks: List<AudioTrack>, onConsentRequired: (IntentSender) -> Unit) {
+        if (tracks.isEmpty()) return
+        val currentPlayingUri = playerManager.state.value.currentTrack?.uri
+        if (tracks.any { it.uri == currentPlayingUri }) {
+            playerManager.pause()
+        }
+
+        viewModelScope.launch {
+            when (val result = repository.deleteMultipleTracks(tracks)) {
+                is DeleteResult.Success -> {
+                    val trackUris = tracks.map { it.uri.toString() }.toSet()
+                    _uiState.update { state ->
+                        val remaining = state.allTracks.filter { !trackUris.contains(it.uri.toString()) }
+                        state.copy(
+                            allTracks = remaining,
+                            deviceFolders = repository.groupIntoDeviceFolders(remaining),
+                            message = "Deleted ${tracks.size} tracks"
+                        )
+                    }
+                    refreshTracks()
+                }
+                is DeleteResult.RequiresUserConsent -> {
+                    onConsentRequired(result.intentSender)
+                }
+                is DeleteResult.Error -> {
+                    _uiState.update { it.copy(message = "Deletion failed: ${result.message}") }
+                }
+            }
+        }
+    }
+
     // --- Custom Folder Actions ---
     fun createUserFolder(name: String) {
         val formattedName = name.toProperTitleCase()
@@ -251,6 +282,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.createUserFolder(formattedName)
             _uiState.update { it.copy(message = "Created folder \"$formattedName\"") }
+        }
+    }
+
+    fun createUserFolderWithTracks(name: String, tracks: List<AudioTrack>) {
+        createFolderWithMultipleTracks(name, tracks)
+    }
+
+    fun createFolderWithMultipleTracks(name: String, tracks: List<AudioTrack>) {
+        val formattedName = name.toProperTitleCase()
+        if (formattedName.isBlank()) return
+        viewModelScope.launch {
+            val folderId = repository.createUserFolder(formattedName)
+            if (tracks.isNotEmpty()) {
+                repository.addTracksToUserFolder(folderId, tracks)
+            }
+            _uiState.update { it.copy(message = "Created folder \"$formattedName\" with ${tracks.size} tracks") }
         }
     }
 
@@ -297,6 +344,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun removeTrackFromFolder(folderId: Long, trackUri: String) {
         viewModelScope.launch {
             repository.removeTrackFromUserFolder(folderId, trackUri)
+        }
+    }
+
+    fun removeMultipleTracksFromFolder(folderId: Long, trackUris: List<String>) {
+        viewModelScope.launch {
+            repository.removeMultipleTracksFromUserFolder(folderId, trackUris)
+            _uiState.update { it.copy(message = "Removed ${trackUris.size} tracks from folder") }
         }
     }
 

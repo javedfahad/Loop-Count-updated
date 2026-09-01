@@ -23,7 +23,8 @@ data class FolderTrackEntity(
     val trackArtist: String,
     val trackDurationMs: Long,
     val trackAlbum: String = "",
-    val albumId: Long = 0L
+    val albumId: Long = 0L,
+    val dateAdded: Long = 0L
 )
 
 @Entity(tableName = "track_positions")

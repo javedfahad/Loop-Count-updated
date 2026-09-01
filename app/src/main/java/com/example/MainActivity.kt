@@ -252,11 +252,24 @@ class MainActivity : ComponentActivity() {
                                                 deleteIntentLauncher.launch(intentSenderRequest)
                                             }
                                         },
+                                        onDeleteMultipleTracks = { tracksToDelete ->
+                                            viewModel.deleteMultipleTracks(tracksToDelete) { intentSender ->
+                                                val intentSenderRequest =
+                                                    IntentSenderRequest.Builder(intentSender).build()
+                                                deleteIntentLauncher.launch(intentSenderRequest)
+                                            }
+                                        },
                                         onAddTrackToFolder = { folderId, track ->
                                             viewModel.addTrackToFolder(folderId, track)
                                         },
+                                        onAddMultipleTracksToFolder = { folderId, addedTracks ->
+                                            viewModel.addTracksToFolder(folderId, addedTracks)
+                                        },
                                         onCreateFolderWithTrack = { folderName, track ->
                                             viewModel.createUserFolderWithTrack(folderName, track)
+                                        },
+                                        onCreateFolderWithMultipleTracks = { folderName, initialTracks ->
+                                            viewModel.createUserFolderWithTracks(folderName, initialTracks)
                                         }
                                     )
                                 }
@@ -311,6 +324,18 @@ class MainActivity : ComponentActivity() {
                                         onRemoveTrack = { trackUri ->
                                             if (currentFolder.id > 0) {
                                                 viewModel.removeTrackFromFolder(currentFolder.id, trackUri)
+                                            }
+                                        },
+                                        onRemoveMultipleTracks = { uris ->
+                                            if (currentFolder.id > 0) {
+                                                viewModel.removeMultipleTracksFromFolder(currentFolder.id, uris)
+                                            }
+                                        },
+                                        onDeleteTracks = { tracksToDelete ->
+                                            viewModel.deleteMultipleTracks(tracksToDelete) { intentSender ->
+                                                val intentSenderRequest =
+                                                    IntentSenderRequest.Builder(intentSender).build()
+                                                deleteIntentLauncher.launch(intentSenderRequest)
                                             }
                                         },
                                         onDeleteFolder = { folderId ->

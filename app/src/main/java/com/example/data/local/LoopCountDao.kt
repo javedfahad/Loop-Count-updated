@@ -25,6 +25,9 @@ interface LoopCountDao {
     suspend fun deleteFolder(folderId: Long)
 
     // --- Folder Tracks (Ordered) ---
+    @Query("SELECT * FROM folder_tracks ORDER BY orderIndex ASC")
+    fun getAllFolderTracks(): Flow<List<FolderTrackEntity>>
+
     @Query("SELECT * FROM folder_tracks WHERE folderId = :folderId ORDER BY orderIndex ASC")
     fun getTracksForFolder(folderId: Long): Flow<List<FolderTrackEntity>>
 

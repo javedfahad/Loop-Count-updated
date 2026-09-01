@@ -22,6 +22,7 @@ import com.example.model.DeviceFolder
 import com.example.model.UserFolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -51,7 +52,8 @@ class AudioRepository(
                                 trackArtist = tr.artist,
                                 trackDurationMs = tr.durationMs,
                                 trackAlbum = tr.album,
-                                albumId = tr.albumId
+                                albumId = tr.albumId,
+                                dateAdded = tr.dateAdded
                             )
                         }
                         dao.insertFolderTracks(entities)
@@ -119,7 +121,8 @@ class AudioRepository(
                             album = ft.trackAlbum,
                             durationMs = ft.trackDurationMs,
                             folderName = entity.name,
-                            albumId = ft.albumId
+                            albumId = ft.albumId,
+                            dateAdded = ft.dateAdded
                         )
                     }
                 )
@@ -178,6 +181,7 @@ class AudioRepository(
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.DATE_ADDED,
+            MediaStore.Audio.Media.DATE_MODIFIED,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 MediaStore.Audio.Media.RELATIVE_PATH
             } else {
@@ -204,7 +208,8 @@ class AudioRepository(
                 val albumCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
                 val durationCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
                 val albumIdCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
-                val dateAddedCol = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
+                val dateAddedCol = it.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
+                val dateModifiedCol = it.getColumnIndex(MediaStore.Audio.Media.DATE_MODIFIED)
                 val pathCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     it.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
                 } else {
@@ -218,7 +223,14 @@ class AudioRepository(
                     val rawAlbum = it.getString(albumCol) ?: ""
                     val duration = it.getLong(durationCol)
                     val albumId = it.getLong(albumIdCol)
-                    val dateAdded = it.getLong(dateAddedCol)
+                    val rawDateAdded = if (dateAddedCol != -1) it.getLong(dateAddedCol) else 0L
+                    val rawDateModified = if (dateModifiedCol != -1) it.getLong(dateModifiedCol) else 0L
+                    val dateAdded = when {
+                        rawDateAdded > 0 && rawDateModified > 0 -> maxOf(rawDateAdded, rawDateModified)
+                        rawDateAdded > 0 -> rawDateAdded
+                        rawDateModified > 0 -> rawDateModified
+                        else -> id.coerceAtLeast(0L)
+                    }
                     val rawPath = if (pathCol != -1) it.getString(pathCol) ?: "" else ""
 
                     val contentUri = ContentUris.withAppendedId(
@@ -307,9 +319,13 @@ class AudioRepository(
 
     // --- User Custom Folders & Persistent Ordering ---
     fun getUserFolders(): Flow<List<UserFolder>> {
-        return dao.getAllFolders().map { entities ->
-            entities.map { entity ->
-                val folderTracks = dao.getTracksForFolderSync(entity.id)
+        return combine(
+            dao.getAllFolders(),
+            dao.getAllFolderTracks()
+        ) { folderEntities, trackEntities ->
+            val tracksByFolder = trackEntities.groupBy { it.folderId }
+            folderEntities.map { entity ->
+                val folderTracks = tracksByFolder[entity.id] ?: emptyList()
                 UserFolder(
                     id = entity.id,
                     name = entity.name,
@@ -323,7 +339,8 @@ class AudioRepository(
                             album = ft.trackAlbum,
                             durationMs = ft.trackDurationMs,
                             folderName = entity.name,
-                            albumId = ft.albumId
+                            albumId = ft.albumId,
+                            dateAdded = ft.dateAdded
                         )
                     }
                 )
@@ -342,7 +359,8 @@ class AudioRepository(
                     album = ft.trackAlbum,
                     durationMs = ft.trackDurationMs,
                     folderName = "",
-                    albumId = ft.albumId
+                    albumId = ft.albumId,
+                    dateAdded = ft.dateAdded
                 )
             }
         }
@@ -381,7 +399,8 @@ class AudioRepository(
                 trackArtist = track.artist,
                 trackDurationMs = track.durationMs,
                 trackAlbum = track.album,
-                albumId = track.albumId
+                albumId = track.albumId,
+                dateAdded = track.dateAdded
             )
         }
         dao.insertFolderTracks(entities)
@@ -407,7 +426,8 @@ class AudioRepository(
                 trackArtist = track.artist,
                 trackDurationMs = track.durationMs,
                 trackAlbum = track.album,
-                albumId = track.albumId
+                albumId = track.albumId,
+                dateAdded = track.dateAdded
             )
         }
         dao.updateFolderTrackOrder(folderId, entities)
@@ -515,6 +535,59 @@ class AudioRepository(
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    suspend fun removeMultipleTracksFromUserFolder(folderId: Long, trackUris: List<String>) = withContext(Dispatchers.IO) {
+        for (uri in trackUris) {
+            dao.deleteTrackFromFolder(folderId, uri)
+        }
+        val remaining = dao.getTracksForFolderSync(folderId)
+        dao.updateFolderTrackOrder(folderId, remaining)
+        syncFoldersToPersistentFile()
+    }
+
+    suspend fun deleteMultipleTracks(tracks: List<AudioTrack>): DeleteResult = withContext(Dispatchers.IO) {
+        if (tracks.isEmpty()) return@withContext DeleteResult.Success
+
+        val fileTracks = tracks.filter { it.uri.scheme == "file" }
+        val contentTracks = tracks.filter { it.uri.scheme == "content" }
+
+        // 1. Delete all file tracks directly
+        for (ft in fileTracks) {
+            val file = ft.uri.path?.let { File(it) }
+            if (file != null && file.exists()) {
+                file.delete()
+            }
+            cleanupDeletedTrack(ft.uri.toString())
+        }
+
+        if (contentTracks.isEmpty()) {
+            return@withContext DeleteResult.Success
+        }
+
+        // 2. Delete content tracks via MediaStore
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val intentSender = MediaStore.createDeleteRequest(
+                    context.contentResolver,
+                    contentTracks.map { it.uri }
+                ).intentSender
+                return@withContext DeleteResult.RequiresUserConsent(intentSender)
+            } catch (e: Exception) {
+                // Fallback to individual deletes
+            }
+        }
+
+        for (ct in contentTracks) {
+            try {
+                context.contentResolver.delete(ct.uri, null, null)
+            } catch (e: Exception) {
+                // Ignore
+            }
+            cleanupDeletedTrack(ct.uri.toString())
+        }
+
+        DeleteResult.Success
     }
 
     suspend fun deleteTrack(track: AudioTrack): DeleteResult = withContext(Dispatchers.IO) {

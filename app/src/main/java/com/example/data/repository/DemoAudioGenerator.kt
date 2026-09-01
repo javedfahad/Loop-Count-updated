@@ -39,41 +39,100 @@ object DemoAudioGenerator {
 
         val tracks = mutableListOf<AudioTrack>()
 
-        if (track1File.exists()) {
-            tracks.add(
-                AudioTrack(
-                    id = -101L,
-                    uri = Uri.fromFile(track1File),
-                    title = "Acoustic Melody Loop (Demo)",
-                    artist = "Loopify Music",
-                    album = "Built-in Demos",
-                    durationMs = 16000L,
-                    folderName = "Built-in Demos",
-                    albumId = -1L,
-                    dateAdded = System.currentTimeMillis() / 1000,
-                    relativePath = "Built-in Demos/"
-                )
-            )
-        }
+        // Scan all .wav files in demoDir
+        val allWavFiles = demoDir.listFiles { file -> file.isFile && file.name.endsWith(".wav") }?.sortedBy { it.name } ?: emptyList()
 
-        if (track2File.exists()) {
+        for (file in allWavFiles) {
+            val isBase1 = file.name == "demo_acoustic_melody.wav"
+            val isBase2 = file.name == "demo_lofi_focus.wav"
+            val trackId = when {
+                isBase1 -> -101L
+                isBase2 -> -102L
+                else -> -(file.name.hashCode().toLong().let { if (it > 0) it else -it } % 100000L + 200L)
+            }
+            val title = when {
+                isBase1 -> "Acoustic Melody Loop (Demo)"
+                isBase2 -> "Lo-Fi Focus Chords (Demo)"
+                else -> file.nameWithoutExtension.replace("custom_", "").replace("_", " ").replace("demo_", "")
+                    .split(" ")
+                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+            }
+            val durationMs = if (isBase1) 16000L else if (isBase2) 20000L else 18000L
+
             tracks.add(
                 AudioTrack(
-                    id = -102L,
-                    uri = Uri.fromFile(track2File),
-                    title = "Lo-Fi Focus Chords (Demo)",
-                    artist = "Loopify Music",
-                    album = "Built-in Demos",
-                    durationMs = 20000L,
-                    folderName = "Built-in Demos",
+                    id = trackId,
+                    uri = Uri.fromFile(file),
+                    title = title,
+                    artist = "Loopify Creator",
+                    album = "Custom & Demo Audio",
+                    durationMs = durationMs,
+                    folderName = "Loopify Audio",
                     albumId = -1L,
-                    dateAdded = System.currentTimeMillis() / 1000,
-                    relativePath = "Built-in Demos/"
+                    dateAdded = file.lastModified() / 1000,
+                    relativePath = "Loopify Audio/"
                 )
             )
         }
 
         tracks
+    }
+
+    /**
+     * Synthesizes an 18-second upbeat Synthwave groove with energetic arpeggio and punchy bass.
+     */
+    private fun generateSynthwaveTrack(outputFile: File) {
+        val durationSeconds = 18
+        val totalSamples = SAMPLE_RATE * durationSeconds
+        val pcmData = ShortArray(totalSamples)
+
+        val noteA2 = 110.00
+        val noteF2 = 87.31
+        val noteC3 = 130.81
+        val noteG2 = 98.00
+
+        val arpNotes = listOf(
+            220.0, 329.63, 440.0, 523.25, 659.25, 523.25, 440.0, 329.63,
+            174.61, 261.63, 349.23, 440.0, 523.25, 440.0, 349.23, 261.63,
+            261.63, 329.63, 392.00, 523.25, 659.25, 523.25, 392.00, 329.63,
+            196.00, 246.94, 293.66, 392.00, 493.88, 392.00, 293.66, 246.94
+        )
+
+        val arpStepSamples = SAMPLE_RATE / 8 // 8 notes per second (120 BPM 16th feel)
+
+        for (i in 0 until totalSamples) {
+            val t = i.toDouble() / SAMPLE_RATE
+            val barIdx = ((t / 4.5) % 4.0).toInt().coerceIn(0, 3)
+            val bassBase = when (barIdx) {
+                0 -> noteA2
+                1 -> noteF2
+                2 -> noteC3
+                else -> noteG2
+            }
+
+            // Synth bass (saw wave approximation)
+            val bassPhase = (t * bassBase) % 1.0
+            val bassSaw = (2.0 * bassPhase - 1.0) * 0.4
+            val bassSub = sin(2.0 * PI * (bassBase * 0.5) * t) * 0.35
+
+            // Arpeggiator lead
+            val arpIdx = (i / arpStepSamples) % arpNotes.size
+            val arpFreq = arpNotes[arpIdx]
+            val stepT = (i % arpStepSamples).toDouble() / SAMPLE_RATE
+            val arpEnv = exp(-stepT * 10.0)
+            val arpLead = arpEnv * (sin(2.0 * PI * arpFreq * t) + 0.3 * sin(4.0 * PI * arpFreq * t)) * 0.45
+
+            // Kick pulse on beat
+            val beatT = (t % 0.5)
+            val kickEnv = exp(-beatT * 22.0)
+            val kick = kickEnv * sin(2.0 * PI * (120.0 * exp(-beatT * 30.0)) * beatT) * 0.45
+
+            val mixed = (bassSaw + bassSub + arpLead + kick) * 0.80
+            val clamped = mixed.coerceIn(-1.0, 1.0)
+            pcmData[i] = (clamped * 32000.0).toInt().toShort()
+        }
+
+        writeWavFile(outputFile, pcmData, SAMPLE_RATE, NUM_CHANNELS)
     }
 
     /**
