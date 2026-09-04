@@ -2,11 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loopify Music • Precision Audio Looper & Player</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <title>Loopify Music • Precision Offline Audio Looper & Ringtone Trimmer</title>
+    <meta name="description" content="Set exact loop counts, trim custom start & stop seconds for ringtones, zero-duplicate playlists, sleep timer, and 100% offline audio playback with zero ads.">
+    <meta name="keywords" content="audio looper, loop music, repeat song, music repeater, trim ringtone, set ringtone, offline music player, zero duplicate playlists">
+    <meta name="author" content="Loopify Audio">
+    <meta name="theme-color" content="#0A0812">
+
+    <!-- Open Graph / Facebook / WhatsApp / LinkedIn Meta Tags -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Loopify Music">
+    <meta property="og:title" content="Loopify Music • Precision Audio Looper & Ringtone Trimmer">
+    <meta property="og:description" content="Set exact loop counts, trim custom start & stop seconds for ringtones, zero-duplicate playlists, sleep timer, and 100% offline playback with zero ads.">
+    <meta property="og:image" content="og-preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:alt" content="Loopify Music App Preview">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Loopify Music • Precision Audio Looper & Ringtone Trimmer">
+    <meta name="twitter:description" content="Set exact loop counts, trim custom start & stop seconds for ringtones, zero-duplicate playlists, sleep timer, and 100% offline playback.">
+    <meta name="twitter:image" content="og-preview.png">
+
+    <!-- Favicon SVG -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%237000FF'/><path d='M18.18 8c5.1 0 5.1 8 0 8-5.1 0-7.08-8-12.36-8-5.27 0-5.27 8 0 8 5.27 0 7.26-8 12.36-8z' stroke='%23FFFFFF' stroke-width='2' fill='none'/><circle cx='6' cy='12' r='1.5' fill='%2300F0FF'/><circle cx='18' cy='12' r='1.5' fill='%23FF007A'/></svg>">
+
+    <!-- Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
     <style>
         :root {
             --bg-dark: #0A0812;
@@ -24,7 +52,7 @@
             --text-primary: #FFFFFF;
             --text-secondary: #D4CEE2;
             --text-muted: #8E85A3;
-            --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
         }
 
@@ -42,27 +70,57 @@
             background-color: var(--bg-dark);
             color: var(--text-primary);
             font-family: var(--font-main);
-            line-height: 1.65;
+            line-height: 1.6;
             -webkit-font-smoothing: antialiased;
             overflow-x: hidden;
             background-image: 
-                radial-gradient(circle at 15% 20%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 85% 60%, rgba(255, 0, 122, 0.08) 0%, transparent 45%),
-                radial-gradient(circle at 50% 90%, rgba(112, 0, 255, 0.1) 0%, transparent 50%);
+                radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 85% 45%, rgba(255, 0, 122, 0.08) 0%, transparent 45%),
+                radial-gradient(circle at 50% 85%, rgba(112, 0, 255, 0.09) 0%, transparent 50%);
         }
 
         .container {
-            max-width: 1040px;
+            max-width: 1080px;
             margin: 0 auto;
             padding: 0 24px;
         }
 
-        /* Navbar */
+        /* In-App Browser Notice */
+        #inAppNotice {
+            display: none;
+            background: linear-gradient(90deg, #FF007A 0%, #7000FF 100%);
+            color: #FFFFFF;
+            padding: 12px 20px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            text-align: center;
+            position: relative;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(255, 0, 122, 0.35);
+        }
+
+        #inAppNotice a {
+            color: #FFFFFF;
+            text-decoration: underline;
+            font-weight: 800;
+        }
+
+        .close-notice-btn {
+            background: none;
+            border: none;
+            color: #FFFFFF;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin-left: 14px;
+            vertical-align: middle;
+        }
+
+        /* Header Navigation */
         header {
             position: sticky;
             top: 0;
             z-index: 100;
-            background: rgba(10, 8, 18, 0.85);
+            background: rgba(10, 8, 18, 0.88);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border-subtle);
@@ -92,7 +150,6 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 0 24px rgba(0, 240, 255, 0.35);
-            position: relative;
         }
 
         .logo-box svg {
@@ -126,7 +183,7 @@
         .nav-links {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 16px;
         }
 
         .nav-links a {
@@ -141,19 +198,27 @@
             color: var(--neon-cyan);
         }
 
-        .nav-btn {
-            background: rgba(0, 240, 255, 0.08);
-            border: 1px solid var(--border-glow);
-            color: var(--text-primary) !important;
+        .nav-support-btn {
+            background: rgba(255, 0, 122, 0.14);
+            border: 1px solid var(--neon-magenta);
+            color: #FFFFFF !important;
             padding: 8px 18px;
             border-radius: 999px;
-            font-weight: 600;
+            font-weight: 700;
+            font-size: 0.88rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 16px rgba(255, 0, 122, 0.25);
+            cursor: pointer;
         }
 
-        .nav-btn:hover {
-            background: rgba(0, 240, 255, 0.16);
-            border-color: var(--neon-cyan);
-            box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+        .nav-support-btn:hover {
+            background: var(--neon-magenta);
+            color: #FFFFFF !important;
+            transform: translateY(-2px);
+            box-shadow: 0 0 24px rgba(255, 0, 122, 0.5);
         }
 
         .nav-btn-primary {
@@ -168,6 +233,7 @@
             gap: 8px;
             box-shadow: 0 0 20px rgba(0, 240, 255, 0.35);
             transition: all 0.25s ease;
+            text-decoration: none;
         }
 
         .nav-btn-primary:hover {
@@ -177,7 +243,7 @@
 
         /* Hero Section */
         .hero {
-            padding: 80px 0 40px;
+            padding: 70px 0 36px;
             text-align: center;
             position: relative;
         }
@@ -198,12 +264,12 @@
         }
 
         .hero h1 {
-            font-size: 3.4rem;
+            font-size: 3.2rem;
             font-weight: 800;
             line-height: 1.15;
             letter-spacing: -0.03em;
             margin-bottom: 20px;
-            max-width: 820px;
+            max-width: 840px;
             margin-left: auto;
             margin-right: auto;
         }
@@ -215,9 +281,9 @@
         }
 
         .hero p {
-            font-size: 1.18rem;
+            font-size: 1.15rem;
             color: var(--text-secondary);
-            max-width: 680px;
+            max-width: 720px;
             margin: 0 auto 36px;
             font-weight: 400;
         }
@@ -256,17 +322,40 @@
             fill: currentColor;
         }
 
+        .hero-support-btn {
+            background: rgba(255, 0, 122, 0.12);
+            border: 1px solid var(--neon-magenta);
+            color: #FFFFFF;
+            font-weight: 700;
+            font-size: 1.02rem;
+            padding: 16px 32px;
+            border-radius: 999px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 0 25px rgba(255, 0, 122, 0.3);
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+
+        .hero-support-btn:hover {
+            background: var(--neon-magenta);
+            transform: translateY(-3px);
+            box-shadow: 0 0 35px rgba(255, 0, 122, 0.6);
+        }
+
         /* Mockup Glass Card */
         .mockup-wrapper {
-            margin: 50px auto 60px;
-            max-width: 720px;
+            margin: 40px auto 60px;
+            max-width: 740px;
         }
 
         .mockup-card {
             background: var(--card-gradient);
             border: 1px solid var(--border-glow);
             border-radius: 28px;
-            padding: 32px;
+            padding: 30px;
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 240, 255, 0.15);
             backdrop-filter: blur(16px);
             position: relative;
@@ -277,7 +366,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
 
         .track-info {
@@ -340,15 +429,14 @@
             100% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 8px var(--neon-magenta); }
         }
 
-        /* Animated Sound Waves */
         .waveform-container {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 4px;
-            height: 70px;
-            padding: 10px 0;
-            margin: 20px 0;
+            gap: 5px;
+            height: 64px;
+            padding: 8px 0;
+            margin: 16px 0;
         }
 
         .wave-bar {
@@ -397,6 +485,7 @@
         .playback-pills {
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
         .pill-tag {
@@ -405,13 +494,13 @@
             padding: 4px 10px;
             border-radius: 6px;
             font-weight: 700;
-            font-size: 0.78rem;
+            font-size: 0.76rem;
         }
 
-        /* Features Bento Grid */
+        /* Features Section Header */
         .section-header {
             text-align: center;
-            margin: 80px 0 40px;
+            margin: 70px 0 36px;
         }
 
         .section-header h2 {
@@ -426,78 +515,280 @@
             font-size: 1.05rem;
         }
 
-        .bento-grid {
+        /* Clean "Just Tell, Not Describe" Feature Grid */
+        .features-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
             margin-bottom: 80px;
         }
 
-        .bento-card {
+        .feature-card {
             background: var(--surface-card);
             border: 1px solid var(--border-subtle);
-            border-radius: 22px;
-            padding: 28px;
-            transition: all 0.25s ease;
+            border-radius: 18px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: all 0.22s ease;
             position: relative;
             overflow: hidden;
         }
 
-        .bento-card:hover {
-            transform: translateY(-4px);
+        .feature-card:hover {
+            transform: translateY(-3px);
             border-color: var(--neon-cyan);
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 240, 255, 0.2);
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4), 0 0 16px rgba(0, 240, 255, 0.2);
             background: var(--surface-card-hover);
         }
 
-        .card-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 14px;
+        .feature-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .feat-icon-box {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
             background: rgba(0, 240, 255, 0.1);
+            border: 1px solid var(--border-glow);
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 20px;
-            border: 1px solid var(--border-glow);
+            flex-shrink: 0;
         }
 
-        .bento-card:nth-child(2) .card-icon {
+        .feature-card:nth-child(even) .feat-icon-box {
             background: rgba(255, 0, 122, 0.1);
             border-color: rgba(255, 0, 122, 0.3);
         }
 
-        .bento-card:nth-child(3) .card-icon {
+        .feature-card:nth-child(3n) .feat-icon-box {
             background: rgba(112, 0, 255, 0.15);
             border-color: rgba(112, 0, 255, 0.3);
         }
 
-        .bento-card:nth-child(4) .card-icon {
+        .feature-card:nth-child(4n) .feat-icon-box {
             background: rgba(0, 255, 178, 0.1);
             border-color: rgba(0, 255, 178, 0.3);
         }
 
-        .card-icon svg {
-            width: 24px;
-            height: 24px;
+        .feat-icon-box svg {
+            width: 20px;
+            height: 20px;
             fill: var(--neon-cyan);
         }
 
-        .bento-card:nth-child(2) .card-icon svg { fill: var(--neon-magenta); }
-        .bento-card:nth-child(3) .card-icon svg { fill: #A36FFF; }
-        .bento-card:nth-child(4) .card-icon svg { fill: var(--neon-mint); }
+        .feature-card:nth-child(even) .feat-icon-box svg { fill: var(--neon-magenta); }
+        .feature-card:nth-child(3n) .feat-icon-box svg { fill: #B388FF; }
+        .feature-card:nth-child(4n) .feat-icon-box svg { fill: var(--neon-mint); }
 
-        .bento-card h3 {
-            font-size: 1.25rem;
+        .feat-name {
+            font-size: 1.05rem;
             font-weight: 700;
-            margin-bottom: 10px;
             color: #FFFFFF;
+            letter-spacing: -0.01em;
         }
 
-        .bento-card p {
+        .feat-desc {
+            font-size: 0.88rem;
             color: var(--text-secondary);
-            font-size: 0.95rem;
-            line-height: 1.6;
+            line-height: 1.45;
+        }
+
+        /* Developer Support Section */
+        .support-section {
+            background: var(--card-gradient);
+            border: 1px solid var(--neon-magenta);
+            border-radius: 28px;
+            padding: 44px 36px;
+            margin-bottom: 80px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 35px rgba(255, 0, 122, 0.25);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .support-layout {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 36px;
+            align-items: center;
+        }
+
+        .support-text-block h2 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+        }
+
+        .support-text-block h2 span {
+            background: linear-gradient(135deg, #FF007A 0%, #00F0FF 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .developer-message-box {
+            background: rgba(10, 8, 18, 0.6);
+            border-left: 4px solid var(--neon-magenta);
+            border-radius: 0 16px 16px 0;
+            padding: 20px;
+            margin: 18px 0 24px;
+            font-size: 0.96rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .developer-message-box p {
+            margin-bottom: 12px;
+        }
+
+        .developer-message-box p:last-child {
+            margin-bottom: 0;
+        }
+
+        .support-badges {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+
+        .support-pill {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* QR Card */
+        .qr-card {
+            background: #FFFFFF;
+            border-radius: 24px;
+            padding: 24px;
+            text-align: center;
+            color: #121016;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 240, 255, 0.2);
+        }
+
+        .qr-card-header {
+            font-size: 0.85rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #7000FF;
+            margin-bottom: 12px;
+        }
+
+        .qr-img-wrapper {
+            background: #FFFFFF;
+            padding: 8px;
+            border-radius: 16px;
+            display: inline-block;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+            border: 1px solid #EEEEEE;
+        }
+
+        .qr-img-wrapper img {
+            width: 220px;
+            height: 220px;
+            display: block;
+        }
+
+        .upi-id-badge {
+            background: #F4F0FF;
+            border: 1px dashed #7000FF;
+            border-radius: 12px;
+            padding: 10px 14px;
+            margin: 14px 0 12px;
+            font-family: var(--font-mono);
+            font-size: 0.86rem;
+            font-weight: 700;
+            color: #1C152E;
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .copy-upi-btn {
+            background: #7000FF;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .copy-upi-btn:hover {
+            background: #5900CC;
+        }
+
+        .upi-action-btns {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .pay-upi-btn {
+            flex: 1;
+            background: linear-gradient(135deg, #00F0FF 0%, #7000FF 100%);
+            color: #FFFFFF;
+            text-decoration: none;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 0.9rem;
+            text-align: center;
+            display: inline-block;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(112, 0, 255, 0.3);
+        }
+
+        .pay-upi-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(112, 0, 255, 0.45);
+        }
+
+        .download-qr-btn {
+            background: #F0EDF5;
+            color: #332B45;
+            border: 1px solid #D8D2E4;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .download-qr-btn:hover {
+            background: #E4DFEF;
+        }
+
+        .upi-apps-icons {
+            margin-top: 14px;
+            font-size: 0.75rem;
+            color: #6C647A;
+            font-weight: 600;
         }
 
         /* Policy & Terms Section */
@@ -563,16 +854,6 @@
             left: 0;
             color: var(--neon-cyan);
             font-weight: bold;
-        }
-
-        .highlight-box {
-            background: rgba(0, 240, 255, 0.08);
-            border-left: 4px solid var(--neon-cyan);
-            padding: 16px 20px;
-            border-radius: 0 12px 12px 0;
-            margin: 16px 0;
-            font-weight: 600;
-            color: #FFFFFF;
         }
 
         .perm-grid {
@@ -701,21 +982,91 @@
             -webkit-text-fill-color: transparent;
         }
 
-        @media (max-width: 860px) {
-            .bento-grid { grid-template-columns: repeat(2, 1fr); }
+        /* Support Floating / Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
         }
 
-        @media (max-width: 640px) {
-            .hero h1 { font-size: 2.3rem; }
-            .bento-grid { grid-template-columns: 1fr; }
-            .policy-container { padding: 24px 18px; }
-            .contact-card { padding: 20px 16px; }
-            .form-submit-btn { width: 100%; justify-content: center; }
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--surface-card);
+            border: 1px solid var(--neon-magenta);
+            border-radius: 28px;
+            max-width: 480px;
+            width: 100%;
+            padding: 28px;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 0, 122, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #FFFFFF;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 900px) {
+            .support-layout {
+                grid-template-columns: 1fr;
+            }
+            .qr-card {
+                max-width: 360px;
+                margin: 0 auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.4rem; }
+            .features-grid { grid-template-columns: repeat(2, 1fr); }
             .nav-links { display: none; }
+            .policy-container { padding: 24px 18px; }
+            .support-section { padding: 30px 20px; }
+        }
+
+        @media (max-width: 480px) {
+            .hero h1 { font-size: 1.95rem; }
+            .features-grid { grid-template-columns: 1fr; }
+            .form-submit-btn { width: 100%; justify-content: center; }
+            .hero-cta-group { flex-direction: column; width: 100%; }
+            .download-main-btn, .hero-support-btn { width: 100%; justify-content: center; }
         }
     </style>
 </head>
 <body>
+
+    <!-- Notice for Facebook In-App Browser & WebViews -->
+    <div id="inAppNotice">
+        <span>ℹ️ <strong>Using Facebook / In-App Browser?</strong> If the APK download does not start automatically, tap the three dots <strong>⋮</strong> at top-right and choose <strong>"Open in Chrome / Browser"</strong>.</span>
+        <button class="close-notice-btn" onclick="document.getElementById('inAppNotice').style.display='none'">✕</button>
+    </div>
 
     <!-- Header Navigation -->
     <header>
@@ -735,10 +1086,16 @@
                     </div>
                 </a>
                 <nav class="nav-links">
-                    <a href="#features">Features</a>
+                    <a href="#features">All Features</a>
+                    <a href="#support" class="nav-support-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                        Support Developer
+                    </a>
                     <a href="#privacy">Privacy Policy</a>
-                    <a href="#contact" class="nav-btn">Contact & Feedback</a>
-                    <a href="loopify-music.apk" download class="nav-btn-primary">
+                    <a href="#contact">Contact</a>
+                    <a href="loopify-music.apk" download="loopify-music.apk" class="nav-btn-primary">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
                         </svg>
@@ -755,22 +1112,27 @@
         <!-- Hero Section -->
         <section class="hero">
             <div class="badge">
-                <span>✦</span> Precision Audio Looper & Smart Repetition Engine
+                <span>✦</span> Precision Audio Looper &amp; Ringtone Trimmer
             </div>
             <h1>Master Every Beat with <span>Loopify Music</span></h1>
-            <p>The ultimate offline audio looper engineered for musicians, dancers, recitation memorizers, and students. Precise loop counts, zero-duplicate playlists, and complete privacy.</p>
+            <p>Counted repetitions, custom ringtone trimmer, zero-duplicate playlists, sleep timer, and 100% offline playback with zero ads.</p>
             <div class="hero-cta-group">
-                <a href="loopify-music.apk" download class="download-main-btn">
+                <a href="loopify-music.apk" download="loopify-music.apk" class="download-main-btn" id="mainDownloadBtn">
                     <svg viewBox="0 0 24 24">
                         <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
                     </svg>
-                    Download Loopify Music APK (v1.0.0)
+                    Download Loopify Music APK
                 </a>
-                <a href="#features" class="nav-btn" style="padding: 16px 30px; font-size: 1rem;">Explore Features</a>
+                <a href="#support" class="hero-support-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                    Support via UPI
+                </a>
             </div>
         </section>
 
-        <!-- Live Waveform & Player Mockup -->
+        <!-- Player Mockup -->
         <div class="mockup-wrapper">
             <div class="mockup-card">
                 <div class="mockup-header">
@@ -805,73 +1167,257 @@
                 <div class="mock-controls">
                     <div class="playback-pills">
                         <span class="pill-tag">STOP AFTER FINISH: ON</span>
-                        <span class="pill-tag" style="background: rgba(255, 0, 122, 0.15); color: var(--neon-magenta);">AUTO TITLE-CASE</span>
+                        <span class="pill-tag" style="background: rgba(255, 0, 122, 0.15); color: var(--neon-magenta);">RINGTONE READY</span>
+                        <span class="pill-tag" style="background: rgba(0, 255, 178, 0.12); color: var(--neon-mint);">OFFLINE MODE</span>
                     </div>
                     <span>00:14 / 00:32</span>
                 </div>
             </div>
         </div>
 
-        <!-- Features Bento Grid -->
+        <!-- Features Section: "Just Tell, Not Describe" -->
         <div class="section-header" id="features">
-            <div class="badge">Designed for Audio Mastery</div>
-            <h2>Why Creators Choose Loopify Music</h2>
-            <p>Everything you need for laser-focused audio practice and recitation repetitions.</p>
+            <div class="badge">What You Can Do</div>
+            <h2>All App Features</h2>
+            <p>Every single capability available in Loopify Music — direct, transparent, and built-in.</p>
         </div>
 
-        <section class="bento-grid">
-            <div class="bento-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24"><path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/></svg>
+        <section class="features-grid">
+            <!-- 1 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/></svg>
+                    </div>
+                    <div class="feat-name">Exact Loop Counter</div>
                 </div>
-                <h3>Exact Counted Loops</h3>
-                <p>Set precise target repetition numbers (e.g. 3, 5, 10, 33, 100 times) or continuous infinite repeat with smooth auto-stop.</p>
+                <div class="feat-desc">Set target repetition count: 1, 3, 5, 10, 33, 100, or any custom number.</div>
             </div>
 
-            <div class="bento-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            <!-- 2 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+                    </div>
+                    <div class="feat-name">Infinite Loop Mode</div>
                 </div>
-                <h3>Stop After Finish</h3>
-                <p>Allow the active loop to finish naturally to the end of the phrase without harsh cutoffs in mid-melody.</p>
+                <div class="feat-desc">Repeat continuously and seamlessly without interruption until you stop.</div>
             </div>
 
-            <div class="bento-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+            <!-- 3 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                    </div>
+                    <div class="feat-name">Stop After Finish</div>
                 </div>
-                <h3>Zero-Duplicate Folders</h3>
-                <p>Create unlimited custom playlists with lightweight pointer references. Saves 100% of your device storage (App is under 2 MB!).</p>
+                <div class="feat-desc">Allows the active song to reach the end of the phrase instead of cutting off mid-track.</div>
             </div>
 
-            <div class="bento-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>
+            <!-- 4 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+                    </div>
+                    <div class="feat-name">Set as Ringtone</div>
                 </div>
-                <h3>Smart Title Case</h3>
-                <p>Automatically cleans and styles all song and folder names into clean Title Case formatting instantly.</p>
+                <div class="feat-desc">Trim custom start and stop seconds and apply directly as Phone Ringtone, Alarm, or Notification tone.</div>
             </div>
 
-            <div class="bento-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24"><path d="M12 20c4.41 0 8-3.59 8-8s-3.59-8-8-8-8 3.59-8 8 3.59 8 8 8zm0-18c5.52 0 10 4.48 10 10s-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2zm1 5h-2v6h6v-2h-4z"/></svg>
+            <!-- 5 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5z"/></svg>
+                    </div>
+                    <div class="feat-name">Magic Remix &amp; Slice</div>
                 </div>
-                <h3>Folder Timers & Timestamps</h3>
-                <p>Set countdown timers (15m, 30m, 1h) on entire playlists with automatic position resume across all tracks.</p>
+                <div class="feat-desc">Auto-shuffles and crossfades short 5s to 30s preview segments across all tracks in a folder.</div>
             </div>
 
-            <div class="bento-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+            <!-- 6 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+                    </div>
+                    <div class="feat-name">Zero-Duplicate Folders</div>
                 </div>
-                <h3>100% Offline & Private</h3>
-                <p>Zero tracking, zero analytics SDKs, and zero cloud uploads. Your music files stay securely on your device.</p>
+                <div class="feat-desc">Create custom playlists without copying or duplicating audio files, saving your storage.</div>
+            </div>
+
+            <!-- 7 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                    </div>
+                    <div class="feat-name">Sleep &amp; Folder Timers</div>
+                </div>
+                <div class="feat-desc">Auto-stop playback after 15m, 30m, 45m, 1h, or custom timer on any playlist.</div>
+            </div>
+
+            <!-- 8 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+                    </div>
+                    <div class="feat-name">Resume Memory</div>
+                </div>
+                <div class="feat-desc">Automatically saves and resumes exact millisecond playback positions per track and folder.</div>
+            </div>
+
+            <!-- 9 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.41 11.93l-1.41 1.41 5.66 5.66 12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/></svg>
+                    </div>
+                    <div class="feat-name">Batch Multi-Select</div>
+                </div>
+                <div class="feat-desc">Select multiple songs simultaneously to play, add to folders, or manage together.</div>
+            </div>
+
+            <!-- 10 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M2.5 4v3h5v12h3V7h5V4h-13zm19 5h-9v3h3v7h3v-7h3V9z"/></svg>
+                    </div>
+                    <div class="feat-name">Smart Title-Casing</div>
+                </div>
+                <div class="feat-desc">Automatically cleans and capitalizes messy track titles and filenames into proper Title Case.</div>
+            </div>
+
+            <!-- 11 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8zm-1.1 11h-.85v-3.26l-1.01.31v-.69l1.73-.63h.13V16zm4.29-1.83c0 .32-.05.6-.16.82s-.27.4-.47.53-.45.19-.74.19c-.3 0-.55-.06-.75-.19s-.35-.31-.46-.53-.16-.5-.16-.82v-.65c0-.32.05-.6.16-.82s.27-.4.47-.53.44-.2.74-.2c.3 0 .55.07.75.2s.35.31.46.53.16.5.16.82v.65zm-.84-.73c0-.23-.03-.41-.09-.53s-.15-.21-.27-.27-.27-.08-.44-.08-.31.02-.43.08-.21.15-.27.27-.09.3-.09.53v.81c0 .23.03.41.09.53s.15.21.27.27.26.08.43.08.32-.02.44-.08.21-.15.27-.27.09-.3.09-.53v-.81z"/></svg>
+                    </div>
+                    <div class="feat-name">10-Second Quick Seek</div>
+                </div>
+                <div class="feat-desc">Dedicated -10s rewind and +10s forward buttons for fast phrase review and practice.</div>
+            </div>
+
+            <!-- 12 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M10 8v8l6-4-6-4zm9-5H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/></svg>
+                    </div>
+                    <div class="feat-name">Variable Speed &amp; Pitch</div>
+                </div>
+                <div class="feat-desc">Adjust playback rate from 0.5× slow-motion to 2.0× speed without audio distortion.</div>
+            </div>
+
+            <!-- 13 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                    </div>
+                    <div class="feat-name">All Major Audio Formats</div>
+                </div>
+                <div class="feat-desc">Plays MP3, WAV, M4A, FLAC, AAC, and OGG formats with hardware-accelerated playback.</div>
+            </div>
+
+            <!-- 14 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+                    </div>
+                    <div class="feat-name">Background &amp; Lock Screen</div>
+                </div>
+                <div class="feat-desc">Keeps playing with screen locked or while using other apps, with notification controls.</div>
+            </div>
+
+            <!-- 15 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                    </div>
+                    <div class="feat-name">100% Offline &amp; Private</div>
+                </div>
+                <div class="feat-desc">Zero tracking, zero analytics, zero cloud uploads, and zero ads. Your files never leave your phone.</div>
+            </div>
+
+            <!-- 16 -->
+            <div class="feature-card">
+                <div class="feature-card-header">
+                    <div class="feat-icon-box">
+                        <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
+                    </div>
+                    <div class="feat-name">Ultra Lightweight</div>
+                </div>
+                <div class="feat-desc">Installs in seconds, uses minimal battery and memory, and launches instantly.</div>
+            </div>
+        </section>
+
+        <!-- Developer Support & UPI Section -->
+        <section class="support-section" id="support">
+            <div class="support-layout">
+                <div class="support-text-block">
+                    <div class="badge" style="background: rgba(255, 0, 122, 0.12); border-color: var(--neon-magenta); color: var(--neon-magenta);">
+                        Direct Independent Developer Support
+                    </div>
+                    <h2>Support <span>Loopify Music</span></h2>
+                    
+                    <div class="developer-message-box">
+                        <p><strong>A Personal Note from the Developer:</strong></p>
+                        <p>I am a small independent developer building apps on my own with care and heart. To be completely real and open with you: I genuinely need financial support to continue developing full-time and sustain my living and project expenses.</p>
+                        <p>With your support, I can stay independent and focus on building real-time, high-quality apps and smart tools that genuinely help you and improve your daily routine.</p>
+                        <p>Loopify Music is 100% free with zero ads, no subscriptions, and complete respect for your privacy. If you value my work, even a small contribution via UPI means the world to me. Thank you from the bottom of my heart for your kindness!</p>
+                    </div>
+
+                    <div class="support-badges">
+                        <span class="support-pill">❤️ 100% Direct Support</span>
+                        <span class="support-pill">⚡ Any UPI App</span>
+                        <span class="support-pill">🔒 Secure &amp; Instant</span>
+                        <span class="support-pill">🚫 Zero Middleman Cut</span>
+                    </div>
+                </div>
+
+                <!-- UPI QR Card -->
+                <div class="qr-card">
+                    <div class="qr-card-header">Scan or Pay with Any UPI App</div>
+                    
+                    <div class="qr-img-wrapper">
+                        <img src="upi-qr.png" alt="Scan to pay via UPI to faahdmallick-1@okhdfcbank" id="qrImage">
+                    </div>
+
+                    <div class="upi-id-badge">
+                        <span id="upiText">faahdmallick-1@okhdfcbank</span>
+                        <button class="copy-upi-btn" onclick="copyUpiId()" id="copyBtn">Copy</button>
+                    </div>
+
+                    <div class="upi-action-btns">
+                        <a href="upi://pay?pa=faahdmallick-1@okhdfcbank&pn=Loopify%20Music&cu=INR" class="pay-upi-btn">
+                            Pay via UPI App
+                        </a>
+                        <a href="upi-qr.png" download="Loopify-Music-UPI-QR.png" class="download-qr-btn" title="Download QR Code">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+                            </svg>
+                        </a>
+                    </div>
+
+                    <div class="upi-apps-icons">
+                        Google Pay • PhonePe • Paytm • BHIM • Amazon Pay • Any Bank
+                    </div>
+                </div>
             </div>
         </section>
 
         <!-- Privacy Policy Header -->
         <div class="section-header" id="privacy">
-            <div class="badge">Google Play Store & GDPR Compliant</div>
+            <div class="badge">Google Play Store &amp; GDPR Compliant</div>
             <h2>Privacy Policy</h2>
             <p>Clear, transparent information on device permissions and your privacy guarantees.</p>
         </div>
@@ -880,25 +1426,22 @@
         <div class="policy-container">
             <div class="policy-meta">
                 <div><strong>Application:</strong> Loopify Music</div>
-                <div><strong>Developer:</strong> Loopify Audio Labs</div>
-                <div><strong>Effective Date:</strong> August 31, 2026</div>
-                <div><strong>Compliance:</strong> Google Play Store Policy & GDPR</div>
+                <div><strong>Developer:</strong> Loopify Audio</div>
+                <div><strong>Effective Date:</strong> September 2026</div>
+                <div><strong>Compliance:</strong> Google Play Store Policy &amp; GDPR</div>
             </div>
 
             <div class="policy-section">
-                <h3>1. Introduction & Overview</h3>
-                <p>Welcome to <strong>Loopify Music</strong>. This Privacy Policy describes how Loopify Music ("we", "us", or "our") protects your privacy when using our Android application.</p>
-                
-                <div class="highlight-box">
-                    <p>Core Privacy Guarantee: Loopify Music is an offline-first utility. We do NOT collect, transmit, share, or sell any personal data, audio files, or usage telemetry to any external servers.</p>
-                </div>
+                <h3>1. Introduction &amp; Overview</h3>
+                <p>Welcome to <strong>Loopify Music</strong>. This Privacy Policy describes how Loopify Music protects your privacy when using our Android application.</p>
+                <p><strong>Core Guarantee:</strong> Loopify Music is an offline-first utility. We do NOT collect, transmit, share, or sell any personal data, audio files, or usage telemetry to any external servers.</p>
             </div>
 
             <div class="policy-section">
                 <h3>2. Information We Handle</h3>
                 <ul>
                     <li><strong>Local Audio Files:</strong> The app accesses audio files stored locally on your device (MP3, WAV, M4A, FLAC, AAC, OGG) solely to play and loop them. Files are never uploaded to any cloud server.</li>
-                    <li><strong>Loop Presets & History:</strong> Loop markers, target count numbers, and playlist configurations are stored locally on your device via an encrypted SQLite database.</li>
+                    <li><strong>Loop Presets &amp; History:</strong> Loop markers, target count numbers, and playlist configurations are stored locally on your device via Room SQLite database.</li>
                     <li><strong>No User Accounts:</strong> The app requires no login, email, phone number, or credentials.</li>
                 </ul>
             </div>
@@ -914,7 +1457,12 @@
                     </div>
 
                     <div class="perm-row">
-                        <span class="perm-name">FOREGROUND_SERVICE & MEDIA_PLAYBACK</span>
+                        <span class="perm-name">WRITE_SETTINGS</span>
+                        <span class="perm-desc">Requested only when you choose to set a trimmed audio track as your phone ringtone, notification, or alarm.</span>
+                    </div>
+
+                    <div class="perm-row">
+                        <span class="perm-name">FOREGROUND_SERVICE &amp; MEDIA_PLAYBACK</span>
                         <span class="perm-desc">Keeps audio looping active when the screen is locked or while using other apps.</span>
                     </div>
 
@@ -922,28 +1470,13 @@
                         <span class="perm-name">POST_NOTIFICATIONS</span>
                         <span class="perm-desc">Displays the lock-screen player and notification controls on Android 13+.</span>
                     </div>
-
-                    <div class="perm-row">
-                        <span class="perm-name">WAKE_LOCK</span>
-                        <span class="perm-desc">Prevents system sleep during active loop rehearsal sessions.</span>
-                    </div>
                 </div>
-            </div>
-
-            <div class="policy-section">
-                <h3>4. Third-Party Services</h3>
-                <p>Loopify Music does not contain any third-party ad networks, advertising identifiers, or tracking SDKs. It uses standard AndroidX libraries created by Google for media playback and UI layout.</p>
-            </div>
-
-            <div class="policy-section">
-                <h3>5. Children's Privacy (COPPA)</h3>
-                <p>Loopify Music does not collect personal data from anyone, making it safe and compliant for all ages, including students and children.</p>
             </div>
 
             <!-- Contact & Support Form -->
             <div class="policy-section" id="contact">
-                <h3>6. Developer Support & Feedback</h3>
-                <p>Have questions regarding this Privacy Policy, bug reports, or feature requests? Send a message directly using the secure form below:</p>
+                <h3>4. Developer Support &amp; Feedback</h3>
+                <p>Have questions regarding this Privacy Policy, bug reports, or feature requests? Send a message directly using the form below:</p>
                 
                 <div class="contact-card">
                     <form class="contact-form" id="supportForm" onsubmit="handleFormSubmit(event)">
@@ -953,23 +1486,23 @@
                         </div>
                         
                         <div class="form-group">
-                            <label for="userEmail">Your Email Address (for reply)</label>
+                            <label for="userEmail">Your Email Address</label>
                             <input type="email" id="userEmail" class="form-input" placeholder="name@example.com" required>
                         </div>
 
                         <div class="form-group">
-                            <label for="userCategory">Subject / Inquiry Type</label>
+                            <label for="userCategory">Subject</label>
                             <select id="userCategory" class="form-input" style="background: var(--bg-dark); cursor: pointer;">
                                 <option value="Feature Request">Feature Request</option>
-                                <option value="Privacy Question">Privacy Question</option>
+                                <option value="Support Inquiry">Support Inquiry</option>
                                 <option value="Bug Report">Bug Report</option>
                                 <option value="General Feedback">General Feedback</option>
                             </select>
                         </div>
 
                         <div class="form-group">
-                            <label for="userMessage">Message / Comments</label>
-                            <textarea id="userMessage" class="form-textarea" placeholder="Write your message or comment here..." required></textarea>
+                            <label for="userMessage">Message</label>
+                            <textarea id="userMessage" class="form-textarea" placeholder="Write your message or feedback here..." required></textarea>
                         </div>
 
                         <button type="submit" class="form-submit-btn">
@@ -992,26 +1525,85 @@
     <!-- Footer -->
     <footer>
         <div class="container">
-            <div class="footer-brand">Loopify Music • Precision Audio Looper</div>
-            <p>© 2026 Loopify Music. All rights reserved.</p>
+            <div class="footer-brand">Loopify Music • Precision Audio Engine</div>
+            <p>© 2026 Loopify Music. Independent Developer. All rights reserved.</p>
         </div>
     </footer>
 
     <script>
+        // In-App Browser (Facebook, Instagram, LinkedIn, etc.) Detection
+        (function detectInAppBrowser() {
+            var ua = navigator.userAgent || navigator.vendor || window.opera;
+            var isFacebook = (ua.indexOf("FBAN") > -1) || (ua.indexOf("FBAV") > -1) || (ua.indexOf("FB_IAB") > -1);
+            var isInstagram = (ua.indexOf("Instagram") > -1);
+            var isOtherInApp = (ua.indexOf("Line") > -1) || (ua.indexOf("Twitter") > -1) || (ua.indexOf("LinkedInApp") > -1);
+
+            if (isFacebook || isInstagram || isOtherInApp) {
+                var notice = document.getElementById('inAppNotice');
+                if (notice) {
+                    notice.style.display = 'block';
+                }
+            }
+        })();
+
+        // Copy UPI ID to Clipboard with instant feedback
+        function copyUpiId() {
+            var upiId = "faahdmallick-1@okhdfcbank";
+            var copyBtn = document.getElementById('copyBtn');
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(upiId).then(showCopied).catch(fallbackCopy);
+            } else {
+                fallbackCopy();
+            }
+
+            function showCopied() {
+                if (copyBtn) {
+                    copyBtn.innerText = "✓ Copied!";
+                    copyBtn.style.background = "#00C853";
+                    setTimeout(function() {
+                        copyBtn.innerText = "Copy";
+                        copyBtn.style.background = "#7000FF";
+                    }, 2500);
+                }
+            }
+
+            function fallbackCopy() {
+                var textArea = document.createElement("textarea");
+                textArea.value = upiId;
+                textArea.style.position = "fixed";
+                textArea.style.opacity = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showCopied();
+                } catch (err) {
+                    alert("UPI ID: " + upiId);
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        // Contact Form Submission
         function handleFormSubmit(e) {
             e.preventDefault();
-            const btn = document.querySelector('.form-submit-btn');
-            const successBox = document.getElementById('formSuccess');
+            var btn = document.querySelector('.form-submit-btn');
+            var successBox = document.getElementById('formSuccess');
             
-            btn.innerHTML = 'Sending...';
-            btn.style.opacity = '0.7';
-            btn.disabled = true;
+            if (btn) {
+                btn.innerHTML = 'Sending...';
+                btn.style.opacity = '0.7';
+                btn.disabled = true;
+            }
             
-            setTimeout(() => {
-                btn.style.display = 'none';
-                successBox.style.display = 'block';
-                document.getElementById('supportForm').reset();
-            }, 800);
+            setTimeout(function() {
+                if (btn) btn.style.display = 'none';
+                if (successBox) successBox.style.display = 'block';
+                var form = document.getElementById('supportForm');
+                if (form) form.reset();
+            }, 700);
         }
     </script>
 

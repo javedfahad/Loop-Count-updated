@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.HorizontalDivider
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun NavigationDrawerContent(
+    onNavigateToSupport: () -> Unit,
     onNavigateToAppearance: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onCloseDrawer: () -> Unit
@@ -84,7 +86,21 @@ fun NavigationDrawerContent(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Navigation Items
+            // Navigation Items - Support Loopify Music FIRST
+            DrawerNavItem(
+                icon = Icons.Default.Favorite,
+                title = "Support Loopify Music",
+                subtitle = "Keep this independent project alive",
+                iconTint = MaterialTheme.colorScheme.primary,
+                onClick = {
+                    onCloseDrawer()
+                    onNavigateToSupport()
+                },
+                testTag = "drawer_item_support"
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
             DrawerNavItem(
                 icon = Icons.Default.Palette,
                 title = "Appearance",
@@ -137,6 +153,7 @@ private fun DrawerNavItem(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
+    iconTint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
     testTag: String = ""
 ) {
     Surface(
@@ -162,7 +179,7 @@ private fun DrawerNavItem(
                 Icon(
                     imageVector = icon,
                     contentDescription = title,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = iconTint,
                     modifier = Modifier.size(20.dp)
                 )
             }

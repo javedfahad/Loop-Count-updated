@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.RingVolume
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
@@ -48,12 +49,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.model.AudioTrack
 import com.example.model.UserFolder
 import com.example.util.toProperTitleCase
@@ -78,8 +82,20 @@ fun TrackOptionsDialog(
     var isConfirmingDelete by remember { mutableStateOf(false) }
     var isPickingFolder by remember { mutableStateOf(false) }
     var isCreatingFolder by remember { mutableStateOf(false) }
+    var isSettingRingtone by remember { mutableStateOf(false) }
     var newFolderText by remember { mutableStateOf("") }
     var renameText by remember { mutableStateOf(track.displayTitle) }
+
+    if (isSettingRingtone) {
+        RingtoneDialog(
+            track = track,
+            onDismiss = {
+                isSettingRingtone = false
+                onDismiss()
+            }
+        )
+        return
+    }
 
     if (isCreatingFolder) {
         AlertDialog(
@@ -372,6 +388,16 @@ fun TrackOptionsDialog(
                 )
 
                 OptionMenuItem(
+                    painter = painterResource(id = R.drawable.ic_set_ringtone),
+                    title = "Set as Ringtone...",
+                    subtitle = "Trim start & stop seconds for phone tone",
+                    onClick = {
+                        isSettingRingtone = true
+                    },
+                    testTag = "option_set_as_ringtone"
+                )
+
+                OptionMenuItem(
                     icon = Icons.Default.Checklist,
                     title = "Select Multiple",
                     subtitle = "Enter batch selection mode",
@@ -426,10 +452,11 @@ fun TrackOptionsDialog(
 
 @Composable
 fun OptionMenuItem(
-    icon: ImageVector,
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    painter: Painter? = null,
     subtitle: String? = null,
     titleColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
     iconTint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
@@ -444,12 +471,21 @@ fun OptionMenuItem(
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = iconTint,
-            modifier = Modifier.size(19.dp)
-        )
+        if (painter != null) {
+            Icon(
+                painter = painter,
+                contentDescription = title,
+                tint = iconTint,
+                modifier = Modifier.size(19.dp)
+            )
+        } else if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = iconTint,
+                modifier = Modifier.size(19.dp)
+            )
+        }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

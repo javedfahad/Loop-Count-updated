@@ -29,11 +29,13 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.RingVolume
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -56,16 +58,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.model.AudioTrack
 import com.example.playback.AudioPlayerManager
 import com.example.playback.PlaybackState
 import com.example.ui.components.NowPlayingArtworkCard
 import com.example.ui.dialogs.RepeatCountDialog
+import com.example.ui.dialogs.RingtoneDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,6 +81,7 @@ fun NowPlayingScreen(
 ) {
     val track = playbackState.currentTrack
     var showRepeatDialog by remember { mutableStateOf(false) }
+    var showRingtoneDialog by remember { mutableStateOf(false) }
 
     var isUserSeeking by remember { mutableStateOf(false) }
     var userSeekPos by remember { mutableFloatStateOf(0f) }
@@ -88,6 +94,13 @@ fun NowPlayingScreen(
             onStartRepeat = { count, stopAfterFinish ->
                 playerManager.setRepeatCount(count, stopAfterFinish)
             }
+        )
+    }
+
+    if (showRingtoneDialog && track != null) {
+        RingtoneDialog(
+            track = track,
+            onDismiss = { showRingtoneDialog = false }
         )
     }
 
@@ -125,7 +138,21 @@ fun NowPlayingScreen(
                         )
                     }
                 },
-                actions = {},
+                actions = {
+                    if (track != null) {
+                        IconButton(
+                            onClick = { showRingtoneDialog = true },
+                            modifier = Modifier.testTag("now_playing_ringtone_action_btn")
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_set_ringtone),
+                                contentDescription = "Set as Ringtone",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
@@ -483,6 +510,26 @@ fun NowPlayingScreen(
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        FilledTonalButton(
+                            onClick = { showRingtoneDialog = true },
+                            enabled = track != null,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("btn_set_as_ringtone_tablet")
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_set_ringtone),
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Set Song as Ringtone", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
                     }
                 }
             } else {
@@ -819,6 +866,27 @@ fun NowPlayingScreen(
                                 )
                             }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    FilledTonalButton(
+                        onClick = { showRingtoneDialog = true },
+                        enabled = track != null,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 480.dp)
+                            .testTag("btn_set_as_ringtone_phone")
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_set_ringtone),
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Set Song as Ringtone", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))

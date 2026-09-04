@@ -471,9 +471,11 @@ fun HomeScreen(
             onDismiss = { selectedTrackForOptions = null },
             onPlay = {
                 playerManager.playTrack(track, filteredTracks, startPositionMs = 0L)
+                onOpenNowPlaying()
             },
             onResume = {
                 playerManager.resumeTrack(track, filteredTracks)
+                onOpenNowPlaying()
             },
             onRepeatOptions = {
                 trackForRepeatDialog = track
@@ -617,6 +619,7 @@ fun HomeScreen(
                                 IconButton(
                                     onClick = {
                                         playerManager.playTrack(selectedTracks.first(), selectedTracks.toList())
+                                        onOpenNowPlaying()
                                         isMultiSelectMode = false
                                         selectedTracks.clear()
                                     },
@@ -857,6 +860,7 @@ fun HomeScreen(
                                         if (selectedTracks.isNotEmpty()) {
                                             val listToPlay = selectedTracks.toList()
                                             playerManager.playTrack(listToPlay.first(), listToPlay)
+                                            onOpenNowPlaying()
                                             isMultiSelectMode = false
                                             selectedTracks.clear()
                                         }
@@ -1021,6 +1025,7 @@ fun HomeScreen(
                                             }
                                         } else {
                                             playerManager.playTrack(track, filteredTracks)
+                                            onOpenNowPlaying()
                                         }
                                     },
                                     onLongClick = {

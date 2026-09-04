@@ -46,6 +46,7 @@ import com.example.ui.screens.AppearanceScreen
 import com.example.ui.screens.FolderDetailScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.NowPlayingScreen
+import com.example.ui.screens.SupportLoopifyScreen
 import com.example.ui.splash.SplashScreen
 import com.example.ui.theme.LoopCountTheme
 import com.example.viewmodel.MainViewModel
@@ -58,6 +59,7 @@ sealed class Screen {
     object NowPlaying : Screen()
     object Appearance : Screen()
     object About : Screen()
+    object Support : Screen()
 }
 
 class MainActivity : ComponentActivity() {
@@ -175,6 +177,9 @@ class MainActivity : ComponentActivity() {
                     gesturesEnabled = currentScreen is Screen.Home,
                     drawerContent = {
                         NavigationDrawerContent(
+                            onNavigateToSupport = {
+                                navigateTo(Screen.Support)
+                            },
                             onNavigateToAppearance = {
                                 navigateTo(Screen.Appearance)
                             },
@@ -301,15 +306,19 @@ class MainActivity : ComponentActivity() {
                                         onBack = { navigateBack() },
                                         onPlayTrack = { track, queue ->
                                             viewModel.playerManager.playTrack(track, queue, startPositionMs = 0L, folderKey = folderKey)
+                                            navigateTo(Screen.NowPlaying)
                                         },
                                         onPlayFolder = { tracks, minutes, shuffle ->
                                             viewModel.playFolder(folderKey, tracks, minutes, shuffle)
+                                            navigateTo(Screen.NowPlaying)
                                         },
                                         onResumeFolder = { tracks ->
                                             viewModel.resumeFolder(folderKey, tracks)
+                                            navigateTo(Screen.NowPlaying)
                                         },
                                         onMagicRemix = { tracks ->
                                             viewModel.playMagicRemix(currentFolder.name, tracks)
+                                            navigateTo(Screen.NowPlaying)
                                         },
                                         onReorder = { reordered ->
                                             if (currentFolder.id > 0) {
@@ -369,6 +378,12 @@ class MainActivity : ComponentActivity() {
 
                                 is Screen.About -> {
                                     AboutScreen(
+                                        onBack = { navigateBack() }
+                                    )
+                                }
+
+                                is Screen.Support -> {
+                                    SupportLoopifyScreen(
                                         onBack = { navigateBack() }
                                     )
                                 }
