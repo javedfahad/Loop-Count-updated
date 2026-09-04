@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -23,9 +24,9 @@ import java.io.FileOutputStream
 
 object QRCodeHelper {
 
-    const val UPI_ID = "faahdmallick-1@okhdfcbank"
-    const val PAYEE_NAME = "Loopify Music"
-    const val UPI_URI = "upi://pay?pa=faahdmallick-1@okhdfcbank&pn=Loopify%20Music&cu=INR"
+    const val UPI_ID = "7654992592@kotakbank"
+    const val PAYEE_NAME = "FAHAD JAVED"
+    const val UPI_URI = "upi://pay?pa=7654992592@kotakbank&pn=FAHAD%20JAVED&cu=INR"
 
     /**
      * Generates a high-contrast QR code bitmap for the UPI URI with high error correction.
@@ -171,12 +172,24 @@ object QRCodeHelper {
     }
 
     /**
+     * Retrieves the official Kotak 811 QR bitmap matching the user-uploaded card.
+     */
+    fun getKotakQrBitmap(context: Context): Bitmap {
+        return try {
+            BitmapFactory.decodeResource(context.resources, com.example.R.drawable.kotak_upi_qr)
+                ?: renderFullPaymentCardBitmap()
+        } catch (e: Exception) {
+            renderFullPaymentCardBitmap()
+        }
+    }
+
+    /**
      * Saves the QR code card into the device's Pictures gallery using MediaStore.
      */
     fun saveQrToGallery(context: Context): Boolean {
         return try {
-            val bitmap = renderFullPaymentCardBitmap()
-            val fileName = "Loopify_UPI_QR_${System.currentTimeMillis()}.png"
+            val bitmap = getKotakQrBitmap(context)
+            val fileName = "Loopify_Kotak_UPI_QR_${System.currentTimeMillis()}.png"
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
@@ -223,9 +236,9 @@ object QRCodeHelper {
      */
     fun shareQrCode(context: Context) {
         try {
-            val bitmap = renderFullPaymentCardBitmap()
+            val bitmap = getKotakQrBitmap(context)
             val cacheFolder = File(context.cacheDir, "images").apply { mkdirs() }
-            val file = File(cacheFolder, "loopify_support_qr.png")
+            val file = File(cacheFolder, "loopify_kotak_support_qr.png")
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
             }

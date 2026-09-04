@@ -73,6 +73,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -439,11 +442,11 @@ private fun SupportQrContent(
             .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Branded QR Card matching user uploaded image exactly
+        // Official Kotak 811 UPI Card matching user uploaded image exactly
         Card(
             shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Black),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
             modifier = Modifier
                 .widthIn(max = 360.dp)
                 .fillMaxWidth()
@@ -452,24 +455,25 @@ private fun SupportQrContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // QR Bitmap Image
+                // Exact Kotak 811 UPI Card Image
                 Image(
-                    bitmap = qrBitmap.asImageBitmap(),
-                    contentDescription = "UPI QR Code for $upiId",
+                    painter = painterResource(id = R.drawable.kotak_upi_qr),
+                    contentDescription = "Kotak 811 UPI QR Code for $upiId",
                     modifier = Modifier
-                        .size(240.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(22.dp)),
+                    contentScale = ContentScale.FillWidth
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // UPI ID Row with 1-click Copy
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFF1F3F4),
+                    color = Color(0xFF1E1A24),
                     modifier = Modifier
                         .clickable {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -477,7 +481,7 @@ private fun SupportQrContent(
                             copiedToClipboard = true
                             Toast.makeText(context, "UPI ID copied: $upiId", Toast.LENGTH_SHORT).show()
                         }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -487,27 +491,19 @@ private fun SupportQrContent(
                             text = "UPI ID: $upiId",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF202124)
+                            color = Color.White
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(
                             imageVector = if (copiedToClipboard) Icons.Default.Check else Icons.Default.ContentCopy,
                             contentDescription = "Copy UPI ID",
-                            tint = if (copiedToClipboard) Color(0xFF1E8E3E) else Color(0xFF5F6368),
+                            tint = if (copiedToClipboard) Color(0xFF30D158) else Color(0xFFCAC4D0),
                             modifier = Modifier.size(16.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = "Scan to pay with any UPI app",
-                    fontSize = 13.sp,
-                    color = Color(0xFF5F6368),
-                    fontWeight = FontWeight.Normal,
-                    textAlign = TextAlign.Center
-                )
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
 
