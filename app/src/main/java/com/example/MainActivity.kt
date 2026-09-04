@@ -46,6 +46,7 @@ import com.example.ui.screens.AppearanceScreen
 import com.example.ui.screens.FolderDetailScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.NowPlayingScreen
+import com.example.ui.screens.ShareToScreen
 import com.example.ui.screens.SupportLoopifyScreen
 import com.example.ui.splash.SplashScreen
 import com.example.ui.theme.LoopCountTheme
@@ -60,6 +61,7 @@ sealed class Screen {
     object Appearance : Screen()
     object About : Screen()
     object Support : Screen()
+    object ShareTo : Screen()
 }
 
 class MainActivity : ComponentActivity() {
@@ -177,6 +179,9 @@ class MainActivity : ComponentActivity() {
                     gesturesEnabled = currentScreen is Screen.Home,
                     drawerContent = {
                         NavigationDrawerContent(
+                            onNavigateToShareTo = {
+                                navigateTo(Screen.ShareTo)
+                            },
                             onNavigateToSupport = {
                                 navigateTo(Screen.Support)
                             },
@@ -385,6 +390,20 @@ class MainActivity : ComponentActivity() {
                                 is Screen.Support -> {
                                     SupportLoopifyScreen(
                                         onBack = { navigateBack() }
+                                    )
+                                }
+
+                                is Screen.ShareTo -> {
+                                    ShareToScreen(
+                                        allTracks = uiState.allTracks,
+                                        userFolders = uiState.userFolders,
+                                        deviceFolders = uiState.deviceFolders,
+                                        transferManager = viewModel.transferManager,
+                                        onBack = { navigateBack() },
+                                        onOpenLibrary = {
+                                            viewModel.onTransferCompleteRefresh()
+                                            navigateTo(Screen.Home)
+                                        }
                                     )
                                 }
                             }

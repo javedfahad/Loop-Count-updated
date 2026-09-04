@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun NavigationDrawerContent(
+    onNavigateToShareTo: () -> Unit,
     onNavigateToSupport: () -> Unit,
     onNavigateToAppearance: () -> Unit,
     onNavigateToAbout: () -> Unit,
@@ -86,7 +88,22 @@ fun NavigationDrawerContent(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Navigation Items - Support Loopify Music FIRST
+            // Navigation Items - Share to (ShareIt style Wi-Fi transfer)
+            DrawerNavItem(
+                icon = Icons.AutoMirrored.Filled.Send,
+                title = "Share to",
+                subtitle = "Fast Wi-Fi Song & Folder Transfer",
+                iconTint = MaterialTheme.colorScheme.primary,
+                onClick = {
+                    onCloseDrawer()
+                    onNavigateToShareTo()
+                },
+                testTag = "drawer_item_share_to"
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Navigation Items - Support Loopify Music
             DrawerNavItem(
                 icon = Icons.Default.Favorite,
                 title = "Support Loopify Music",
