@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -156,7 +157,8 @@ fun HomeScreen(
     onAddTrackToFolder: (Long, AudioTrack) -> Unit = { _, _ -> },
     onAddMultipleTracksToFolder: ((Long, List<AudioTrack>) -> Unit)? = null,
     onCreateFolderWithTrack: (String, AudioTrack) -> Unit = { _, _ -> },
-    onCreateFolderWithMultipleTracks: ((String, List<AudioTrack>) -> Unit)? = null
+    onCreateFolderWithMultipleTracks: ((String, List<AudioTrack>) -> Unit)? = null,
+    onOpenDualListen: (() -> Unit)? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = selectedTab.coerceIn(0, 1), pageCount = { 2 })
@@ -683,6 +685,20 @@ fun HomeScreen(
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1
                                 )
+                            }
+                        },
+                        actions = {
+                            if (onOpenDualListen != null) {
+                                IconButton(
+                                    onClick = onOpenDualListen,
+                                    modifier = Modifier.testTag("home_dual_listen_btn")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Headphones,
+                                        contentDescription = "Dual Listen Together [Beta]",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(

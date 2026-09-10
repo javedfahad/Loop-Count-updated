@@ -41,6 +41,7 @@ import androidx.core.content.ContextCompat
 import com.example.model.AudioTrack
 import com.example.model.UserFolder
 import com.example.ui.components.NavigationDrawerContent
+import com.example.ui.dialogs.DualListenBottomSheet
 import com.example.ui.screens.AboutScreen
 import com.example.ui.screens.AppearanceScreen
 import com.example.ui.screens.FolderDetailScreen
@@ -177,6 +178,15 @@ class MainActivity : ComponentActivity() {
                     navigateBack()
                 }
 
+                var showDualListenSheet by remember { mutableStateOf(false) }
+
+                if (showDualListenSheet) {
+                    DualListenBottomSheet(
+                        syncManager = viewModel.bluetoothSyncManager,
+                        onDismiss = { showDualListenSheet = false }
+                    )
+                }
+
                 ModalNavigationDrawer(
                     drawerState = drawerState,
                     gesturesEnabled = currentScreen is Screen.Home,
@@ -193,6 +203,9 @@ class MainActivity : ComponentActivity() {
                             },
                             onNavigateToAbout = {
                                 navigateTo(Screen.About)
+                            },
+                            onOpenDualListen = {
+                                showDualListenSheet = true
                             },
                             onCloseDrawer = {
                                 scope.launch { drawerState.close() }
@@ -237,6 +250,9 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onOpenDrawer = {
                                             scope.launch { drawerState.open() }
+                                        },
+                                        onOpenDualListen = {
+                                            showDualListenSheet = true
                                         },
                                         onOpenNowPlaying = {
                                             navigateTo(Screen.NowPlaying)

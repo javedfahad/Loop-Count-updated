@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.HorizontalDivider
@@ -40,6 +42,7 @@ fun NavigationDrawerContent(
     onNavigateToSupport: () -> Unit,
     onNavigateToAppearance: () -> Unit,
     onNavigateToAbout: () -> Unit,
+    onOpenDualListen: () -> Unit = {},
     onCloseDrawer: () -> Unit
 ) {
     ModalDrawerSheet(
@@ -87,6 +90,21 @@ fun NavigationDrawerContent(
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
             Spacer(modifier = Modifier.height(12.dp))
+
+            // Navigation Items - Dual Listen (Bluetooth Sync Together)
+            DrawerNavItem(
+                icon = Icons.Default.Headphones,
+                title = "Dual Listen [Beta]",
+                subtitle = "Listen Together via Bluetooth",
+                iconTint = MaterialTheme.colorScheme.primary,
+                onClick = {
+                    onCloseDrawer()
+                    onOpenDualListen()
+                },
+                testTag = "drawer_item_dual_listen"
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Navigation Items - Share to (ShareIt style Wi-Fi transfer)
             DrawerNavItem(
