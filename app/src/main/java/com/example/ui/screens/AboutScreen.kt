@@ -20,10 +20,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
@@ -33,6 +38,7 @@ import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -211,28 +217,64 @@ fun AboutScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Feature 7: Zero-Duplicate Smart Storage
+            // Feature 7: Ringtone Cutter & Audio Trimmer
+            FeatureCard(
+                icon = Icons.Default.ContentCut,
+                title = "7. Ringtone Trimmer & Audio Cutter",
+                description = "Set exact start and stop second markers to preview, trim, and set any track directly as your Phone Ringtone, Alarm, or Notification sound with 1 tap."
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Feature 8: Dual Listen Offline Bluetooth Sync (BETA)
+            FeatureCard(
+                icon = Icons.Default.Headphones,
+                title = "8. Dual Listen (Offline Bluetooth Sync) [Beta - Under Development]",
+                description = "Listen together with a friend's phone over local Bluetooth. When the host plays, pauses, or seeks, both phones synchronize playback in real time without needing internet or mobile data. (Actively under development)."
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Feature 9: Offline Wi-Fi Direct Transfer
+            FeatureCard(
+                icon = Icons.Default.Wifi,
+                title = "9. Offline Wi-Fi Song Sharing",
+                description = "Send and receive songs directly phone-to-phone at high transfer speeds using local Wi-Fi Hotspot. 100% offline with zero mobile data consumption."
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Feature 10: 5-Band Equalizer & Bass Boost
+            FeatureCard(
+                icon = Icons.Default.GraphicEq,
+                title = "10. 5-Band Equalizer & Bass Boost",
+                description = "Fine-tune frequencies, boost bass response, and adjust virtualizer sound stages to match your headphones and speakers."
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Feature 11: Zero-Duplicate Smart Storage
             FeatureCard(
                 icon = Icons.Default.Storage,
-                title = "7. Zero-Duplicate Storage Engine",
+                title = "11. Zero-Duplicate Storage Engine",
                 description = "Custom folders and playlists save lightweight pointer references without copying or duplicating your audio files. The entire app uses under 2 MB, keeping your phone storage completely free."
             )
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Feature 8: Title Case Formatting & Magic Remix
+            // Feature 12: Title Case Formatting & Magic Remix
             FeatureCard(
                 icon = Icons.Default.AutoAwesome,
-                title = "8. Smart Formatting & Magic Remix",
+                title = "12. Smart Formatting & Magic Remix",
                 description = "Automatic Title Case cleans up folder and track names no matter how they are typed. Enjoy playlist shuffle, continuous loop modes, and flexible audio organization."
             )
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Feature 9: Theme Customization & Privacy
+            // Feature 13: Theme Customization & Privacy
             FeatureCard(
                 icon = Icons.Default.Palette,
-                title = "9. Theme Styles & Offline Privacy",
+                title = "13. Theme Styles & Offline Privacy",
                 description = "Customize dark, light, or OLED true black modes with vivid accents. Loopify Music operates completely offline without data collection or tracking."
             )
 

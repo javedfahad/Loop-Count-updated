@@ -33,6 +33,10 @@ class AudioRepository(
 ) {
     private val persistentStorage = PersistentStorageManager(context)
 
+    @Volatile
+    var lastLoadedTracks: List<AudioTrack> = emptyList()
+        private set
+
     suspend fun restoreAndSyncPersistentStorage() = withContext(Dispatchers.IO) {
         try {
             // 1. Sync User Folders
@@ -290,6 +294,7 @@ class AudioRepository(
             e.printStackTrace()
         }
 
+        lastLoadedTracks = trackList
         trackList
     }
 

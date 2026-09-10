@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -43,14 +45,18 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -65,6 +71,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -75,6 +82,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -110,6 +118,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.model.AudioTrack
 import com.example.model.DeviceFolder
 import com.example.model.UserFolder
+import com.example.transfer.DiscoveredDevice
 import com.example.transfer.NetworkUtils
 import com.example.transfer.ReceiverState
 import com.example.transfer.TransferItem
@@ -159,19 +168,28 @@ fun ShareToScreen(
     val selectedFolderKeys = remember { mutableStateListOf<String>() }
     var expandedFolderKey by remember { mutableStateOf<String?>(null) }
 
-    // Live Transfer Active Dialog
+    // Live Transfer Active Dialog & Radar Sheet
     var showSendProgressDialog by remember { mutableStateOf(false) }
+    var showDeviceRadarSheet by remember { mutableStateOf(false) }
+    var showMaxFolderDialog by remember { mutableStateOf(false) }
 
-    // Start/stop receiver server when entering/leaving RECEIVE mode
+    val discoveredDevices by transferManager.discoveredDevices.collectAsState()
+    val isSearchingDevices by transferManager.isSearchingDevices.collectAsState()
+
+    // Start/stop receiver server when entering/leaving RECEIVE mode, or start discovery in SEND mode
     DisposableEffect(shareMode) {
         if (shareMode == ShareMode.RECEIVE) {
+            transferManager.stopDiscovery()
             transferManager.startReceiver()
         } else {
             transferManager.stopReceiver()
+            transferManager.startDiscovery()
         }
         onDispose {
             if (shareMode == ShareMode.RECEIVE) {
                 transferManager.stopReceiver()
+            } else {
+                transferManager.stopDiscovery()
             }
         }
     }
@@ -225,6 +243,41 @@ fun ShareToScreen(
         tracksToSend.sumOf { (it.durationMs * 16L).coerceAtLeast(1024L * 1024L) }
     }
 
+    // Direct helper to send to any target IP
+    val startSendingToIp: (String) -> Unit = { targetIp ->
+        showDeviceRadarSheet = false
+        focusManager.clearFocus()
+        scope.launch {
+            val items = transferManager.prepareTransferItems(tracksToSend)
+            showSendProgressDialog = true
+            transferManager.sendItems(
+                receiverIp = targetIp.trim(),
+                items = items,
+                onSuccess = {
+                    Toast.makeText(context, "All songs sent successfully!", Toast.LENGTH_LONG).show()
+                },
+                onError = { err ->
+                    Toast.makeText(context, "Transfer error: $err", Toast.LENGTH_LONG).show()
+                }
+            )
+        }
+    }
+
+    // QR scanner launcher via camera preview
+    val qrLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        if (bitmap != null) {
+            val qrText = NetworkUtils.decodeQrFromBitmap(bitmap)
+            val ip = qrText?.let { NetworkUtils.parseIpFromPayload(it) }
+            if (!ip.isNullOrBlank()) {
+                receiverIpInput = ip
+                Toast.makeText(context, "Connected to receiver ($ip)!", Toast.LENGTH_SHORT).show()
+                startSendingToIp(ip)
+            } else {
+                Toast.makeText(context, "Could not detect QR code. Try again or tap Hotspot.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -253,32 +306,6 @@ fun ShareToScreen(
                         )
                     }
                 },
-                actions = {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(end = 12.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Wifi,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Wi-Fi Direct",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
@@ -304,9 +331,9 @@ fun ShareToScreen(
                             Column {
                                 Text(
                                     text = if (selectionTab == SelectionTab.SONGS) {
-                                        "${tracksToSend.size} songs selected"
+                                        "Songs"
                                     } else {
-                                        "${selectedFolderKeys.size} folders (${tracksToSend.size} songs)"
+                                        "Folders"
                                     },
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
@@ -322,25 +349,11 @@ fun ShareToScreen(
 
                             Button(
                                 onClick = {
-                                    if (receiverIpInput.isBlank()) {
-                                        Toast.makeText(context, "Please enter Receiver IP address", Toast.LENGTH_SHORT).show()
+                                    if (tracksToSend.isEmpty()) {
+                                        Toast.makeText(context, "Please select at least one song or folder to send", Toast.LENGTH_SHORT).show()
                                         return@Button
                                     }
-                                    focusManager.clearFocus()
-                                    scope.launch {
-                                        val items = transferManager.prepareTransferItems(tracksToSend)
-                                        showSendProgressDialog = true
-                                        transferManager.sendItems(
-                                            receiverIp = receiverIpInput.trim(),
-                                            items = items,
-                                            onSuccess = {
-                                                Toast.makeText(context, "All songs sent successfully!", Toast.LENGTH_LONG).show()
-                                            },
-                                            onError = { err ->
-                                                Toast.makeText(context, "Transfer error: $err", Toast.LENGTH_LONG).show()
-                                            }
-                                        )
-                                    }
+                                    showDeviceRadarSheet = true
                                 },
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(
@@ -355,7 +368,7 @@ fun ShareToScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Send Now",
+                                    text = "Send to Phone",
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -461,8 +474,7 @@ fun ShareToScreen(
 
                 ShareMode.SEND -> {
                     SendModeContent(
-                        receiverIp = receiverIpInput,
-                        onReceiverIpChanged = { receiverIpInput = it },
+                        discoveredDevices = discoveredDevices,
                         selectionTab = selectionTab,
                         onSelectionTabChanged = { selectionTab = it },
                         searchQuery = searchQuery,
@@ -493,9 +505,10 @@ fun ShareToScreen(
                             } else {
                                 // Enforce user constraint: maximum 2 folders!
                                 if (selectedFolderKeys.size >= 2) {
+                                    showMaxFolderDialog = true
                                     Toast.makeText(
                                         context,
-                                        "Maximum 2 folders allowed per transfer. Deselect one first.",
+                                        "Maximum 2 folders allowed. Please uncheck one folder first.",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 } else {
@@ -511,6 +524,62 @@ fun ShareToScreen(
                 }
             }
         }
+    }
+
+    // Popup alert message when user attempts to select more than 2 folders
+    if (showMaxFolderDialog) {
+        AlertDialog(
+            onDismissRequest = { showMaxFolderDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Maximum 2 Folders",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "You can select a maximum of 2 folders to send at a time. To choose a different folder, please deselect one of your currently selected folders first."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showMaxFolderDialog = false },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
+    // Nearby Device Radar Bottom Sheet
+    if (showDeviceRadarSheet) {
+        NearbyDeviceRadarSheet(
+            discoveredDevices = discoveredDevices,
+            isSearching = isSearchingDevices,
+            onSendToDevice = { ip ->
+                startSendingToIp(ip)
+            },
+            onScanQr = {
+                qrLauncher.launch(null)
+            },
+            onSendViaHotspot = {
+                val gateway = NetworkUtils.getGatewayIpAddress(context) ?: "192.168.43.1"
+                Toast.makeText(context, "Connecting to Hotspot ($gateway)...", Toast.LENGTH_SHORT).show()
+                startSendingToIp(gateway)
+            },
+            manualIp = receiverIpInput,
+            onManualIpChanged = { receiverIpInput = it },
+            onDismiss = { showDeviceRadarSheet = false }
+        )
     }
 
     // Active Live Transfer Dialog (Sending)
@@ -1107,12 +1176,11 @@ fun ReceiveModeContent(
 }
 
 /**
- * UI for Send Mode with Sender IP input, Tabs (Songs vs Folders with 2-folder cap), and preview.
+ * UI for Send Mode with automatic receiver detection, Tabs (Songs vs Folders with 2-folder cap), and preview.
  */
 @Composable
 fun SendModeContent(
-    receiverIp: String,
-    onReceiverIpChanged: (String) -> Unit,
+    discoveredDevices: List<DiscoveredDevice>,
     selectionTab: SelectionTab,
     onSelectionTabChanged: (SelectionTab) -> Unit,
     searchQuery: String,
@@ -1138,69 +1206,79 @@ fun SendModeContent(
             .fillMaxSize()
             .padding(horizontal = 16.dp)
     ) {
-        // Target Receiver IP Input Card
+        // Clean, elegant Status Banner (No raw IP field clutter)
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            color = if (discoveredDevices.isNotEmpty())
+                Color(0xFF4CAF50).copy(alpha = 0.12f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (discoveredDevices.isNotEmpty()) Color(0xFF4CAF50).copy(alpha = 0.4f)
+                else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            ),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                OutlinedTextField(
-                    value = receiverIp,
-                    onValueChange = onReceiverIpChanged,
-                    label = { Text("Receiver Device IP") },
-                    placeholder = { Text("192.168.43.1") },
-                    singleLine = true,
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Wifi,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("receiver_ip_input")
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Auto Hotspot Default button
-                OutlinedButton(
-                    onClick = {
-                        onReceiverIpChanged("192.168.43.1")
-                        Toast.makeText(context, "Set to Hotspot Gateway (192.168.43.1)", Toast.LENGTH_SHORT).show()
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = "Hotspot",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        imageVector = if (discoveredDevices.isNotEmpty()) Icons.Default.CheckCircle else Icons.Default.Wifi,
+                        contentDescription = null,
+                        tint = if (discoveredDevices.isNotEmpty()) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
                     )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = if (discoveredDevices.isNotEmpty())
+                                "Receiver Detected: ${discoveredDevices.first().name}"
+                            else
+                                "Wi-Fi Music Sharing",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (discoveredDevices.isNotEmpty())
+                                "Ready to send • Tap 'Send to Phone' below"
+                            else
+                                "Select songs or folders, then tap 'Send to Phone'",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (discoveredDevices.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF4CAF50).copy(alpha = 0.25f)
+                    ) {
+                        Text(
+                            text = "READY",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF1B5E20),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Selection Tabs: "Songs (One by One)" vs "Folders (Max 2)"
+        // Selection Tabs: "Songs" vs "Folders"
         TabRow(
             selectedTabIndex = selectionTab.ordinal,
             containerColor = Color.Transparent,
@@ -1217,7 +1295,7 @@ fun SendModeContent(
                 onClick = { onSelectionTabChanged(SelectionTab.SONGS) },
                 text = {
                     Text(
-                        text = "Songs (One by One)",
+                        text = "Songs",
                         fontWeight = if (selectionTab == SelectionTab.SONGS) FontWeight.Bold else FontWeight.Normal,
                         color = if (selectionTab == SelectionTab.SONGS) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1230,28 +1308,10 @@ fun SendModeContent(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Folders (Max 2)",
+                            text = "Folders",
                             fontWeight = if (selectionTab == SelectionTab.FOLDERS) FontWeight.Bold else FontWeight.Normal,
                             color = if (selectionTab == SelectionTab.FOLDERS) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (selectedFolderKeys.isNotEmpty()) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = "${selectedFolderKeys.size}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             )
@@ -1393,7 +1453,7 @@ fun SendModeContent(
             }
 
             SelectionTab.FOLDERS -> {
-                // Folders Mode (Max 2 Folders Constraint)
+                // Folders Mode
                 Card(
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(
@@ -1410,7 +1470,7 @@ fun SendModeContent(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Folder Selection (Max 2 Folders)",
+                                text = "Folder Selection",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -1423,14 +1483,14 @@ fun SendModeContent(
 
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = if (selectedFolderKeys.size == 2) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                            color = if (selectedFolderKeys.size >= 2) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
                             modifier = Modifier.padding(start = 8.dp)
                         ) {
                             Text(
-                                text = "${selectedFolderKeys.size} / 2 Selected",
+                                text = if (selectedFolderKeys.size >= 2) "Max Folders Selected" else "Selected Folders",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (selectedFolderKeys.size == 2) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+                                color = if (selectedFolderKeys.size >= 2) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
@@ -1594,6 +1654,275 @@ fun SendModeContent(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Modern Nearby Devices Radar Bottom Sheet for 1-tap music transfer.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NearbyDeviceRadarSheet(
+    discoveredDevices: List<DiscoveredDevice>,
+    isSearching: Boolean,
+    onSendToDevice: (String) -> Unit,
+    onScanQr: () -> Unit,
+    onSendViaHotspot: () -> Unit,
+    manualIp: String,
+    onManualIpChanged: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var showManualIp by remember { mutableStateOf(false) }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "sheet_radar_pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "sheet_scale"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 0.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "sheet_alpha"
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Send to Nearby Phone",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Fast local Wi-Fi transfer • Zero mobile data used",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Radar Animation
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(100.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(90.dp)
+                        .scale(pulseScale)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha))
+                )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Wifi,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Discovered Devices Section
+            if (discoveredDevices.isNotEmpty()) {
+                Text(
+                    text = "Nearby Receivers Found (${discoveredDevices.size}):",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    discoveredDevices.forEach { dev ->
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSendToDevice(dev.ip) }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.PhoneAndroid,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = dev.name,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Ready to receive • Tap to send",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFF2E7D32),
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+
+                                Button(
+                                    onClick = { onSendToDevice(dev.ip) },
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Send", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = "Searching for receiver on your Wi-Fi...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Make sure the other phone has 'Receive' open in Loopify",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Instant 1-Tap Connect Options
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Hotspot 1-tap connect
+                Button(
+                    onClick = onSendViaHotspot,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(imageVector = Icons.Default.WifiTethering, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Hotspot Mode", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+
+                // Scan QR code
+                Button(
+                    onClick = onScanQr,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(imageVector = Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Scan QR", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Manual IP fallback accordion
+            TextButton(
+                onClick = { showManualIp = !showManualIp }
+            ) {
+                Text(
+                    text = if (showManualIp) "Hide manual IP" else "Enter IP manually",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+
+            if (showManualIp) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = manualIp,
+                        onValueChange = onManualIpChanged,
+                        label = { Text("Receiver IP") },
+                        placeholder = { Text("192.168.43.1") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (manualIp.isNotBlank()) {
+                                onSendToDevice(manualIp.trim())
+                            }
+                        },
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Send")
                     }
                 }
             }

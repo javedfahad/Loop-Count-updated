@@ -152,6 +152,7 @@ class MediaPlaybackService : MediaSessionService() {
 
         val dynamicSubtext = when {
             state.isMagicRemixActive -> "✨ Magic Remix • #${state.magicTransitionCount}"
+            state.isInfiniteRepeat -> "Infinite Loop (∞)"
             state.isRepeatActive -> "Remaining: ${state.remainingCount}"
             state.stopAfterFinish -> "Stop after this track"
             state.isFolderTimerActive -> "Timer active"
@@ -166,6 +167,7 @@ class MediaPlaybackService : MediaSessionService() {
 
         val contentText = when {
             state.isMagicRemixActive -> "✨ Magic Remix: ${state.magicFolderName ?: "Folder"} • #${state.magicTransitionCount}"
+            state.isInfiniteRepeat -> "Infinite Loop (∞)"
             state.isRepeatActive -> "Remaining: ${state.remainingCount}"
             else -> track.displayArtist
         }

@@ -1,8 +1,16 @@
 package com.example.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,8 +19,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -22,13 +32,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.model.AudioTrack
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -45,31 +59,52 @@ fun TrackItemCard(
     isSelected: Boolean = false,
     onSelectionToggle: ((Boolean) -> Unit)? = null
 ) {
-    val cardBg = when {
-        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
-        isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-        else -> MaterialTheme.colorScheme.surface
-    }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
 
-    val borderColor = when {
-        isSelected -> MaterialTheme.colorScheme.primary
-        isCurrentTrack -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-    }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.975f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "track_card_scale"
+    )
+
+    val animatedCardBg by animateColorAsState(
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
+            isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            else -> MaterialTheme.colorScheme.surface
+        },
+        label = "track_card_bg"
+    )
+
+    val animatedBorderColor by animateColorAsState(
+        targetValue = when {
+            isSelected -> MaterialTheme.colorScheme.primary
+            isCurrentTrack -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+        },
+        label = "track_card_border"
+    )
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(20.dp))
             .combinedClickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.material3.ripple(),
                 onClick = onClick,
                 onLongClick = onLongClick
             )
             .testTag("track_item_${track.id}"),
-        shape = RoundedCornerShape(18.dp),
-        color = cardBg,
-        border = androidx.compose.foundation.BorderStroke(if (isSelected) 1.5.dp else 1.dp, borderColor),
-        tonalElevation = if (isSelected || isCurrentTrack) 3.dp else 1.dp
+        shape = RoundedCornerShape(20.dp),
+        color = animatedCardBg,
+        border = androidx.compose.foundation.BorderStroke(if (isSelected) 1.5.dp else 1.dp, animatedBorderColor),
+        tonalElevation = if (isSelected || isCurrentTrack) 4.dp else 1.dp
     ) {
         Row(
             modifier = Modifier
@@ -84,19 +119,37 @@ fun TrackItemCard(
                     colors = CheckboxDefaults.colors(
                         checkedColor = MaterialTheme.colorScheme.primary
                     ),
-                    modifier = Modifier.padding(end = 4.dp)
+                    modifier = Modifier.padding(end = 6.dp)
                 )
             } else {
-                // Artwork thumbnail
-                TrackArtwork(
-                    track = track,
-                    isPlaying = isCurrentTrack && isPlaying,
-                    shape = RoundedCornerShape(12.dp),
-                    iconSize = 22.dp,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                )
+                // Artwork thumbnail with active indicator
+                Box(contentAlignment = Alignment.Center) {
+                    TrackArtwork(
+                        track = track,
+                        isPlaying = isCurrentTrack && isPlaying,
+                        shape = RoundedCornerShape(14.dp),
+                        iconSize = 22.dp,
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                    )
+                    if (isCurrentTrack && isPlaying) {
+                        Box(
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Equalizer,
+                                contentDescription = "Now playing",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.width(14.dp))
             }
 
@@ -128,7 +181,7 @@ fun TrackItemCard(
                     Text(
                         text = " • ${track.formattedDuration}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
                 }
             }
@@ -138,7 +191,8 @@ fun TrackItemCard(
                 IconButton(
                     onClick = onOptionsClick,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(38.dp)
+                        .clip(CircleShape)
                         .testTag("track_options_${track.id}")
                 ) {
                     Icon(

@@ -45,6 +45,9 @@ class AudioPlayerManager(
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
+    // Real-time listener for Bluetooth Dual Offline Synchronization
+    var onSyncEvent: ((event: String, positionMs: Long, track: AudioTrack?) -> Unit)? = null
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _state.update { it.copy(isPlaying = isPlaying) }
@@ -302,6 +305,7 @@ class AudioPlayerManager(
             player.seekTo(startPositionMs)
         }
         player.play()
+        onSyncEvent?.invoke("TRACK", startPositionMs, track)
     }
 
     // --- MAGIC REMIX (Continuous Non-Stop DJ Mashup Engine) ---
@@ -466,6 +470,8 @@ class AudioPlayerManager(
     fun pause() {
         saveCurrentTrackPosition()
         exoPlayer?.pause()
+        val pos = exoPlayer?.currentPosition ?: _state.value.currentPositionMs
+        onSyncEvent?.invoke("PAUSE", pos, _state.value.currentTrack)
     }
 
     fun play() {
@@ -474,6 +480,8 @@ class AudioPlayerManager(
             player.seekTo(0)
         }
         player.play()
+        val pos = player.currentPosition
+        onSyncEvent?.invoke("PLAY", pos, _state.value.currentTrack)
     }
 
     fun stop() {
@@ -489,12 +497,14 @@ class AudioPlayerManager(
                 currentPositionMs = 0L
             )
         }
+        onSyncEvent?.invoke("PAUSE", 0L, null)
     }
 
     fun seekTo(positionMs: Long) {
         exoPlayer?.seekTo(positionMs.coerceAtLeast(0L))
         _state.update { it.copy(currentPositionMs = positionMs) }
         saveCurrentTrackPosition()
+        onSyncEvent?.invoke("SEEK", positionMs, _state.value.currentTrack)
     }
 
     fun seekForward10() {
@@ -628,11 +638,12 @@ class AudioPlayerManager(
      */
     fun setRepeatCount(count: Int, stopAfterFinish: Boolean) {
         val safeCount = count.coerceAtLeast(0)
+        val safeStopAfterFinish = if (safeCount == Int.MAX_VALUE) false else stopAfterFinish
         _state.update {
             it.copy(
                 repeatCountTotal = safeCount,
                 remainingCount = safeCount,
-                stopAfterFinish = stopAfterFinish
+                stopAfterFinish = safeStopAfterFinish
             )
         }
         updateMediaMetadata()
@@ -649,6 +660,7 @@ class AudioPlayerManager(
     }
 
     fun setStopAfterCurrentTrack(enabled: Boolean) {
+        if (enabled && _state.value.isInfiniteRepeat) return
         _state.update { it.copy(stopAfterFinish = enabled) }
         updateMediaMetadata()
         if (enabled) {
@@ -692,6 +704,14 @@ class AudioPlayerManager(
 
         // 2. Check Repeat Count
         if (currentState.repeatCountTotal > 0) {
+            // Infinite repeat mode: repeat continuously without a countdown
+            if (currentState.repeatCountTotal == Int.MAX_VALUE) {
+                updateMediaMetadata()
+                player.seekTo(0)
+                player.play()
+                return
+            }
+
             val currentRemaining = currentState.remainingCount
             val nextRemaining = currentRemaining - 1
 
@@ -804,6 +824,7 @@ class AudioPlayerManager(
         val currentState = _state.value
         val loopSubtitle = when {
             currentState.isMagicRemixActive -> "✨ Magic Remix • ${currentState.magicFolderName ?: "Folder"}"
+            currentState.isInfiniteRepeat -> "Infinite Loop (∞)"
             currentState.isRepeatActive -> "Remaining: ${currentState.remainingCount}"
             currentState.stopAfterFinish -> "Stop after this track"
             currentState.isFolderTimerActive -> "Timer active"

@@ -1435,9 +1435,14 @@ fun BottomOneHandedDock(
     }
 
     Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.95f),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 6.dp,
+        shadowElevation = 8.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 6.dp)
@@ -1505,7 +1510,7 @@ fun BottomOneHandedDock(
                             focusManager.clearFocus(force = true)
                         }),
                         singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
@@ -1531,17 +1536,17 @@ fun BottomOneHandedDock(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Surface(
                         onClick = { onSearchActiveChange(true) },
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         color = MaterialTheme.colorScheme.surface,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
                         ),
                         modifier = Modifier
                             .weight(1f)
@@ -1576,6 +1581,7 @@ fun BottomOneHandedDock(
                             onClick = { showSortMenu = true },
                             modifier = Modifier
                                 .size(44.dp)
+                                .clip(CircleShape)
                                 .testTag("sort_menu_button")
                         ) {
                             Icon(

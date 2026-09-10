@@ -72,6 +72,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Automatically unlock device's highest refresh rate (e.g. 90Hz, 120Hz, 144Hz) for ultra-smooth UI
+        com.example.util.DisplayRefreshRateHelper.enableMaxRefreshRate(this)
+
         setContent {
             val uiState by viewModel.uiState.collectAsState()
             val playbackState by viewModel.playbackState.collectAsState()
@@ -366,6 +369,7 @@ class MainActivity : ComponentActivity() {
                                     NowPlayingScreen(
                                         playbackState = playbackState,
                                         playerManager = viewModel.playerManager,
+                                        syncManager = viewModel.bluetoothSyncManager,
                                         onBack = { navigateBack() }
                                     )
                                 }

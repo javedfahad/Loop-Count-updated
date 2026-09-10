@@ -34,9 +34,13 @@ data class PlaybackState(
     val isRepeatActive: Boolean
         get() = repeatCountTotal > 0
 
+    val isInfiniteRepeat: Boolean
+        get() = repeatCountTotal == Int.MAX_VALUE
+
     val repeatDisplayLabel: String
         get() = when {
             repeatCountTotal <= 0 -> "Off"
+            repeatCountTotal == Int.MAX_VALUE -> "Infinite (∞)"
             repeatCountTotal == 1 -> "1 Time"
             else -> "$repeatCountTotal Times"
         }

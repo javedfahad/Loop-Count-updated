@@ -57,8 +57,8 @@ fun RepeatCountDialog(
     onStartRepeat: (count: Int, stopAfterFinish: Boolean) -> Unit
 ) {
     var selectedCount by remember { mutableStateOf(initialCount) }
-    var isCustom by remember { mutableStateOf(initialCount > 15) }
-    var customInputText by remember { mutableStateOf(if (initialCount > 15) initialCount.toString() else "108") }
+    var isCustom by remember { mutableStateOf(initialCount > 15 && initialCount != Int.MAX_VALUE) }
+    var customInputText by remember { mutableStateOf(if (initialCount > 15 && initialCount != Int.MAX_VALUE) initialCount.toString() else "108") }
     var stopAfterFinish by remember { mutableStateOf(initialStopAfterFinish) }
 
     BasicAlertDialog(onDismissRequest = onDismiss) {
@@ -150,6 +150,19 @@ fun RepeatCountDialog(
                         },
                         testTag = "repeat_chip_custom"
                     )
+
+                    // Infinite chip (loop continuously without count)
+                    val isInfiniteSelected = !isCustom && selectedCount == Int.MAX_VALUE
+                    BentoSelectionChip(
+                        label = "Infinite (∞)",
+                        isSelected = isInfiniteSelected,
+                        onClick = {
+                            isCustom = false
+                            selectedCount = Int.MAX_VALUE
+                            stopAfterFinish = false
+                        },
+                        testTag = "repeat_chip_infinite"
+                    )
                 }
 
                 // Custom Input Field
@@ -176,14 +189,18 @@ fun RepeatCountDialog(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Stop after finish toggle
+                // Stop after finish toggle (disabled when Infinite loop is selected)
+                val isStopAfterDisabled = !isCustom && selectedCount == Int.MAX_VALUE
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .clickable { stopAfterFinish = !stopAfterFinish }
+                        .clickable(enabled = !isStopAfterDisabled) { stopAfterFinish = !stopAfterFinish }
                         .testTag("stop_after_finish_toggle"),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    color = if (isStopAfterDisabled)
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                    else
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Row(
@@ -198,20 +215,29 @@ fun RepeatCountDialog(
                                 text = "Stop after finish",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = if (isStopAfterDisabled)
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                else
+                                    MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (selectedCount > 0 || (isCustom && customInputText.isNotBlank()))
+                                text = if (isStopAfterDisabled)
+                                    "Disabled for Infinite loop • Stop music manually"
+                                else if (selectedCount > 0 || (isCustom && customInputText.isNotBlank()))
                                     "Stop after all repetitions complete"
                                 else
                                     "Stop playback after this song finishes",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (isStopAfterDisabled)
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Switch(
-                            checked = stopAfterFinish,
-                            onCheckedChange = { stopAfterFinish = it }
+                            checked = if (isStopAfterDisabled) false else stopAfterFinish,
+                            onCheckedChange = { stopAfterFinish = it },
+                            enabled = !isStopAfterDisabled
                         )
                     }
                 }
@@ -237,7 +263,8 @@ fun RepeatCountDialog(
                             } else {
                                 selectedCount
                             }
-                            onStartRepeat(finalCount, stopAfterFinish)
+                            val finalStopAfterFinish = if (finalCount == Int.MAX_VALUE) false else stopAfterFinish
+                            onStartRepeat(finalCount, finalStopAfterFinish)
                             onDismiss()
                         },
                         shape = RoundedCornerShape(16.dp),

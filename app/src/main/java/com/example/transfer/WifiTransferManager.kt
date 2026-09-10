@@ -24,15 +24,21 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import kotlinx.coroutines.delay
 
 class WifiTransferManager(private val context: Context) {
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var serverJob: Job? = null
     private var clientJob: Job? = null
+    private var beaconJob: Job? = null
+    private var discoveryJob: Job? = null
     private var serverSocket: ServerSocket? = null
     private var activeClientSocket: Socket? = null
 
@@ -42,14 +48,23 @@ class WifiTransferManager(private val context: Context) {
     private val _senderProgress = MutableStateFlow<TransferProgress?>(null)
     val senderProgress: StateFlow<TransferProgress?> = _senderProgress.asStateFlow()
 
+    private val _discoveredDevices = MutableStateFlow<List<DiscoveredDevice>>(emptyList())
+    val discoveredDevices: StateFlow<List<DiscoveredDevice>> = _discoveredDevices.asStateFlow()
+
+    private val _isSearchingDevices = MutableStateFlow(false)
+    val isSearchingDevices: StateFlow<Boolean> = _isSearchingDevices.asStateFlow()
+
     companion object {
         const val DEFAULT_PORT = 8888
+        const val DISCOVERY_PORT = 8889
         private const val PROTOCOL_HEADER = "LOOPIFY_TRANSFER_V1"
         private const val PROTOCOL_OK = "LOOPIFY_OK"
         private const val PROTOCOL_READY = "READY"
         private const val PROTOCOL_ITEM_OK = "ITEM_OK"
         private const val PROTOCOL_BATCH_COMPLETE = "BATCH_COMPLETE"
         private const val PROTOCOL_ALL_DONE = "ALL_DONE"
+        private const val BEACON_PREFIX = "LOOPIFY_BEACON"
+        private const val PING_PREFIX = "LOOPIFY_PING"
     }
 
     /**
@@ -140,6 +155,8 @@ class WifiTransferManager(private val context: Context) {
             deviceName = deviceName,
             statusMessage = "Waiting for sender to connect..."
         )
+
+        startBeaconBroadcaster(localIp, deviceName, port)
 
         serverJob = scope.launch {
             try {
@@ -551,6 +568,131 @@ class WifiTransferManager(private val context: Context) {
         }
     }
 
+    private fun startBeaconBroadcaster(ip: String, deviceName: String, port: Int) {
+        beaconJob?.cancel()
+        beaconJob = scope.launch {
+            var socket: DatagramSocket? = null
+            try {
+                socket = DatagramSocket().apply {
+                    broadcast = true
+                }
+                val payload = "$BEACON_PREFIX|$deviceName|$ip|$port".toByteArray(Charsets.UTF_8)
+                val broadcastAddr = InetAddress.getByName("255.255.255.255")
+                val packet = DatagramPacket(payload, payload.size, broadcastAddr, DISCOVERY_PORT)
+
+                while (isActive) {
+                    try {
+                        socket.send(packet)
+                    } catch (e: Exception) {
+                        // ignore network transient error
+                    }
+                    delay(1200)
+                }
+            } catch (e: Exception) {
+                // Ignore
+            } finally {
+                socket?.close()
+            }
+        }
+    }
+
+    /**
+     * Starts automatic scanning for nearby receivers (via UDP beacon and gateway probing).
+     */
+    fun startDiscovery() {
+        stopDiscovery()
+        _isSearchingDevices.value = true
+        _discoveredDevices.value = emptyList()
+
+        discoveryJob = scope.launch {
+            val deviceMap = mutableMapOf<String, DiscoveredDevice>()
+
+            // 1. Fast probe: Check Wi-Fi gateway (Hotspot) & 192.168.43.1
+            launch {
+                val candidateIps = mutableSetOf<String>()
+                NetworkUtils.getGatewayIpAddress(context)?.let { candidateIps.add(it) }
+                candidateIps.add("192.168.43.1") // Android Hotspot default
+                val myIp = NetworkUtils.getLocalIpAddress(context)
+                val prefix = myIp.substringBeforeLast(".", "")
+                if (prefix.isNotBlank()) {
+                    candidateIps.add("$prefix.1")
+                }
+
+                for (ip in candidateIps) {
+                    if (!isActive) break
+                    if (ip == myIp) continue
+                    launch {
+                        try {
+                            Socket().use { probeSocket ->
+                                probeSocket.connect(InetSocketAddress(ip, DEFAULT_PORT), 350)
+                                val dev = DiscoveredDevice(
+                                    name = if (ip == "192.168.43.1") "Loopify Receiver (Hotspot)" else "Loopify Receiver",
+                                    ip = ip,
+                                    port = DEFAULT_PORT,
+                                    isHotspotGateway = (ip == "192.168.43.1")
+                                )
+                                synchronized(deviceMap) {
+                                    deviceMap[ip] = dev
+                                    _discoveredDevices.value = deviceMap.values.toList()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // unreachable
+                        }
+                    }
+                }
+            }
+
+            // 2. UDP Beacon Listener
+            launch {
+                var socket: DatagramSocket? = null
+                try {
+                    socket = DatagramSocket(DISCOVERY_PORT).apply {
+                        broadcast = true
+                        soTimeout = 2000
+                    }
+                    val buffer = ByteArray(1024)
+                    val packet = DatagramPacket(buffer, buffer.size)
+
+                    while (isActive) {
+                        try {
+                            socket.receive(packet)
+                            val message = String(packet.data, 0, packet.length, Charsets.UTF_8).trim()
+                            if (message.startsWith(BEACON_PREFIX)) {
+                                val parts = message.split("|")
+                                if (parts.size >= 4) {
+                                    val name = parts[1]
+                                    val ip = parts[2]
+                                    val port = parts[3].toIntOrNull() ?: DEFAULT_PORT
+                                    val myIp = NetworkUtils.getLocalIpAddress(context)
+                                    if (ip != myIp) {
+                                        val dev = DiscoveredDevice(name = name, ip = ip, port = port)
+                                        synchronized(deviceMap) {
+                                            deviceMap[ip] = dev
+                                            _discoveredDevices.value = deviceMap.values.toList()
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // timeout or socket close
+                        }
+                    }
+                } catch (e: Exception) {
+                    // port bound or network issue
+                } finally {
+                    socket?.close()
+                }
+            }
+        }
+    }
+
+    fun stopDiscovery() {
+        discoveryJob?.cancel()
+        discoveryJob = null
+        _isSearchingDevices.value = false
+    }
+
     fun stopReceiver() {
         try {
             serverSocket?.close()
@@ -560,6 +702,8 @@ class WifiTransferManager(private val context: Context) {
         }
         serverJob?.cancel()
         serverJob = null
+        beaconJob?.cancel()
+        beaconJob = null
         _receiverState.update { it.copy(isServerRunning = false, isReceiving = false) }
     }
 

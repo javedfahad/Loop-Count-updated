@@ -67,6 +67,32 @@ object NetworkUtils {
     }
 
     /**
+     * Attempts to find the Wi-Fi gateway (router or hotspot host IP).
+     */
+    fun getGatewayIpAddress(context: Context?): String? {
+        if (context == null) return null
+        try {
+            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            val dhcp = wifiManager?.dhcpInfo ?: return null
+            val gatewayInt = dhcp.gateway
+            if (gatewayInt != 0) {
+                val ip = String.format(
+                    Locale.US,
+                    "%d.%d.%d.%d",
+                    gatewayInt and 0xff,
+                    gatewayInt shr 8 and 0xff,
+                    gatewayInt shr 16 and 0xff,
+                    gatewayInt shr 24 and 0xff
+                )
+                if (ip != "0.0.0.0") return ip
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+        return null
+    }
+
+    /**
      * Returns human-readable device name.
      */
     fun getDeviceModelName(): String {
@@ -127,5 +153,38 @@ object NetworkUtils {
             }
         }
         return bitmap
+    }
+
+    /**
+     * Decodes a QR code string from a Bitmap if possible.
+     */
+    fun decodeQrFromBitmap(bitmap: Bitmap): String? {
+        return try {
+            val width = bitmap.width
+            val height = bitmap.height
+            val pixels = IntArray(width * height)
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+            val source = com.google.zxing.RGBLuminanceSource(width, height, pixels)
+            val binaryBitmap = com.google.zxing.BinaryBitmap(com.google.zxing.common.HybridBinarizer(source))
+            val result = com.google.zxing.qrcode.QRCodeReader().decode(binaryBitmap)
+            result.text
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Extracts IP from QR payload: "loopify-share://192.168.1.5:8888" or "192.168.1.5"
+     */
+    fun parseIpFromPayload(payload: String): String? {
+        val clean = payload.trim()
+        if (clean.startsWith("loopify-share://")) {
+            val hostPort = clean.removePrefix("loopify-share://")
+            return hostPort.substringBefore(":")
+        }
+        if (clean.matches(Regex("""\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"""))) {
+            return clean
+        }
+        return null
     }
 }

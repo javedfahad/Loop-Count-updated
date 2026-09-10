@@ -112,26 +112,29 @@ fun RingtoneDialog(
         }
     }
 
-    // Monitor preview stop
-    LaunchedEffect(isPreviewPlaying) {
+    // Monitor preview playback position & seamlessly enforce loop between startSec and stopSec
+    LaunchedEffect(isPreviewPlaying, stopSec, startSec) {
         if (isPreviewPlaying) {
             while (isActive && isPreviewPlaying) {
                 try {
                     val currentMs = mediaPlayer.currentPosition
+                    // If playback reaches or exceeds the stop mark, loop back to the current start second
                     if (currentMs >= stopSec * 1000) {
-                        mediaPlayer.pause()
                         mediaPlayer.seekTo(startSec * 1000)
-                        isPreviewPlaying = false
-                        break
+                    } else if (currentMs < startSec * 1000) {
+                        // If current playhead is behind the updated start time, jump forward to startSec
+                        mediaPlayer.seekTo(startSec * 1000)
                     }
                 } catch (_: Exception) {
                     isPreviewPlaying = false
                     break
                 }
-                delay(100)
+                delay(80)
             }
         }
     }
+
+    var isPrepared by remember { mutableStateOf(false) }
 
     fun togglePreview() {
         if (isPreviewPlaying) {
@@ -141,16 +144,53 @@ fun RingtoneDialog(
             isPreviewPlaying = false
         } else {
             try {
-                mediaPlayer.reset()
-                mediaPlayer.setDataSource(context, track.uri)
-                mediaPlayer.prepare()
+                if (!isPrepared) {
+                    mediaPlayer.reset()
+                    mediaPlayer.setDataSource(context, track.uri)
+                    mediaPlayer.prepare()
+                    isPrepared = true
+                }
                 mediaPlayer.seekTo(startSec * 1000)
                 mediaPlayer.start()
                 isPreviewPlaying = true
             } catch (e: Exception) {
-                Toast.makeText(context, "Cannot preview audio: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                isPreviewPlaying = false
+                try {
+                    mediaPlayer.reset()
+                    mediaPlayer.setDataSource(context, track.uri)
+                    mediaPlayer.prepare()
+                    mediaPlayer.seekTo(startSec * 1000)
+                    mediaPlayer.start()
+                    isPrepared = true
+                    isPreviewPlaying = true
+                } catch (err: Exception) {
+                    Toast.makeText(context, "Cannot preview audio: ${err.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    isPreviewPlaying = false
+                }
             }
+        }
+    }
+
+    // Dynamic start update helper that immediately seeks to new start if playing
+    fun updateStartSec(newSec: Int) {
+        val bounded = newSec.coerceIn(0, (stopSec - 1).coerceAtLeast(0))
+        startSec = bounded
+        if (isPreviewPlaying) {
+            try {
+                mediaPlayer.seekTo(bounded * 1000)
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Dynamic stop update helper
+    fun updateStopSec(newSec: Int) {
+        val bounded = newSec.coerceIn((startSec + 1).coerceAtMost(totalDurationSeconds), totalDurationSeconds)
+        stopSec = bounded
+        if (isPreviewPlaying) {
+            try {
+                if (mediaPlayer.currentPosition >= bounded * 1000) {
+                    mediaPlayer.seekTo(startSec * 1000)
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -338,17 +378,17 @@ fun RingtoneDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Dual Range Slider
+                // Dual Range Slider with real-time responsive updates
                 RangeSlider(
                     value = startSec.toFloat()..stopSec.toFloat(),
                     onValueChange = { range ->
                         val newStart = range.start.toInt().coerceIn(0, totalDurationSeconds - 1)
                         val newStop = range.endInclusive.toInt().coerceIn(newStart + 1, totalDurationSeconds)
-                        startSec = newStart
-                        stopSec = newStop
-                        if (isPreviewPlaying) {
-                            try { mediaPlayer.pause() } catch (_: Exception) {}
-                            isPreviewPlaying = false
+                        if (newStart != startSec) {
+                            updateStartSec(newStart)
+                        }
+                        if (newStop != stopSec) {
+                            updateStopSec(newStop)
                         }
                     },
                     valueRange = 0f..totalDurationSeconds.toFloat(),
@@ -360,45 +400,78 @@ fun RingtoneDialog(
                     modifier = Modifier.testTag("ringtone_range_slider")
                 )
 
-                // Quick Nudge Buttons (-5s, -1s, +1s, +5s)
+                // Quick Nudge Buttons (-5s, -1s, +1s, +5s) & Dynamic Preview Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Start nudge
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        NudgeChip("-5s") {
-                            startSec = (startSec - 5).coerceAtLeast(0)
-                        }
-                        NudgeChip("+5s") {
-                            startSec = (startSec + 5).coerceAtMost(stopSec - 1)
+                    // Start nudge controls (-5s, -1s, +1s, +5s)
+                    Column(horizontalAlignment = Alignment.Start) {
+                        Text(
+                            "Start: ${formatTime(startSec)}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            NudgeChip("-5s") { updateStartSec(startSec - 5) }
+                            NudgeChip("-1s") { updateStartSec(startSec - 1) }
+                            NudgeChip("+1s") { updateStartSec(startSec + 1) }
+                            NudgeChip("+5s") { updateStartSec(startSec + 5) }
                         }
                     }
 
-                    // Preview Button
+                    // Stop nudge controls (-5s, -1s, +1s, +5s)
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "Stop: ${formatTime(stopSec)}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            NudgeChip("-5s") { updateStopSec(stopSec - 5) }
+                            NudgeChip("-1s") { updateStopSec(stopSec - 1) }
+                            NudgeChip("+1s") { updateStopSec(stopSec + 1) }
+                            NudgeChip("+5s") { updateStopSec(stopSec + 5) }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Center Dynamic Play/Pause Preview Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
                     FilledTonalButton(
                         onClick = { togglePreview() },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.testTag("ringtone_preview_btn")
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (isPreviewPlaying) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = if (isPreviewPlaying) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("ringtone_preview_btn")
                     ) {
                         Icon(
                             imageVector = if (isPreviewPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (isPreviewPlaying) "Pause" else "Preview", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    // Stop nudge
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        NudgeChip("-5s") {
-                            stopSec = (stopSec - 5).coerceAtLeast(startSec + 1)
-                        }
-                        NudgeChip("+5s") {
-                            stopSec = (stopSec + 5).coerceAtMost(totalDurationSeconds)
-                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            if (isPreviewPlaying) "Playing Preview (${formatTime(startSec)} - ${formatTime(stopSec)}) • Tap to Stop"
+                            else "Play Preview from ${formatTime(startSec)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 

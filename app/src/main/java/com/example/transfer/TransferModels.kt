@@ -3,6 +3,15 @@ package com.example.transfer
 import androidx.compose.runtime.Immutable
 
 @Immutable
+data class DiscoveredDevice(
+    val name: String,
+    val ip: String,
+    val port: Int = 8888,
+    val isHotspotGateway: Boolean = false,
+    val lastSeenMs: Long = System.currentTimeMillis()
+)
+
+@Immutable
 data class TransferItem(
     val id: Long,
     val uri: String,

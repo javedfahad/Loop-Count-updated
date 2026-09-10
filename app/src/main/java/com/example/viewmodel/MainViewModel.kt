@@ -42,10 +42,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: AudioRepository = app.repository
     val playerManager: AudioPlayerManager = app.playerManager
     val transferManager = app.transferManager
+    val bluetoothSyncManager = app.bluetoothSyncManager
 
     val playbackState: StateFlow<PlaybackState> = playerManager.state
     val receiverState = transferManager.receiverState
     val senderProgress = transferManager.senderProgress
+    val syncUiState = bluetoothSyncManager.uiState
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()

@@ -21,8 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -48,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -69,22 +72,35 @@ import com.example.model.AudioTrack
 import com.example.playback.AudioPlayerManager
 import com.example.playback.PlaybackState
 import com.example.ui.components.NowPlayingArtworkCard
+import com.example.ui.dialogs.DualListenBottomSheet
 import com.example.ui.dialogs.RepeatCountDialog
 import com.example.ui.dialogs.RingtoneDialog
+import com.example.sync.BluetoothSyncManager
+import com.example.sync.DualSyncConnectionState
+import androidx.compose.runtime.collectAsState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(
     playbackState: PlaybackState,
     playerManager: AudioPlayerManager,
+    syncManager: BluetoothSyncManager? = null,
     onBack: () -> Unit
 ) {
     val track = playbackState.currentTrack
     var showRepeatDialog by remember { mutableStateOf(false) }
     var showRingtoneDialog by remember { mutableStateOf(false) }
+    var showDualListenSheet by remember { mutableStateOf(false) }
+
+    val effectiveSyncManager = syncManager ?: remember {
+        com.example.LoopCountApp.instance.bluetoothSyncManager
+    }
+    val syncState by effectiveSyncManager.uiState.collectAsState()
 
     var isUserSeeking by remember { mutableStateOf(false) }
     var userSeekPos by remember { mutableFloatStateOf(0f) }
+
+    var wasPlayingBeforeRingtone by remember { mutableStateOf(false) }
 
     if (showRepeatDialog) {
         RepeatCountDialog(
@@ -98,9 +114,28 @@ fun NowPlayingScreen(
     }
 
     if (showRingtoneDialog && track != null) {
+        DisposableEffect(Unit) {
+            wasPlayingBeforeRingtone = playbackState.isPlaying
+            if (playbackState.isPlaying) {
+                playerManager.pause()
+            }
+            onDispose {
+                if (wasPlayingBeforeRingtone) {
+                    playerManager.play()
+                }
+            }
+        }
+
         RingtoneDialog(
             track = track,
             onDismiss = { showRingtoneDialog = false }
+        )
+    }
+
+    if (showDualListenSheet) {
+        DualListenBottomSheet(
+            syncManager = effectiveSyncManager,
+            onDismiss = { showDualListenSheet = false }
         )
     }
 
@@ -110,7 +145,10 @@ fun NowPlayingScreen(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "NOW PLAYING",
+                            text = if (syncState.connectionState == DualSyncConnectionState.CONNECTED)
+                                "SYNCED WITH ${syncState.connectedDeviceName?.uppercase() ?: "FRIEND"}"
+                            else
+                                "NOW PLAYING",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.5.sp,
@@ -139,6 +177,25 @@ fun NowPlayingScreen(
                     }
                 },
                 actions = {
+                    // Dual Listen (Offline Bluetooth Together) Button
+                    IconButton(
+                        onClick = { showDualListenSheet = true },
+                        modifier = Modifier.testTag("now_playing_dual_listen_btn")
+                    ) {
+                        Icon(
+                            imageVector = if (syncState.connectionState == DualSyncConnectionState.CONNECTED)
+                                Icons.Default.BluetoothConnected
+                            else
+                                Icons.Default.Headphones,
+                            contentDescription = "Dual Listen Offline",
+                            tint = if (syncState.connectionState == DualSyncConnectionState.CONNECTED)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
                     if (track != null) {
                         IconButton(
                             onClick = { showRingtoneDialog = true },
@@ -334,23 +391,38 @@ fun NowPlayingScreen(
                                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(
-                                                    text = "LEFT: ",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-                                                )
-                                                Text(
-                                                    text = "${playbackState.remainingCount}",
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = MaterialTheme.colorScheme.onPrimary
-                                                )
+                                                if (playbackState.isInfiniteRepeat) {
+                                                    Text(
+                                                        text = "LOOP: ",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                                                    )
+                                                    Text(
+                                                        text = "∞",
+                                                        fontSize = 16.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        text = "LEFT: ",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                                                    )
+                                                    Text(
+                                                        text = "${playbackState.remainingCount}",
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                }
                                             }
                                         }
                                     }
 
-                                    if (playbackState.stopAfterFinish && !playbackState.isMagicRemixActive) {
+                                    if (playbackState.stopAfterFinish && !playbackState.isMagicRemixActive && !playbackState.isInfiniteRepeat) {
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
                                             color = MaterialTheme.colorScheme.secondaryContainer
@@ -509,26 +581,6 @@ fun NowPlayingScreen(
                                     )
                                 }
                             }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        FilledTonalButton(
-                            onClick = { showRingtoneDialog = true },
-                            enabled = track != null,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("btn_set_as_ringtone_tablet")
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_set_ringtone),
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Set Song as Ringtone", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                         }
                     }
                 }
@@ -689,23 +741,38 @@ fun NowPlayingScreen(
                                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = "LEFT: ",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-                                            )
-                                            Text(
-                                                text = "${playbackState.remainingCount}",
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = MaterialTheme.colorScheme.onPrimary
-                                            )
+                                            if (playbackState.isInfiniteRepeat) {
+                                                Text(
+                                                    text = "LOOP: ",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                                                )
+                                                Text(
+                                                    text = "∞",
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = "LEFT: ",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                                                )
+                                                Text(
+                                                    text = "${playbackState.remainingCount}",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                )
+                                            }
                                         }
                                     }
                                 }
 
-                                if (playbackState.stopAfterFinish && !playbackState.isMagicRemixActive) {
+                                if (playbackState.stopAfterFinish && !playbackState.isMagicRemixActive && !playbackState.isInfiniteRepeat) {
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.secondaryContainer
@@ -726,6 +793,60 @@ fun NowPlayingScreen(
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                 }
+                            }
+                        }
+                    }
+
+                    // Live Dual Listen Sync Status Banner if connected
+                    if (syncState.connectionState == DualSyncConnectionState.CONNECTED) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 480.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable { showDualListenSheet = true }
+                                .testTag("now_playing_sync_status_badge"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.BluetoothConnected,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Dual Listen Active",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Listening together with ${syncState.connectedDeviceName ?: "Friend"}",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Text(
+                                    text = "Manage",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
                         }
                     }
@@ -866,27 +987,6 @@ fun NowPlayingScreen(
                                 )
                             }
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    FilledTonalButton(
-                        onClick = { showRingtoneDialog = true },
-                        enabled = track != null,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 480.dp)
-                            .testTag("btn_set_as_ringtone_phone")
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_set_ringtone),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Set Song as Ringtone", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))

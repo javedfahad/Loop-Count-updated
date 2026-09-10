@@ -28,6 +28,10 @@ class LoopCountApp : Application(), ImageLoaderFactory {
         WifiTransferManager(this)
     }
 
+    val bluetoothSyncManager: com.example.sync.BluetoothSyncManager by lazy {
+        com.example.sync.BluetoothSyncManager(this, playerManager)
+    }
+
     companion object {
         lateinit var instance: LoopCountApp
             private set
@@ -36,6 +40,18 @@ class LoopCountApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+
+        // Connect player events to Bluetooth Dual Sync
+        playerManager.onSyncEvent = { event, pos, track ->
+            if (bluetoothSyncManager.isSyncConnected()) {
+                when (event) {
+                    "PLAY" -> bluetoothSyncManager.onUserPlay(pos)
+                    "PAUSE" -> bluetoothSyncManager.onUserPause(pos)
+                    "SEEK" -> bluetoothSyncManager.onUserSeek(pos)
+                    "TRACK" -> track?.let { bluetoothSyncManager.sendTrackChange(it, pos, true) }
+                }
+            }
+        }
     }
 
     override fun newImageLoader(): ImageLoader {
