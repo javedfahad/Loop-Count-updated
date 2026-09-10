@@ -86,13 +86,13 @@ fun MiniPlayerBar(
             )
             .testTag("mini_player_bar"),
         shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.primaryContainer,
         border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+            1.5.dp,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
         ),
-        shadowElevation = 10.dp,
-        tonalElevation = 6.dp
+        shadowElevation = 14.dp,
+        tonalElevation = 10.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -123,7 +123,7 @@ fun MiniPlayerBar(
                         text = track.displayTitle,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -132,7 +132,7 @@ fun MiniPlayerBar(
                         Text(
                             text = track.displayArtist,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
@@ -237,7 +237,7 @@ fun MiniPlayerBar(
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next track",
-                        tint = MaterialTheme.colorScheme.onSurface,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -250,7 +250,7 @@ fun MiniPlayerBar(
                     .fillMaxWidth()
                     .height(3.5.dp),
                 color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f)
             )
         }
     }

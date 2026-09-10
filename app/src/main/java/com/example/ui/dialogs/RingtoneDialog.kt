@@ -400,48 +400,44 @@ fun RingtoneDialog(
                     modifier = Modifier.testTag("ringtone_range_slider")
                 )
 
-                // Quick Nudge Buttons (-5s, -1s, +1s, +5s) & Dynamic Preview Button
+                // Fine-tuning Nudge Buttons (clean and non-duplicate)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Start nudge controls (-5s, -1s, +1s, +5s)
-                    Column(horizontalAlignment = Alignment.Start) {
+                    // Start fine-tune
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Text(
-                            "Start: ${formatTime(startSec)}",
-                            fontSize = 10.sp,
+                            "Start:",
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                            NudgeChip("-5s") { updateStartSec(startSec - 5) }
-                            NudgeChip("-1s") { updateStartSec(startSec - 1) }
-                            NudgeChip("+1s") { updateStartSec(startSec + 1) }
-                            NudgeChip("+5s") { updateStartSec(startSec + 5) }
-                        }
+                        NudgeChip("-1s") { updateStartSec(startSec - 1) }
+                        NudgeChip("+1s") { updateStartSec(startSec + 1) }
                     }
 
-                    // Stop nudge controls (-5s, -1s, +1s, +5s)
-                    Column(horizontalAlignment = Alignment.End) {
+                    // Stop fine-tune
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Text(
-                            "Stop: ${formatTime(stopSec)}",
-                            fontSize = 10.sp,
+                            "Stop:",
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                            NudgeChip("-5s") { updateStopSec(stopSec - 5) }
-                            NudgeChip("-1s") { updateStopSec(stopSec - 1) }
-                            NudgeChip("+1s") { updateStopSec(stopSec + 1) }
-                            NudgeChip("+5s") { updateStopSec(stopSec + 5) }
-                        }
+                        NudgeChip("-1s") { updateStopSec(stopSec - 1) }
+                        NudgeChip("+1s") { updateStopSec(stopSec + 1) }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Center Dynamic Play/Pause Preview Button
                 Row(
@@ -467,9 +463,8 @@ fun RingtoneDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            if (isPreviewPlaying) "Playing Preview (${formatTime(startSec)} - ${formatTime(stopSec)}) • Tap to Stop"
-                            else "Play Preview from ${formatTime(startSec)}",
-                            fontSize = 12.sp,
+                            text = if (isPreviewPlaying) "Stop Preview" else "Play Preview",
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }

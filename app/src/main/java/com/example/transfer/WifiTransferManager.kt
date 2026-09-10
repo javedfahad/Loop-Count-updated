@@ -577,14 +577,20 @@ class WifiTransferManager(private val context: Context) {
                     broadcast = true
                 }
                 val payload = "$BEACON_PREFIX|$deviceName|$ip|$port".toByteArray(Charsets.UTF_8)
-                val broadcastAddr = InetAddress.getByName("255.255.255.255")
-                val packet = DatagramPacket(payload, payload.size, broadcastAddr, DISCOVERY_PORT)
+                val targetAddresses = mutableListOf<InetAddress>()
+                try { targetAddresses.add(InetAddress.getByName("255.255.255.255")) } catch (_: Exception) {}
+                try { targetAddresses.add(InetAddress.getByName("192.168.43.255")) } catch (_: Exception) {}
+                val prefix = ip.substringBeforeLast(".", "")
+                if (prefix.isNotBlank()) {
+                    try { targetAddresses.add(InetAddress.getByName("$prefix.255")) } catch (_: Exception) {}
+                }
 
                 while (isActive) {
-                    try {
-                        socket.send(packet)
-                    } catch (e: Exception) {
-                        // ignore network transient error
+                    for (targetAddr in targetAddresses) {
+                        try {
+                            val packet = DatagramPacket(payload, payload.size, targetAddr, DISCOVERY_PORT)
+                            socket.send(packet)
+                        } catch (_: Exception) {}
                     }
                     delay(1200)
                 }
@@ -594,6 +600,24 @@ class WifiTransferManager(private val context: Context) {
                 socket?.close()
             }
         }
+    }
+
+    /**
+     * Actively probes candidate Hotspot and gateway IPs and returns the first reachable receiver IP.
+     */
+    suspend fun findActiveReceiverIp(): String? = withContext(Dispatchers.IO) {
+        val candidates = NetworkUtils.getHotspotCandidateIps(context)
+        val myIp = NetworkUtils.getLocalIpAddress(context)
+        for (ip in candidates) {
+            if (ip == myIp) continue
+            try {
+                Socket().use { s ->
+                    s.connect(InetSocketAddress(ip, DEFAULT_PORT), 1500)
+                    return@withContext ip
+                }
+            } catch (_: Exception) {}
+        }
+        null
     }
 
     /**
@@ -607,39 +631,37 @@ class WifiTransferManager(private val context: Context) {
         discoveryJob = scope.launch {
             val deviceMap = mutableMapOf<String, DiscoveredDevice>()
 
-            // 1. Fast probe: Check Wi-Fi gateway (Hotspot) & 192.168.43.1
+            // 1. Proactive multi-candidate Hotspot & Gateway probe
             launch {
-                val candidateIps = mutableSetOf<String>()
-                NetworkUtils.getGatewayIpAddress(context)?.let { candidateIps.add(it) }
-                candidateIps.add("192.168.43.1") // Android Hotspot default
-                val myIp = NetworkUtils.getLocalIpAddress(context)
-                val prefix = myIp.substringBeforeLast(".", "")
-                if (prefix.isNotBlank()) {
-                    candidateIps.add("$prefix.1")
-                }
+                while (isActive) {
+                    val candidateIps = NetworkUtils.getHotspotCandidateIps(context)
+                    val myIp = NetworkUtils.getLocalIpAddress(context)
 
-                for (ip in candidateIps) {
-                    if (!isActive) break
-                    if (ip == myIp) continue
-                    launch {
-                        try {
-                            Socket().use { probeSocket ->
-                                probeSocket.connect(InetSocketAddress(ip, DEFAULT_PORT), 350)
-                                val dev = DiscoveredDevice(
-                                    name = if (ip == "192.168.43.1") "Loopify Receiver (Hotspot)" else "Loopify Receiver",
-                                    ip = ip,
-                                    port = DEFAULT_PORT,
-                                    isHotspotGateway = (ip == "192.168.43.1")
-                                )
-                                synchronized(deviceMap) {
-                                    deviceMap[ip] = dev
-                                    _discoveredDevices.value = deviceMap.values.toList()
+                    for (ip in candidateIps) {
+                        if (!isActive) break
+                        if (ip == myIp) continue
+                        launch {
+                            try {
+                                Socket().use { probeSocket ->
+                                    probeSocket.connect(InetSocketAddress(ip, DEFAULT_PORT), 1200)
+                                    val isHotspot = ip.startsWith("192.168.43.") || ip.endsWith(".1")
+                                    val dev = DiscoveredDevice(
+                                        name = if (isHotspot) "Loopify Receiver (Hotspot)" else "Loopify Receiver",
+                                        ip = ip,
+                                        port = DEFAULT_PORT,
+                                        isHotspotGateway = isHotspot
+                                    )
+                                    synchronized(deviceMap) {
+                                        deviceMap[ip] = dev
+                                        _discoveredDevices.value = deviceMap.values.toList()
+                                    }
                                 }
+                            } catch (e: Exception) {
+                                // unreachable
                             }
-                        } catch (e: Exception) {
-                            // unreachable
                         }
                     }
+                    delay(2500)
                 }
             }
 

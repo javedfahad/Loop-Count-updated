@@ -43,7 +43,7 @@ class ExampleUnitTest {
         assertEquals("500 B", NetworkUtils.formatFileSize(500))
         assertEquals("500 KB", NetworkUtils.formatFileSize(500 * 1024))
         assertEquals("5.0 MB", NetworkUtils.formatFileSize(5 * 1024 * 1024))
-        assertEquals("12.5 MB/s", NetworkUtils.formatSpeed(12_500 * 1024))
+        assertEquals("12.5 MB/s", NetworkUtils.formatSpeed((12.5 * 1024 * 1024).toLong()))
         assertEquals("my_song", NetworkUtils.sanitizeFileName("my/song*?"))
     }
 

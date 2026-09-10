@@ -67,14 +67,31 @@ object NetworkUtils {
     }
 
     /**
-     * Attempts to find the Wi-Fi gateway (router or hotspot host IP).
+     * Attempts to find the Wi-Fi gateway (router or hotspot host IP) using multiple robust techniques.
      */
     fun getGatewayIpAddress(context: Context?): String? {
         if (context == null) return null
+
+        // 1. Try ConnectivityManager link properties (most reliable on Android 6.0+)
+        try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val activeNet = cm?.activeNetwork
+                val linkProps = cm?.getLinkProperties(activeNet)
+                for (route in linkProps?.routes ?: emptyList()) {
+                    if (route.isDefaultRoute && route.gateway is Inet4Address) {
+                        val gw = route.gateway?.hostAddress
+                        if (!gw.isNullOrBlank() && gw != "0.0.0.0") return gw
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 2. Wi-Fi Manager DHCP Info fallback
         try {
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            val dhcp = wifiManager?.dhcpInfo ?: return null
-            val gatewayInt = dhcp.gateway
+            val dhcp = wifiManager?.dhcpInfo
+            val gatewayInt = dhcp?.gateway ?: 0
             if (gatewayInt != 0) {
                 val ip = String.format(
                     Locale.US,
@@ -86,10 +103,91 @@ object NetworkUtils {
                 )
                 if (ip != "0.0.0.0") return ip
             }
-        } catch (e: Exception) {
-            // Ignore
-        }
+        } catch (_: Exception) {}
+
         return null
+    }
+
+    /**
+     * Gathers all candidate Hotspot / Wi-Fi IP addresses that could host the receiver.
+     */
+    fun getHotspotCandidateIps(context: Context?): List<String> {
+        val candidates = linkedSetOf<String>()
+
+        // Gateway from active network
+        getGatewayIpAddress(context)?.let { candidates.add(it) }
+
+        // Standard Android SoftAP / Hotspot IP addresses
+        candidates.add("192.168.43.1")
+        candidates.add("192.168.49.1") // Wi-Fi Direct
+        candidates.add("192.168.44.1")
+        candidates.add("192.168.50.1")
+        candidates.add("172.20.10.1") // iOS hotspot default
+        candidates.add("10.42.0.1")
+
+        // Subnet expansion based on local IP
+        val localIp = getLocalIpAddress(context)
+        val prefix = localIp.substringBeforeLast(".", "")
+        if (prefix.isNotBlank()) {
+            candidates.add("$prefix.1")
+            // If local IP is 192.168.43.1 (this device is hotspot), probe connected clients 2..15
+            if (localIp == "192.168.43.1" || localIp == "$prefix.1") {
+                for (i in 2..15) {
+                    candidates.add("$prefix.$i")
+                }
+            }
+        }
+
+        // Check ARP cache for connected clients if available
+        try {
+            val arpClients = java.io.File("/proc/net/arp")
+            if (arpClients.exists()) {
+                arpClients.forEachLine { line ->
+                    val tokens = line.split(Regex("\\s+"))
+                    if (tokens.size >= 4 && tokens[0].matches(Regex("\\d+\\.\\d+\\.\\d+\\.\\d+"))) {
+                        val ip = tokens[0]
+                        val mac = tokens[3]
+                        if (mac != "00:00:00:00:00:00" && ip != "0.0.0.0" && ip != localIp) {
+                            candidates.add(ip)
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Never include self
+        candidates.remove(localIp)
+        return candidates.toList()
+    }
+
+    /**
+     * Opens Android portable hotspot / tethering settings so user can toggle hotspot on/off.
+     */
+    fun openHotspotSettings(context: Context) {
+        val intents = listOf(
+            android.content.Intent("android.settings.TETHER_SETTINGS"),
+            android.content.Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS),
+            android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)
+        )
+        for (intent in intents) {
+            try {
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                return
+            } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Opens Android Wi-Fi settings so user can connect to receiver's hotspot network.
+     */
+    fun openWifiSettings(context: Context) {
+        try {
+            val intent = android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {}
     }
 
     /**
@@ -130,6 +228,7 @@ object NetworkUtils {
 
     fun sanitizeFileName(input: String): String {
         var clean = input.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
+        clean = clean.replace(Regex("_+"), "_").trim('_')
         if (clean.isBlank()) clean = "track"
         return clean
     }
