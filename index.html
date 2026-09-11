@@ -1897,7 +1897,7 @@
                         </span>
                     </h4>
                     <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.94rem;">
-                        Submit bug telemetry, request audio algorithms, or connect directly with Eert Labs (<strong style="color: var(--neon-cyan);">faahdmallick@gmail.com</strong>). Messages pass anti-spam verification before transmission.
+                        Submit bug telemetry, request audio algorithms, or connect directly with the engineering team. Messages pass anti-spam verification before transmission.
                     </p>
 
                     <form id="supportForm" onsubmit="handleFormSubmit(event)">
@@ -1929,8 +1929,8 @@
                         </div>
 
                         <div id="formSuccess" style="display: none; margin-top: 14px; color: var(--neon-emerald); background: rgba(0, 245, 160, 0.12); border: 1px solid var(--neon-emerald); padding: 14px 18px; border-radius: 10px; font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.5;">
-                            ✓ TRANSMISSION DISPATCHED TO FAAHDMALLICK@GMAIL.COM.<br>
-                            <span style="font-size: 0.78rem; color: var(--text-secondary);">Your email client has been launched with your encrypted dispatch. Thank you for reaching Eert Labs.</span>
+                            ✓ TRANSMISSION DISPATCHED TO EERT LABS INBOX.<br>
+                            <span style="font-size: 0.78rem; color: var(--text-secondary);">Your dispatch has been queued securely. Thank you for connecting with Eert Labs.</span>
                         </div>
                     </form>
                 </div>
@@ -2111,7 +2111,7 @@
             var rate = getDailySubmissionRecord();
             if (rate.remaining <= 0) {
                 if (errorEl) {
-                    errorEl.innerText = "RATE LIMIT EXCEEDED: Only 2 dispatches allowed per day from this connection to prevent spam. Please try again tomorrow or contact faahdmallick@gmail.com directly.";
+                    errorEl.innerText = "RATE LIMIT EXCEEDED: Only 2 dispatches allowed per day from this connection to prevent spam. Please try again tomorrow.";
                     errorEl.style.display = 'block';
                 }
                 return false;
@@ -2162,7 +2162,7 @@
             updateRateLimitUI();
 
             if (btn) {
-                btn.innerHTML = 'Dispatched to ' + DESTINATION_EMAIL + '...';
+                btn.innerHTML = 'Transmitting to Eert Labs...';
                 btn.disabled = true;
             }
 
