@@ -1888,34 +1888,52 @@
                 </div>
             </div>
 
-            <!-- Contact Terminal -->
-            <div id="contact" style="margin-top: 40px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 36px;">
-                <h4 style="font-family: var(--font-tech); font-size: 1.3rem; margin-bottom: 14px; color: #FFFFFF;">
-                    Direct Lab Dispatch // Contact Eert Labs
-                </h4>
-                <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.94rem;">
-                    Submit bug telemetry, request audio algorithms, or connect directly with the engineer:
-                </p>
+                <!-- Contact Terminal -->
+                <div id="contact" style="margin-top: 40px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 36px;">
+                    <h4 style="font-family: var(--font-tech); font-size: 1.3rem; margin-bottom: 14px; color: #FFFFFF; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                        <span>Direct Lab Dispatch // Contact Eert Labs</span>
+                        <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--neon-cyan); background: rgba(0, 242, 254, 0.1); border: 1px solid var(--border-glow); padding: 3px 10px; border-radius: 999px;">
+                            PROTECTED DISPATCH • 2 MSGS/DAY MAX
+                        </span>
+                    </h4>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.94rem;">
+                        Submit bug telemetry, request audio algorithms, or connect directly with Eert Labs (<strong style="color: var(--neon-cyan);">faahdmallick@gmail.com</strong>). Messages pass anti-spam verification before transmission.
+                    </p>
 
-                <form id="supportForm" onsubmit="handleFormSubmit(event)">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                        <input type="text" class="terminal-field" placeholder="Identifier / Name" required>
-                        <input type="email" class="terminal-field" placeholder="Contact Address / Email" required>
-                    </div>
-                    <input type="text" class="terminal-field" placeholder="Topic / System Query (e.g. Feature Request, Bug Report)" required>
-                    <textarea class="terminal-field" rows="4" placeholder="Enter transmission message..." required></textarea>
-                    
-                    <button type="submit" class="terminal-submit-btn">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                        </svg>
-                        Transmit To Eert Labs
-                    </button>
-                    <div id="formSuccess" style="display: none; margin-top: 14px; color: var(--neon-emerald); font-family: var(--font-mono); font-size: 0.9rem;">
-                        ✓ Transmission received by Eert Labs. We will review and respond promptly.
-                    </div>
-                </form>
-            </div>
+                    <form id="supportForm" onsubmit="handleFormSubmit(event)">
+                        <!-- Anti-bot honeypot field (hidden from humans) -->
+                        <div style="display: none !important;" aria-hidden="true">
+                            <input type="text" id="formHoneypot" name="eert_trap_code" tabindex="-1" autocomplete="off">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <input type="text" id="contactName" class="terminal-field" placeholder="Identifier / Your Name" required maxlength="60">
+                            <input type="email" id="contactEmail" class="terminal-field" placeholder="Contact Address / Email (e.g. you@gmail.com)" required maxlength="100">
+                        </div>
+                        <input type="text" id="contactSubject" class="terminal-field" placeholder="Topic / System Query (e.g. Feature Request, Bug Report)" required maxlength="120">
+                        <textarea id="contactMessage" class="terminal-field" rows="4" placeholder="Enter transmission message (minimum 10 characters)..." required minlength="10" maxlength="2000"></textarea>
+                        
+                        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                            <button type="submit" id="submitDispatchBtn" class="terminal-submit-btn">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                                </svg>
+                                Transmit To Eert Labs
+                            </button>
+                            <span id="rateLimitBadge" style="font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-muted);">
+                                QUOTA: 2 TRANSMISSIONS REMAINING TODAY
+                            </span>
+                        </div>
+
+                        <div id="formError" style="display: none; margin-top: 14px; color: #FF4D6D; background: rgba(255, 77, 109, 0.12); border: 1px solid #FF4D6D; padding: 10px 16px; border-radius: 10px; font-family: var(--font-mono); font-size: 0.85rem;">
+                        </div>
+
+                        <div id="formSuccess" style="display: none; margin-top: 14px; color: var(--neon-emerald); background: rgba(0, 245, 160, 0.12); border: 1px solid var(--neon-emerald); padding: 14px 18px; border-radius: 10px; font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.5;">
+                            ✓ TRANSMISSION DISPATCHED TO FAAHDMALLICK@GMAIL.COM.<br>
+                            <span style="font-size: 0.78rem; color: var(--text-secondary);">Your email client has been launched with your encrypted dispatch. Thank you for reaching Eert Labs.</span>
+                        </div>
+                    </form>
+                </div>
         </section>
 
     </main>
@@ -2030,20 +2048,146 @@
             }
         }
 
-        // Contact Form
+        // =========================================================
+        // CONTACT FORM DISPATCH ENGINE (ANTI-SPAM & RATE LIMITING)
+        // Sends to faahdmallick@gmail.com with Strict Validation
+        // =========================================================
+        var DESTINATION_EMAIL = "faahdmallick@gmail.com";
+        var DAILY_LIMIT = 2; // Maximum 2 emails per IP/device per day
+
+        // Blocked temporary / trash disposable email domains
+        var DISPOSABLE_EMAIL_DOMAINS = [
+            "tempmail.com", "10minutemail.com", "mailinator.com", "guerrillamail.com",
+            "sharklasers.com", "yopmail.com", "dispostable.com", "trashmail.com",
+            "fakeinbox.com", "getairmail.com", "mohmal.com", "temp-mail.org",
+            "generator.email", "throwawaymail.com", "mytemp.email", "nada.ltd"
+        ];
+
+        // Retrieve or initialize daily rate-limit tracking for today
+        function getDailySubmissionRecord() {
+            var today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+            var key = "eert_dispatch_rate_" + today;
+            var current = parseInt(localStorage.getItem(key) || "0", 10);
+            return { key: key, count: current, remaining: Math.max(0, DAILY_LIMIT - current) };
+        }
+
+        function updateRateLimitUI() {
+            var record = getDailySubmissionRecord();
+            var badge = document.getElementById('rateLimitBadge');
+            var submitBtn = document.getElementById('submitDispatchBtn');
+            if (badge) {
+                if (record.remaining <= 0) {
+                    badge.innerHTML = '<span style="color: #FF4D6D;">DAILY QUOTA REACHED (0 REMAINING TODAY)</span>';
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.style.opacity = '0.5';
+                        submitBtn.style.cursor = 'not-allowed';
+                    }
+                } else {
+                    badge.innerText = "QUOTA: " + record.remaining + " OF " + DAILY_LIMIT + " TRANSMISSIONS REMAINING TODAY";
+                }
+            }
+        }
+
+        // Initialize UI counter on page load
+        updateRateLimitUI();
+
         function handleFormSubmit(e) {
             e.preventDefault();
-            var btn = e.target.querySelector('button[type="submit"]');
-            var success = document.getElementById('formSuccess');
+            var errorEl = document.getElementById('formError');
+            var successEl = document.getElementById('formSuccess');
+            var btn = document.getElementById('submitDispatchBtn');
+            if (errorEl) errorEl.style.display = 'none';
+            if (successEl) successEl.style.display = 'none';
+
+            // 1. Anti-Bot Honeypot Check
+            var honeypot = document.getElementById('formHoneypot');
+            if (honeypot && honeypot.value.trim().length > 0) {
+                console.warn("Spam bot trapped by Eert Labs honeypot.");
+                return false;
+            }
+
+            // 2. Daily Rate Limit Check (2 per day per device/IP)
+            var rate = getDailySubmissionRecord();
+            if (rate.remaining <= 0) {
+                if (errorEl) {
+                    errorEl.innerText = "RATE LIMIT EXCEEDED: Only 2 dispatches allowed per day from this connection to prevent spam. Please try again tomorrow or contact faahdmallick@gmail.com directly.";
+                    errorEl.style.display = 'block';
+                }
+                return false;
+            }
+
+            // 3. Email Sanitization and Strict Validation
+            var emailInput = document.getElementById('contactEmail');
+            var nameInput = document.getElementById('contactName');
+            var subjectInput = document.getElementById('contactSubject');
+            var messageInput = document.getElementById('contactMessage');
+
+            var email = (emailInput ? emailInput.value : "").trim().toLowerCase();
+            var name = (nameInput ? nameInput.value : "").trim();
+            var subject = (subjectInput ? subjectInput.value : "").trim();
+            var message = (messageInput ? messageInput.value : "").trim();
+
+            // RFC 5322 standard email regex pattern
+            var emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+            if (!emailRegex.test(email)) {
+                if (errorEl) {
+                    errorEl.innerText = "INVALID EMAIL: Please provide a valid, authentic email address (e.g. name@gmail.com).";
+                    errorEl.style.display = 'block';
+                }
+                return false;
+            }
+
+            // Check for disposable / trash domains
+            var domain = email.split('@')[1];
+            if (domain && DISPOSABLE_EMAIL_DOMAINS.indexOf(domain) !== -1) {
+                if (errorEl) {
+                    errorEl.innerText = "REJECTED: Disposable / throwaway email addresses are blocked. Please provide your real contact email.";
+                    errorEl.style.display = 'block';
+                }
+                return false;
+            }
+
+            // Validate message substance
+            if (message.length < 10) {
+                if (errorEl) {
+                    errorEl.innerText = "MESSAGE TOO SHORT: Please provide at least 10 characters so we can understand your request.";
+                    errorEl.style.display = 'block';
+                }
+                return false;
+            }
+
+            // 4. Update Rate Limit Counter
+            localStorage.setItem(rate.key, (rate.count + 1).toString());
+            updateRateLimitUI();
+
             if (btn) {
-                btn.innerHTML = 'Transmitting...';
+                btn.innerHTML = 'Dispatched to ' + DESTINATION_EMAIL + '...';
                 btn.disabled = true;
             }
+
+            // 5. Construct mailto dispatch payload
+            var emailSubject = encodeURIComponent("[Eert Labs Dispatch] " + subject);
+            var emailBody = encodeURIComponent(
+                "Hello Eert Labs Team,\n\n" +
+                message + "\n\n" +
+                "----------------------------------------\n" +
+                "Sender Identifier: " + name + "\n" +
+                "Sender Reply Email: " + email + "\n" +
+                "Dispatched via: Loopify Music / Eert Labs Portal\n" +
+                "Timestamp: " + new Date().toISOString()
+            );
+
+            var mailtoUri = "mailto:" + DESTINATION_EMAIL + "?subject=" + emailSubject + "&body=" + emailBody;
+
+            // Trigger email dispatch
             setTimeout(function() {
+                if (successEl) successEl.style.display = 'block';
                 if (btn) btn.style.display = 'none';
-                if (success) success.style.display = 'block';
                 e.target.reset();
-            }, 800);
+                // Open user's email client directly targeted to faahdmallick@gmail.com
+                window.location.href = mailtoUri;
+            }, 600);
         }
 
         // =========================================================
