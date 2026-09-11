@@ -47,6 +47,7 @@ class LoopCountApp : Application(), ImageLoaderFactory {
                 when (event) {
                     "PLAY" -> bluetoothSyncManager.onUserPlay(pos)
                     "PAUSE" -> bluetoothSyncManager.onUserPause(pos)
+                    "STOP" -> bluetoothSyncManager.onUserStop()
                     "SEEK" -> bluetoothSyncManager.onUserSeek(pos)
                     "TRACK" -> track?.let { bluetoothSyncManager.sendTrackChange(it, pos, true) }
                 }

@@ -1,8 +1,11 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -279,6 +282,36 @@ fun ShareToScreen(
         }
     }
 
+    // Direct step-by-step back handling to ensure user does not get kicked out to Home
+    val handleBackStep: () -> Unit = {
+        when {
+            showSendProgressDialog && (senderProgress?.isCompleted == true || senderProgress?.errorMessage != null) -> {
+                showSendProgressDialog = false
+            }
+            showDeviceRadarSheet -> {
+                showDeviceRadarSheet = false
+            }
+            showHotspotConnectDialog -> {
+                showHotspotConnectDialog = false
+            }
+            showMaxFolderDialog -> {
+                showMaxFolderDialog = false
+            }
+            shareMode == ShareMode.RECEIVE -> {
+                shareMode = ShareMode.SEND
+            }
+            selectedTrackIds.isNotEmpty() || selectedFolderKeys.isNotEmpty() -> {
+                selectedTrackIds.clear()
+                selectedFolderKeys.clear()
+            }
+            else -> {
+                onBack()
+            }
+        }
+    }
+
+    BackHandler(onBack = handleBackStep)
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -298,7 +331,7 @@ fun ShareToScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = onBack,
+                        onClick = handleBackStep,
                         modifier = Modifier.testTag("share_to_back_button")
                     ) {
                         Icon(
@@ -929,46 +962,64 @@ fun ReceiveModeContent(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // IP & Port pill with copy button
+                    // Friendly Device Status Card (No technical IP address)
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surface,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Text(
-                                    text = "Receiver IP Address",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "${receiverState.localIp}:${receiverState.port}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhoneAndroid,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Receiver Device Name",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = receiverState.deviceName.ifBlank { "Loopify Receiver" },
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
 
-                            IconButton(
-                                onClick = { onCopyIp(receiverState.localIp) },
-                                modifier = Modifier.size(36.dp)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy IP",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                Text(
+                                    text = "READY",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
                         }
@@ -1131,7 +1182,7 @@ fun ReceiveModeContent(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Sender can enter the IP above or scan this code",
+                        text = "Sender can tap your device name or scan this QR code",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1995,24 +2046,43 @@ fun HotspotConnectDialog(
     onConnectToIp: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    // Intercept back button to dismiss dialog smoothly
+    BackHandler {
+        onDismiss()
+    }
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isProbing by remember { mutableStateOf(true) }
     var detectedIp by remember { mutableStateOf<String?>(null) }
+    var isConnectingDirectly by remember { mutableStateOf(false) }
+    var connectionError by remember { mutableStateOf<String?>(null) }
     val gatewayIp = remember { NetworkUtils.getGatewayIpAddress(context) }
 
     fun runProbe() {
         isProbing = true
-        detectedIp = null
+        connectionError = null
         scope.launch {
             val ip = transferManager.findActiveReceiverIp()
-            detectedIp = ip
+            if (ip != null) {
+                detectedIp = ip
+            }
             isProbing = false
         }
     }
 
+    // Auto-probe repeatedly every 2 seconds while dialog is open
     LaunchedEffect(Unit) {
-        runProbe()
+        while (isActive) {
+            val ip = transferManager.findActiveReceiverIp()
+            if (ip != null) {
+                detectedIp = ip
+                isProbing = false
+                break
+            }
+            isProbing = false
+            delay(2000)
+        }
     }
 
     Dialog(
@@ -2095,10 +2165,9 @@ fun HotspotConnectDialog(
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Target IP: $detectedIp",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                text = "Ready to transmit directly",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
                             Spacer(modifier = Modifier.height(10.dp))
                             Button(
@@ -2141,6 +2210,36 @@ fun HotspotConnectDialog(
                     Spacer(modifier = Modifier.height(14.dp))
                 }
 
+                // Error alert card if direct send could not reach receiver
+                if (connectionError != null) {
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = connectionError!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
                 // Step-by-step instructions card
                 Card(
                     shape = RoundedCornerShape(16.dp),
@@ -2168,7 +2267,7 @@ fun HotspotConnectDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Action buttons: Open Wi-Fi Settings, Direct Connect 192.168.43.1, Rescan
+                // Action buttons: Open Wi-Fi Settings, Direct Connect, Rescan
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -2187,15 +2286,39 @@ fun HotspotConnectDialog(
 
                     Button(
                         onClick = {
-                            val target = detectedIp ?: gatewayIp ?: "192.168.43.1"
-                            onConnectToIp(target)
+                            if (isConnectingDirectly) return@Button
+                            isConnectingDirectly = true
+                            connectionError = null
+                            scope.launch {
+                                val target = detectedIp?.takeIf { transferManager.isPortReachable(it) }
+                                    ?: transferManager.findActiveReceiverIp()
+                                    ?: listOfNotNull(gatewayIp, "192.168.43.1").firstOrNull { transferManager.isPortReachable(it) }
+
+                                isConnectingDirectly = false
+                                if (target != null) {
+                                    onConnectToIp(target)
+                                } else {
+                                    connectionError = "Receiver phone not detected yet.\nMake sure the other phone has 'Receive' mode open in Loopify."
+                                }
+                            }
                         },
+                        enabled = !isConnectingDirectly,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Send Directly", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        if (isConnectingDirectly) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Connecting...", fontSize = 11.sp)
+                        } else {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Send Directly", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 

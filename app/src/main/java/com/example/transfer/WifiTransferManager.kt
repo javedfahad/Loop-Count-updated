@@ -10,6 +10,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -95,18 +97,47 @@ class WifiTransferManager(private val context: Context) {
 
             if (size <= 0) {
                 try {
-                    context.contentResolver.openFileDescriptor(track.uri, "r")?.use { pfd ->
-                        size = pfd.statSize
+                    val path = track.uri.path
+                    if (!path.isNullOrBlank()) {
+                        val f = File(path)
+                        if (f.exists() && f.length() > 0) {
+                            size = f.length()
+                            if (displayName.isBlank()) displayName = f.name
+                        }
                     }
-                } catch (e: Exception) {
-                    // Ignore
-                }
+                } catch (_: Exception) {}
+            }
+
+            if (size <= 0) {
+                try {
+                    context.contentResolver.openAssetFileDescriptor(track.uri, "r")?.use { afd ->
+                        if (afd.length > 0) {
+                            size = afd.length
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            if (size <= 0) {
+                try {
+                    context.contentResolver.openFileDescriptor(track.uri, "r")?.use { pfd ->
+                        if (pfd.statSize > 0) {
+                            size = pfd.statSize
+                        }
+                    }
+                } catch (_: Exception) {}
             }
 
             if (size <= 0) {
                 try {
                     context.contentResolver.openInputStream(track.uri)?.use { stream ->
-                        size = stream.available().toLong()
+                        val buf = ByteArray(16384)
+                        var total = 0L
+                        var r: Int
+                        while (stream.read(buf).also { r = it } != -1) {
+                            total += r
+                        }
+                        if (total > 0) size = total
                     }
                 } catch (e: Exception) {
                     // Approximate fallback: 128kbps based on duration
@@ -343,21 +374,27 @@ class WifiTransferManager(private val context: Context) {
     }
 
     private fun resolveDestinationFile(folderName: String, fileName: String): File {
-        // Target: Music/Loopify/{folderName}/
         val cleanFolder = NetworkUtils.sanitizeFileName(folderName.ifBlank { "Loopify" })
         val cleanFile = NetworkUtils.sanitizeFileName(fileName)
 
-        val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-        val baseDir = if (musicDir != null && (musicDir.exists() || musicDir.mkdirs())) {
-            File(musicDir, "Loopify")
-        } else {
-            File(context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: context.filesDir, "Loopify")
+        var baseDir: File? = null
+        try {
+            val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+            if (musicDir != null) {
+                val candidate = File(musicDir, "Loopify")
+                if (candidate.exists() || candidate.mkdirs()) {
+                    baseDir = candidate
+                }
+            }
+        } catch (_: Exception) {}
+
+        if (baseDir == null || !baseDir.canWrite()) {
+            baseDir = File(context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: context.filesDir, "Loopify")
+            try { baseDir.mkdirs() } catch (_: Exception) {}
         }
 
         val targetDir = File(baseDir, cleanFolder)
-        if (!targetDir.exists()) {
-            targetDir.mkdirs()
-        }
+        try { targetDir.mkdirs() } catch (_: Exception) {}
 
         var candidate = File(targetDir, cleanFile)
         var counter = 1
@@ -603,21 +640,42 @@ class WifiTransferManager(private val context: Context) {
     }
 
     /**
-     * Actively probes candidate Hotspot and gateway IPs and returns the first reachable receiver IP.
+     * Actively probes candidate Hotspot and gateway IPs in parallel and returns the first reachable receiver IP.
      */
     suspend fun findActiveReceiverIp(): String? = withContext(Dispatchers.IO) {
         val candidates = NetworkUtils.getHotspotCandidateIps(context)
         val myIp = NetworkUtils.getLocalIpAddress(context)
-        for (ip in candidates) {
-            if (ip == myIp) continue
-            try {
-                Socket().use { s ->
-                    s.connect(InetSocketAddress(ip, DEFAULT_PORT), 1500)
-                    return@withContext ip
+        val validCandidates = candidates.filter { it != myIp }
+
+        coroutineScope {
+            val deferreds = validCandidates.map { ip ->
+                async {
+                    try {
+                        Socket().use { s ->
+                            s.connect(InetSocketAddress(ip, DEFAULT_PORT), 800)
+                            ip
+                        }
+                    } catch (_: Exception) {
+                        null
+                    }
                 }
-            } catch (_: Exception) {}
+            }
+            deferreds.firstNotNullOfOrNull { it.await() }
         }
-        null
+    }
+
+    /**
+     * Quickly checks if a receiver port is actively listening.
+     */
+    suspend fun isPortReachable(ip: String, port: Int = DEFAULT_PORT, timeoutMs: Int = 1000): Boolean = withContext(Dispatchers.IO) {
+        try {
+            Socket().use { s ->
+                s.connect(InetSocketAddress(ip, port), timeoutMs)
+                true
+            }
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**

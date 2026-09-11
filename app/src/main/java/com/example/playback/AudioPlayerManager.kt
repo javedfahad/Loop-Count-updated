@@ -56,6 +56,14 @@ class AudioPlayerManager(
             } else {
                 saveCurrentTrackPosition()
             }
+            // Real-time synchronization broadcast hook
+            val pos = exoPlayer?.currentPosition ?: _state.value.currentPositionMs
+            val track = _state.value.currentTrack
+            if (isPlaying) {
+                onSyncEvent?.invoke("PLAY", pos, track)
+            } else {
+                onSyncEvent?.invoke("PAUSE", pos, track)
+            }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -458,12 +466,9 @@ class AudioPlayerManager(
     fun togglePlayPause() {
         val player = exoPlayer ?: return
         if (player.isPlaying) {
-            player.pause()
+            pause()
         } else {
-            if (player.playbackState == Player.STATE_ENDED) {
-                player.seekTo(0)
-            }
-            player.play()
+            play()
         }
     }
 
@@ -497,7 +502,7 @@ class AudioPlayerManager(
                 currentPositionMs = 0L
             )
         }
-        onSyncEvent?.invoke("PAUSE", 0L, null)
+        onSyncEvent?.invoke("STOP", 0L, null)
     }
 
     fun seekTo(positionMs: Long) {

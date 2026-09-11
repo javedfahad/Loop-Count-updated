@@ -85,6 +85,7 @@ fun NowPlayingScreen(
     playbackState: PlaybackState,
     playerManager: AudioPlayerManager,
     syncManager: BluetoothSyncManager? = null,
+    onNavigateToShareTo: (() -> Unit)? = null,
     onBack: () -> Unit
 ) {
     val track = playbackState.currentTrack
@@ -135,6 +136,10 @@ fun NowPlayingScreen(
     if (showDualListenSheet) {
         DualListenBottomSheet(
             syncManager = effectiveSyncManager,
+            onNavigateToShareTo = {
+                showDualListenSheet = false
+                onNavigateToShareTo?.invoke()
+            },
             onDismiss = { showDualListenSheet = false }
         )
     }

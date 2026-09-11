@@ -1055,12 +1055,155 @@
             .support-section { padding: 30px 20px; }
         }
 
+        /* New Update Banner in Hero */
+        .update-hero-banner {
+            margin-top: 20px;
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.12) 0%, rgba(255, 0, 122, 0.08) 100%);
+            border: 1px solid rgba(0, 240, 255, 0.45);
+            border-radius: 18px;
+            padding: 16px 20px;
+            max-width: 640px;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: 0 8px 30px rgba(0, 240, 255, 0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            text-align: center;
+        }
+
+        .update-pulse-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 255, 178, 0.15);
+            border: 1px solid rgba(0, 255, 178, 0.4);
+            border-radius: 999px;
+            padding: 4px 14px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            color: var(--neon-mint);
+            text-transform: uppercase;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--neon-mint);
+            box-shadow: 0 0 10px var(--neon-mint);
+            animation: pulseGlow 1.8s infinite;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(0.9); opacity: 0.8; }
+            50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 14px var(--neon-mint); }
+            100% { transform: scale(0.9); opacity: 0.8; }
+        }
+
+        .update-hero-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #FFFFFF;
+        }
+
+        .update-hero-desc {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+            max-width: 540px;
+        }
+
+        .update-hero-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #00F0FF 0%, #7000FF 100%);
+            color: #FFFFFF;
+            font-weight: 700;
+            font-size: 0.92rem;
+            padding: 10px 22px;
+            border-radius: 12px;
+            text-decoration: none;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 15px rgba(0, 240, 255, 0.3);
+            margin-top: 4px;
+        }
+
+        .update-hero-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 22px rgba(0, 240, 255, 0.45);
+        }
+
+        /* Dedicated Section for Update */
+        .app-update-section {
+            margin: 60px 0 30px 0;
+            background: linear-gradient(145deg, rgba(30, 20, 48, 0.95) 0%, rgba(18, 12, 30, 0.98) 100%);
+            border: 1px solid rgba(0, 240, 255, 0.4);
+            border-radius: 28px;
+            padding: 40px;
+            position: relative;
+            box-shadow: 0 16px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 240, 255, 0.12);
+        }
+
+        .app-update-grid {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 32px;
+            align-items: center;
+            margin-top: 24px;
+        }
+
+        .update-changelog-list {
+            list-style: none;
+            margin: 18px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .update-changelog-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 0.92rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .update-changelog-item svg {
+            flex-shrink: 0;
+            color: var(--neon-cyan);
+            margin-top: 3px;
+        }
+
+        .update-download-card {
+            background: rgba(10, 7, 18, 0.75);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            border-radius: 22px;
+            padding: 28px 24px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.05);
+        }
+
+        @media (max-width: 850px) {
+            .app-update-grid { grid-template-columns: 1fr; }
+            .app-update-section { padding: 28px 20px; }
+        }
+
         @media (max-width: 480px) {
             .hero h1 { font-size: 1.95rem; }
             .features-grid { grid-template-columns: 1fr; }
             .form-submit-btn { width: 100%; justify-content: center; }
             .hero-cta-group { flex-direction: column; width: 100%; }
             .download-main-btn, .hero-support-btn { width: 100%; justify-content: center; }
+            .update-hero-btn { width: 100%; justify-content: center; }
         }
     </style>
 </head>
@@ -1090,6 +1233,7 @@
                     </div>
                 </a>
                 <nav class="nav-links">
+                    <a href="#updates" style="color: var(--neon-cyan); font-weight: 700;">★ New Update</a>
                     <a href="#features">All Features</a>
                     <a href="#support" class="nav-support-btn">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -1132,6 +1276,22 @@
                         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                     </svg>
                     Support via UPI
+                </a>
+            </div>
+            <div class="update-hero-banner">
+                <div class="update-pulse-indicator">
+                    <span class="pulse-dot"></span>
+                    <span>NEW APK UPDATE IS AVAILABLE</span>
+                </div>
+                <div class="update-hero-title">Already have Loopify or received this link?</div>
+                <div class="update-hero-desc">
+                    A new version update is ready with 15-Device Dual Listen sync, smart back navigation, and fixed direct Wi-Fi Hotspot sharing!
+                </div>
+                <a href="loopify-music.apk" download="loopify-music.apk" class="update-hero-btn">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+                    </svg>
+                    Download New APK (Direct Update)
                 </a>
             </div>
         </section>
@@ -1395,6 +1555,93 @@
                     <div class="feat-name">Ultra Lightweight</div>
                 </div>
                 <div class="feat-desc">Installs in seconds, uses minimal battery and memory, and launches instantly.</div>
+            </div>
+        </section>
+
+        <!-- New APK Update Announcement & Direct Download Section -->
+        <section class="app-update-section" id="updates">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 8px;">
+                <div class="badge" style="background: rgba(0, 240, 255, 0.15); border-color: var(--neon-cyan); color: var(--neon-cyan); margin-bottom: 0;">
+                    🚀 LATEST VERSION UPDATE AVAILABLE
+                </div>
+                <div class="update-pulse-indicator">
+                    <span class="pulse-dot"></span>
+                    <span>NEW APK READY TO DOWNLOAD</span>
+                </div>
+            </div>
+
+            <h2 style="font-size: 2.1rem; font-weight: 800; margin-top: 10px; color: #FFFFFF;">
+                Update Loopify Music to the <span style="background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Latest Release</span>
+            </h2>
+            <p style="color: var(--text-secondary); font-size: 1.05rem; margin-top: 6px; max-width: 780px;">
+                If you already received this link or currently have Loopify Music installed on your device, download the updated APK file below. You can install it directly over your existing app — your saved songs, playlists, and loop settings will remain completely preserved.
+            </p>
+
+            <div class="app-update-grid">
+                <div>
+                    <h3 style="color: var(--neon-mint); font-size: 1.15rem; font-weight: 700; margin-bottom: 8px;">
+                        ✦ What's New in this Update:
+                    </h3>
+                    <ul class="update-changelog-list">
+                        <li class="update-changelog-item">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                            <div>
+                                <strong style="color: #FFFFFF;">Dual Listen 15-Device DJ Sync:</strong> Host and synchronize music playback across up to 15 nearby devices offline via Bluetooth and local Wi-Fi without internet or cellular data.
+                            </div>
+                        </li>
+                        <li class="update-changelog-item">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                            <div>
+                                <strong style="color: #FFFFFF;">Smart Step-by-Step Back Navigation:</strong> Pressing back inside Share to or Dual Listen now smoothly dismisses open dialogs and sub-modes instead of abruptly kicking you back to Home.
+                            </div>
+                        </li>
+                        <li class="update-changelog-item">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                            <div>
+                                <strong style="color: #FFFFFF;">Fixed Direct Wi-Fi Hotspot Send:</strong> One-tap "Send Directly" automatically verifies receiver reachability without requiring complex manual IP configuration.
+                            </div>
+                        </li>
+                        <li class="update-changelog-item">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                            <div>
+                                <strong style="color: #FFFFFF;">Clean Receiver Interface:</strong> Replaced technical IP address displays with friendly device names and QR code detection.
+                            </div>
+                        </li>
+                    </ul>
+
+                    <div style="background: rgba(255, 255, 255, 0.04); border-left: 3px solid var(--neon-cyan); padding: 10px 14px; border-radius: 0 10px 10px 0; margin-top: 14px; font-size: 0.85rem; color: var(--text-secondary);">
+                        <strong style="color: #FFFFFF;">How to install update:</strong> Tap the download button, open the downloaded APK file in your phone's notification bar or Downloads folder, and choose <strong>"Update"</strong>.
+                    </div>
+                </div>
+
+                <div class="update-download-card">
+                    <div style="width: 56px; height: 56px; border-radius: 18px; background: rgba(0, 240, 255, 0.15); display: flex; align-items: center; justify-content: center; color: var(--neon-cyan);">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div style="font-weight: 800; font-size: 1.25rem; color: #FFFFFF;">Loopify Music APK</div>
+                        <div style="font-size: 0.84rem; color: var(--neon-mint); font-weight: 600; margin-top: 2px;">Latest Version • 23 MB • Verified Safe</div>
+                    </div>
+                    <a href="loopify-music.apk" download="loopify-music.apk" class="download-main-btn" style="width: 100%; justify-content: center; font-size: 1rem; padding: 14px 20px;">
+                        <svg viewBox="0 0 24 24" style="width: 22px; height: 22px;">
+                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+                        </svg>
+                        Download New APK Update
+                    </a>
+                    <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4;">
+                        Safe direct download • No Google Play account required • 100% Free &amp; Ad-Free
+                    </div>
+                </div>
             </div>
         </section>
 

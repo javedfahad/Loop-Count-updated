@@ -169,20 +169,24 @@ class MainActivity : ComponentActivity() {
                 themeMode = uiState.themeMode,
                 accent = uiState.accentColor
             ) {
+                var showDualListenSheet by remember { mutableStateOf(false) }
+
                 // System Back gesture / button handling:
                 // If drawer is open, close it. If on a sub-screen, pop to the previous screen (e.g. NowPlaying -> FolderDetail -> Home).
                 BackHandler(enabled = drawerState.isOpen) {
                     scope.launch { drawerState.close() }
                 }
-                BackHandler(enabled = screenStack.size > 1 && !drawerState.isOpen && currentScreen !is Screen.Splash) {
+                BackHandler(enabled = screenStack.size > 1 && !drawerState.isOpen && currentScreen !is Screen.Splash && !showDualListenSheet) {
                     navigateBack()
                 }
-
-                var showDualListenSheet by remember { mutableStateOf(false) }
 
                 if (showDualListenSheet) {
                     DualListenBottomSheet(
                         syncManager = viewModel.bluetoothSyncManager,
+                        onNavigateToShareTo = {
+                            showDualListenSheet = false
+                            navigateTo(Screen.ShareTo)
+                        },
                         onDismiss = { showDualListenSheet = false }
                     )
                 }
@@ -386,6 +390,7 @@ class MainActivity : ComponentActivity() {
                                         playbackState = playbackState,
                                         playerManager = viewModel.playerManager,
                                         syncManager = viewModel.bluetoothSyncManager,
+                                        onNavigateToShareTo = { navigateTo(Screen.ShareTo) },
                                         onBack = { navigateBack() }
                                     )
                                 }
