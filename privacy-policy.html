@@ -398,15 +398,31 @@
         }
 
         /* Mobile responsiveness */
-        @media (max-width: 640px) {
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 16px;
+            }
+            .hero {
+                padding: 45px 0 35px;
+            }
             .hero h1 {
-                font-size: 2.1rem;
+                font-size: clamp(1.85rem, 7vw, 2.3rem);
+                line-height: 1.18;
+            }
+            .bento-grid {
+                grid-template-columns: 1fr;
+                gap: 14px;
             }
             .policy-container {
-                padding: 24px 18px;
+                padding: 22px 16px;
+                border-radius: 18px;
             }
             .nav-links {
                 display: none;
+            }
+            .policy-meta {
+                flex-direction: column;
+                gap: 8px;
             }
         }
     </style>

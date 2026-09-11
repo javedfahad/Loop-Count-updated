@@ -1207,6 +1207,12 @@
             backdrop-filter: blur(20px);
         }
 
+        .contact-grid-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
         .terminal-field {
             width: 100%;
             background: rgba(5, 3, 10, 0.7);
@@ -1371,26 +1377,95 @@
             vertical-align: middle;
         }
 
-        /* Responsive Breakpoints */
+        /* Responsive Breakpoints & Dynamic Mobile Fluidity */
         @media (max-width: 992px) {
-            .hero h1 { font-size: 3.2rem; }
-            .bento-matrix { grid-template-columns: repeat(6, 1fr); }
+            .hero h1 { font-size: clamp(2.2rem, 5vw, 3.2rem); }
+            .bento-matrix { grid-template-columns: repeat(6, 1fr); gap: 16px; }
             .span-4, .span-6, .span-8 { grid-column: span 6; }
-            .dual-listen-grid, .sponsor-layout { grid-template-columns: 1fr; }
-            .footer-grid { grid-template-columns: 1fr 1fr; }
+            .dual-listen-grid, .sponsor-layout { grid-template-columns: 1fr; gap: 30px; }
+            .footer-grid { grid-template-columns: 1fr 1fr; gap: 24px; }
         }
 
         @media (max-width: 768px) {
-            .hero h1 { font-size: 2.5rem; }
+            .container { padding: 0 16px; }
+            
+            /* Typography Scaling */
+            .hero { padding: 50px 0 35px; }
+            .hero-hud-pill { font-size: 0.68rem; padding: 4px 12px; margin-bottom: 18px; }
+            .hero h1 { font-size: clamp(1.95rem, 8vw, 2.6rem); line-height: 1.15; margin-bottom: 18px; }
+            .hero-desc { font-size: 0.98rem; line-height: 1.6; margin-bottom: 26px; }
+            
+            /* Actions & Buttons */
+            .hero-actions { flex-direction: column; width: 100%; gap: 12px; }
+            .cyber-btn-primary, .cyber-btn-secondary { width: 100%; justify-content: center; padding: 14px 24px; font-size: 0.98rem; }
+            
+            /* Header Navigation */
             .nav-links { display: none; }
-            .bento-matrix { grid-template-columns: 1fr; }
-            .span-4, .span-6, .span-8, .span-12 { grid-column: span 1; }
-            .hero-actions { flex-direction: column; width: 100%; }
-            .cyber-btn-primary, .cyber-btn-secondary { width: 100%; justify-content: center; }
-            .eert-release-card { flex-direction: column; text-align: center; }
+            .brand-title { font-size: 1.25rem; }
+            .brand-eert-tag { font-size: 0.62rem; }
+            .brand-logo-cyber { width: 38px; height: 38px; }
+            
+            /* Simulator Deck Mobile Optimization */
+            .simulator-deck { padding: 18px 14px; border-radius: 20px; margin: 40px auto 60px; }
+            .deck-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .deck-status-display { width: 100%; justify-content: space-between; font-size: 0.76rem; padding: 8px 12px; }
+            .controls-matrix { grid-template-columns: 1fr; gap: 12px; }
+            .control-pod { padding: 12px; }
+            .loop-count-btn { padding: 8px 2px; font-size: 0.74rem; }
+            .visualizer-canvas-container { height: 90px; border-radius: 14px; margin-bottom: 16px; }
+            .transport-bar { flex-direction: column; align-items: stretch; gap: 14px; padding: 14px; }
+            .transport-main-btns { width: 100%; display: flex; gap: 8px; }
+            .play-synth-btn, .stop-synth-btn { flex: 1; justify-content: center; padding: 12px 14px; font-size: 0.85rem; }
+            .toggle-switch-group { justify-content: space-between; width: 100%; }
+            
+            /* Release notification card */
+            .eert-release-card { flex-direction: column; text-align: center; padding: 18px 16px; border-radius: 16px; gap: 14px; }
             .release-left { text-align: center; }
-            .footer-grid { grid-template-columns: 1fr; }
-            .simulator-deck { padding: 22px; }
+            .release-download-link { width: 100%; justify-content: center; }
+            
+            /* Bento Grid Matrix */
+            .section-header-cyber { margin: 60px 0 30px; }
+            .section-header-cyber h2 { font-size: clamp(1.75rem, 7vw, 2.2rem); }
+            .section-header-cyber p { font-size: 0.95rem; }
+            .bento-matrix { grid-template-columns: 1fr; gap: 14px; margin-bottom: 60px; }
+            .span-4, .span-6, .span-8, .span-12 { grid-column: span 1; }
+            .bento-cell { padding: 20px 18px; border-radius: 18px; }
+            
+            /* Dual Listen Radar Section */
+            .dual-listen-section { padding: 24px 18px; border-radius: 20px; margin-bottom: 60px; }
+            .dual-listen-section h3 { font-size: 1.8rem; }
+            .radar-canvas-box { height: 260px; border-radius: 16px; }
+            
+            /* Sponsor Terminal & QR Code */
+            .sponsor-terminal { padding: 24px 18px; border-radius: 20px; margin-bottom: 60px; }
+            .sponsor-left h3 { font-size: 1.75rem; }
+            .dev-terminal-message { padding: 16px; font-size: 0.88rem; }
+            .qr-cyber-deck { padding: 18px 14px; border-radius: 20px; }
+            .qr-img-frame img { max-width: 220px; }
+            .upi-copy-field { flex-direction: column; text-align: center; gap: 8px; font-size: 0.82rem; }
+            .upi-copy-action { width: 100%; padding: 8px 12px; }
+            
+            /* Privacy and Contact Terminal */
+            .policy-terminal-container { padding: 22px 16px; border-radius: 20px; margin-bottom: 60px; }
+            .policy-terminal-container h3 { font-size: 1.6rem; }
+            .contact-grid-row { grid-template-columns: 1fr; gap: 0; }
+            .terminal-field { font-size: 0.88rem; padding: 12px 14px; }
+            .terminal-submit-btn { width: 100%; justify-content: center; }
+            
+            /* Footer */
+            .footer-grid { grid-template-columns: 1fr; gap: 28px; }
+            .footer-bottom-bar { flex-direction: column; text-align: center; gap: 10px; font-size: 0.74rem; }
+        }
+
+        @media (max-width: 480px) {
+            .hero h1 { font-size: 1.85rem; }
+            .brand-cluster { gap: 10px; }
+            .brand-title { font-size: 1.15rem; }
+            .loop-count-selector { flex-wrap: nowrap; overflow-x: auto; }
+            .loop-count-btn { min-width: 42px; }
+            .radar-canvas-box { height: 230px; }
+            .radar-stats-overlay { font-size: 0.65rem; padding: 4px 8px; }
+            .qr-img-frame img { max-width: 190px; }
         }
     </style>
 </head>
@@ -1906,7 +1981,7 @@
                             <input type="text" id="formHoneypot" name="eert_trap_code" tabindex="-1" autocomplete="off">
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="contact-grid-row">
                             <input type="text" id="contactName" class="terminal-field" placeholder="Identifier / Your Name" required maxlength="60">
                             <input type="email" id="contactEmail" class="terminal-field" placeholder="Contact Address / Email (e.g. you@gmail.com)" required maxlength="100">
                         </div>
