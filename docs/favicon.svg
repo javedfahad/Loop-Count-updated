@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <defs>
+    <!-- Background Linear Gradient -->
+    <linearGradient id="bgGrad" x1="54" y1="0" x2="54" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1A0A30"/>
+      <stop offset="50%" stop-color="#0D0418"/>
+      <stop offset="100%" stop-color="#040108"/>
+    </linearGradient>
+    
+    <!-- Center Radial Glow -->
+    <radialGradient id="radialGlow" cx="54" cy="54" r="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3D126E" stop-opacity="0.9"/>
+      <stop offset="55%" stop-color="#200742" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Outer Sound Ring Gradient -->
+    <linearGradient id="outerRingGrad" x1="18" y1="18" x2="90" y2="90" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FF3366"/>
+      <stop offset="50%" stop-color="#7928CA"/>
+      <stop offset="100%" stop-color="#00DFD8"/>
+    </linearGradient>
+
+    <!-- Sonic Groove Left Gradient -->
+    <linearGradient id="grooveLeftGrad" x1="30" y1="39" x2="30" y2="69" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FF3366"/>
+      <stop offset="100%" stop-color="#7928CA"/>
+    </linearGradient>
+
+    <!-- Sonic Groove Right Gradient -->
+    <linearGradient id="grooveRightGrad" x1="75" y1="39" x2="75" y2="69" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7928CA"/>
+      <stop offset="100%" stop-color="#00DFD8"/>
+    </linearGradient>
+
+    <!-- Playhead Prism Gradient -->
+    <linearGradient id="playheadGrad" x1="48" y1="44" x2="64" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#00DFD8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Deep Obsidian Rounded Squircle Background -->
+  <rect width="108" height="108" rx="24" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle Edge Highlighting -->
+  <rect width="106" height="106" x="1" y="1" rx="23" fill="none" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1"/>
+
+  <!-- Radiant Neon Aurora Flare -->
+  <circle cx="54" cy="54" r="46" fill="url(#radialGlow)"/>
+
+  <!-- Subtle Orbit Wave Lines -->
+  <circle cx="54" cy="54" r="38" fill="none" stroke="#2E1452" stroke-width="0.8"/>
+
+  <!-- Outer Radiant Neon Sound Ring -->
+  <circle cx="54" cy="54" r="36" fill="none" stroke="url(#outerRingGrad)" stroke-width="4.2" stroke-linecap="round"/>
+
+  <!-- Sonic Groove Left Arc -->
+  <path d="M 33 39 A 26 26 0 0 0 33 69" fill="none" stroke="url(#grooveLeftGrad)" stroke-width="3.2" stroke-linecap="round"/>
+
+  <!-- Sonic Groove Right Arc -->
+  <path d="M 75 39 A 26 26 0 0 1 75 69" fill="none" stroke="url(#grooveRightGrad)" stroke-width="3.2" stroke-linecap="round"/>
+
+  <!-- Inner Dark Vinyl Disc -->
+  <circle cx="54" cy="54" r="18" fill="#15082A"/>
+
+  <!-- Center Forward Playhead Prism -->
+  <path d="M 48 44 L 64 54 L 48 64 Z" fill="url(#playheadGrad)"/>
+
+  <!-- Orbiting Sound Sparks -->
+  <circle cx="18" cy="54" r="3" fill="#FF3366"/>
+  <circle cx="90" cy="54" r="3" fill="#00DFD8"/>
+  <circle cx="54" cy="18" r="2" fill="#FFFFFF"/>
+  <circle cx="54" cy="90" r="2.5" fill="#7928CA"/>
+</svg>
