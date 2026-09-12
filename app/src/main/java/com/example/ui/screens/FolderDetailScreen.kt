@@ -518,7 +518,11 @@ fun FolderDetailScreen(
                 .padding(horizontal = 16.dp)
         ) {
             val screenWidth = maxWidth
-            val gridColumns = if (screenWidth >= 600.dp) 2 else 1
+            val gridColumns = when {
+                screenWidth >= 840.dp -> 3
+                screenWidth >= 540.dp -> 2
+                else -> 1
+            }
 
             Column(modifier = Modifier.fillMaxSize()) {
                 // Action Banner Bento Card (Hidden during multi-select to keep focus clean)

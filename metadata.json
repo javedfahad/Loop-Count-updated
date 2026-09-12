@@ -1,5 +1,5 @@
 {
-  "name": "Loopify Music",
+  "name": "Tuny Music",
   "description": "Precision Audio Looper & Smart Music Player engineered by Eert Labs with counted repetitions, zero-duplicate playlists, and offline playback.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

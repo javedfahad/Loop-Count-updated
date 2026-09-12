@@ -99,7 +99,17 @@ class MediaPlaybackService : MediaSessionService() {
             ACTION_NEXT -> app.playerManager.next()
             ACTION_PREVIOUS -> app.playerManager.previous()
         }
-        return super.onStartCommand(intent, flags, startId)
+        super.onStartCommand(intent, flags, startId)
+        return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val app = application as? LoopCountApp ?: LoopCountApp.instance
+        val isPlaying = app.playerManager.state.value.isPlaying
+        if (!isPlaying) {
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     private fun createNotificationChannel() {

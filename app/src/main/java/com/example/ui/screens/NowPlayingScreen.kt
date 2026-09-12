@@ -227,6 +227,7 @@ fun NowPlayingScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            val screenHeight = maxHeight
             val isTabletOrLandscape = maxWidth >= 600.dp
             val currentPos = if (isUserSeeking) userSeekPos.toLong() else playbackState.currentPositionMs
             val duration = playbackState.durationMs.coerceAtLeast(1L)
@@ -601,11 +602,12 @@ fun NowPlayingScreen(
                 ) {
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    val artworkSize = (screenHeight * 0.32f).coerceIn(160.dp, 260.dp)
                     NowPlayingArtworkCard(
                         track = track,
                         isPlaying = playbackState.isPlaying,
                         modifier = Modifier
-                            .size(230.dp)
+                            .size(artworkSize)
                             .testTag("now_playing_artwork")
                     )
 

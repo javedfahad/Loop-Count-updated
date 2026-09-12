@@ -125,6 +125,14 @@ class AudioPlayerManager(
             exoPlayer = basePlayer
 
             forwardingPlayer = object : ForwardingPlayer(basePlayer) {
+                override fun play() {
+                    this@AudioPlayerManager.play()
+                }
+
+                override fun pause() {
+                    this@AudioPlayerManager.pause()
+                }
+
                 override fun getAvailableCommands(): Player.Commands {
                     return super.getAvailableCommands().buildUpon()
                         .add(Player.COMMAND_SEEK_TO_NEXT)
@@ -268,6 +276,19 @@ class AudioPlayerManager(
 
     // --- Core Playback Methods ---
 
+    fun ensureServiceStarted() {
+        try {
+            val serviceIntent = android.content.Intent(context, MediaPlaybackService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
+        } catch (e: Exception) {
+            // Ignore if service start is restricted by background execution limits
+        }
+    }
+
     fun playTrack(
         track: AudioTrack,
         queue: List<AudioTrack> = listOf(track),
@@ -295,16 +316,7 @@ class AudioPlayerManager(
             )
         }
 
-        try {
-            val serviceIntent = android.content.Intent(context, MediaPlaybackService::class.java)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
-        } catch (e: Exception) {
-            // Ignore if service start is restricted by background execution limits
-        }
+        ensureServiceStarted()
 
         val mediaItem = buildMediaItem(track)
         player.setMediaItem(mediaItem)
@@ -480,6 +492,7 @@ class AudioPlayerManager(
     }
 
     fun play() {
+        ensureServiceStarted()
         val player = exoPlayer ?: return
         if (player.playbackState == Player.STATE_ENDED) {
             player.seekTo(0)
@@ -841,7 +854,7 @@ class AudioPlayerManager(
             .setArtist(track.displayArtist)
             .setSubtitle(loopSubtitle)
             .setDescription(loopSubtitle)
-            .setAlbumTitle(track.album.ifBlank { "Loopify Music" })
+            .setAlbumTitle(track.album.ifBlank { "Tuny Music" })
             .setDisplayTitle(track.displayTitle)
             .build()
 

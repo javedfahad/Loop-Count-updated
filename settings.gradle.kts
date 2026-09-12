@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "LoopifyMusic"
+rootProject.name = "TunyMusic"
 
 include(":app")
