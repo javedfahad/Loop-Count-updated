@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -89,64 +88,107 @@ fun FolderOptionsDialog(
     }
 
     if (isRenaming) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { isRenaming = false },
-            title = { Text("Rename Folder", fontWeight = FontWeight.Bold) },
-            text = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Rename Folder",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = renameText,
                     onValueChange = { renameText = it },
                     label = { Text("Folder Name") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onRename(renameText.toProperTitleCase())
-                        isRenaming = false
-                        onDismiss()
-                    }
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Save", fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { isRenaming = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(
+                        onClick = {
+                            onRename(renameText.toProperTitleCase())
+                            isRenaming = false
+                            onDismiss()
+                        }
+                    ) {
+                        Text("Save", fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { isRenaming = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
         return
     }
 
     if (isConfirmingDelete) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { isConfirmingDelete = false },
-            title = { Text("Delete Folder", fontWeight = FontWeight.Bold) },
-            text = {
-                Text("Delete \"$folderName\"? This removes the custom folder list from Loopify Music. Your original audio files on the device will not be deleted.")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        isConfirmingDelete = false
-                        onDelete()
-                        onDismiss()
-                    }
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Delete Folder",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Delete \"$folderName\"? This removes the custom folder list from Loopify Music. Your original audio files on the device will not be deleted.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { isConfirmingDelete = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(
+                        onClick = {
+                            isConfirmingDelete = false
+                            onDelete()
+                            onDismiss()
+                        }
+                    ) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { isConfirmingDelete = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
         return
     }
 
@@ -287,6 +329,7 @@ fun FolderOptionsDialog(
         }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FolderTimerDialog(
     folderName: String,
@@ -304,97 +347,109 @@ fun FolderTimerDialog(
         120 to "2 hours"
     )
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = {
-            Column {
-                Text("Play Folder for...", fontWeight = FontWeight.Bold)
-                Text(
-                    text = "Audio will finish naturally after the timer expires, then stop.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        text = {
-            Column {
-                presetOptions.forEach { (mins, label) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                isCustom = false
-                                selectedOption = mins
-                            }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = !isCustom && selectedOption == mins,
-                            onClick = {
-                                isCustom = false
-                                selectedOption = mins
-                            }
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = label, style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+        ) {
+            Text("Play Folder for...", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                text = "Audio will finish naturally after the timer expires, then stop.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-                // Custom option
+            Spacer(modifier = Modifier.height(16.dp))
+
+            presetOptions.forEach { (mins, label) ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { isCustom = true }
-                        .padding(vertical = 6.dp),
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            isCustom = false
+                            selectedOption = mins
+                        }
+                        .padding(vertical = 8.dp, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     RadioButton(
-                        selected = isCustom,
-                        onClick = { isCustom = true }
+                        selected = !isCustom && selectedOption == mins,
+                        onClick = {
+                            isCustom = false
+                            selectedOption = mins
+                        }
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Custom minutes", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(text = label, style = MaterialTheme.typography.bodyLarge)
                 }
+            }
 
-                if (isCustom) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = customText,
-                        onValueChange = {
-                            if (it.all { char -> char.isDigit() }) {
-                                customText = it
-                            }
-                        },
-                        label = { Text("Minutes") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val minutes = if (isCustom) {
-                        customText.toIntOrNull()?.coerceAtLeast(1) ?: 30
-                    } else {
-                        selectedOption
-                    }
-                    onConfirm(minutes)
-                }
+            // Custom option
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { isCustom = true }
+                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Start Timer", fontWeight = FontWeight.Bold)
+                RadioButton(
+                    selected = isCustom,
+                    onClick = { isCustom = true }
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(text = "Custom minutes", style = MaterialTheme.typography.bodyLarge)
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+
+            if (isCustom) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = customText,
+                    onValueChange = {
+                        if (it.all { char -> char.isDigit() }) {
+                            customText = it
+                        }
+                    },
+                    label = { Text("Minutes") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-        },
-        shape = RoundedCornerShape(24.dp)
-    )
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                TextButton(
+                    onClick = {
+                        val minutes = if (isCustom) {
+                            customText.toIntOrNull()?.coerceAtLeast(1) ?: 30
+                        } else {
+                            selectedOption
+                        }
+                        onConfirm(minutes)
+                    }
+                ) {
+                    Text("Start Timer", fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
 }

@@ -50,7 +50,7 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -63,6 +63,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -71,6 +72,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -165,45 +167,92 @@ fun FolderDetailScreen(
     }
 
     if (showDeleteConfirmDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showDeleteConfirmDialog = false },
-            title = { Text("Delete Folder", fontWeight = FontWeight.Bold) },
-            text = {
-                Text("Delete \"${folder.name}\"? This removes the folder list from Loopify Music. Your original audio files on the device will not be deleted.")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteConfirmDialog = false
-                        onDeleteFolder?.invoke(folder.id)
-                        onBack()
-                    },
-                    modifier = Modifier.testTag("confirm_delete_folder_button")
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Delete Folder",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Delete \"${folder.name}\"? This removes the folder list from Loopify Music. Your original audio files on the device will not be deleted.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Delete Folder", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(
+                        onClick = {
+                            showDeleteConfirmDialog = false
+                            onDeleteFolder?.invoke(folder.id)
+                            onBack()
+                        },
+                        modifier = Modifier.testTag("confirm_delete_folder_button")
+                    ) {
+                        Text("Delete Folder", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirmDialog = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
     }
 
     if (showBatchDeleteConfirmDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showBatchDeleteConfirmDialog = false },
-            title = { Text("Delete ${selectedTracks.size} Songs", fontWeight = FontWeight.Bold) },
-            text = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
                 Text(
-                    if (folder.id > 0) "Remove these ${selectedTracks.size} songs from \"${folder.name}\" or delete permanently?"
-                    else "Are you sure you want to delete ${selectedTracks.size} selected songs from your device?"
+                    text = "Delete ${selectedTracks.size} Songs",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
                 )
-            },
-            confirmButton = {
-                Row {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = if (folder.id > 0) "Remove these ${selectedTracks.size} songs from \"${folder.name}\" or delete permanently?"
+                    else "Are you sure you want to delete ${selectedTracks.size} selected songs from your device?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = { showBatchDeleteConfirmDialog = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     if (folder.id > 0) {
                         TextButton(
                             onClick = {
@@ -220,6 +269,7 @@ fun FolderDetailScreen(
                         ) {
                             Text("Remove from Folder")
                         }
+                        Spacer(modifier = Modifier.width(8.dp))
                     }
                     TextButton(
                         onClick = {
@@ -234,49 +284,64 @@ fun FolderDetailScreen(
                         Text("Delete Permanently", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                     }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showBatchDeleteConfirmDialog = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
     }
 
     if (showRenameDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showRenameDialog = false },
-            title = { Text("Rename Folder", fontWeight = FontWeight.Bold) },
-            text = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Rename Folder",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = renameInputText,
                     onValueChange = { renameInputText = it },
                     label = { Text("Folder Name") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (renameInputText.isNotBlank()) {
-                            onRenameFolder?.invoke(folder.id, renameInputText.toProperTitleCase())
-                            showRenameDialog = false
-                        }
-                    },
-                    enabled = renameInputText.isNotBlank()
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Save", fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { showRenameDialog = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(
+                        onClick = {
+                            if (renameInputText.isNotBlank()) {
+                                onRenameFolder?.invoke(folder.id, renameInputText.toProperTitleCase())
+                                showRenameDialog = false
+                            }
+                        },
+                        enabled = renameInputText.isNotBlank()
+                    ) {
+                        Text("Save", fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRenameDialog = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
     }
 
     if (showAddTracksDialog) {
@@ -295,105 +360,132 @@ fun FolderDetailScreen(
     }
 
     if (showBatchAddToFolderDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = {
                 showBatchAddToFolderDialog = false
                 createNewInBatch = false
                 batchFolderName = ""
             },
-            title = { Text("Add ${selectedTracks.size} Songs to Folder", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    if (createNewInBatch) {
-                        OutlinedTextField(
-                            value = batchFolderName,
-                            onValueChange = { batchFolderName = it },
-                            label = { Text("New Folder Name") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        Text("Select a folder or create a new one:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Add ${selectedTracks.size} Songs to Folder",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (createNewInBatch) {
+                    OutlinedTextField(
+                        value = batchFolderName,
+                        onValueChange = { batchFolderName = it },
+                        label = { Text("New Folder Name") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { createNewInBatch = false }) {
+                            Text("Back")
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        TextButton(
+                            onClick = {
+                                if (batchFolderName.isNotBlank()) {
+                                    val toAdd = selectedTracks.toList()
+                                    onCreateFolderWithMultipleTracks?.invoke(batchFolderName.toProperTitleCase(), toAdd)
+                                    showBatchAddToFolderDialog = false
+                                    isMultiSelectMode = false
+                                    selectedTracks.clear()
+                                }
+                            },
+                            enabled = batchFolderName.isNotBlank()
                         ) {
-                            item {
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable { createNewInBatch = true }
-                                        .padding(vertical = 8.dp, horizontal = 6.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("+ Create New Folder", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    }
+                            Text("Create & Add", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    Text("Select a folder or create a new one:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        item {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { createNewInBatch = true }
+                                    .padding(vertical = 10.dp, horizontal = 10.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text("+ Create New Folder", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 }
                             }
-                            items(userFolders.size) { idx ->
-                                val uf = userFolders[idx]
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            val toAdd = selectedTracks.toList()
-                                            onAddMultipleTracksToFolder?.invoke(uf.id, toAdd)
-                                            showBatchAddToFolderDialog = false
-                                            isMultiSelectMode = false
-                                            selectedTracks.clear()
-                                        }
-                                        .padding(vertical = 8.dp, horizontal = 6.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.PlaylistAdd, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(uf.name, fontWeight = FontWeight.Medium)
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Text("${uf.tracks.size} tracks", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        items(userFolders.size) { idx ->
+                            val uf = userFolders[idx]
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        val toAdd = selectedTracks.toList()
+                                        onAddMultipleTracksToFolder?.invoke(uf.id, toAdd)
+                                        showBatchAddToFolderDialog = false
+                                        isMultiSelectMode = false
+                                        selectedTracks.clear()
                                     }
+                                    .padding(vertical = 10.dp, horizontal = 10.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.PlaylistAdd, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(uf.name, fontWeight = FontWeight.Medium)
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text("${uf.tracks.size} tracks", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
                     }
-                }
-            },
-            confirmButton = {
-                if (createNewInBatch) {
-                    TextButton(
-                        onClick = {
-                            if (batchFolderName.isNotBlank()) {
-                                val toAdd = selectedTracks.toList()
-                                onCreateFolderWithMultipleTracks?.invoke(batchFolderName.toProperTitleCase(), toAdd)
-                                showBatchAddToFolderDialog = false
-                                isMultiSelectMode = false
-                                selectedTracks.clear()
-                            }
-                        },
-                        enabled = batchFolderName.isNotBlank()
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
                     ) {
-                        Text("Create & Add", fontWeight = FontWeight.Bold)
+                        TextButton(onClick = {
+                            showBatchAddToFolderDialog = false
+                            createNewInBatch = false
+                            batchFolderName = ""
+                        }) {
+                            Text("Cancel")
+                        }
                     }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showBatchAddToFolderDialog = false
-                    createNewInBatch = false
-                    batchFolderName = ""
-                }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
     }
 
     Scaffold(
@@ -1128,6 +1220,7 @@ fun FolderDetailScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTracksToFolderDialog(
     allTracks: List<AudioTrack>,
@@ -1150,127 +1243,139 @@ fun AddTracksToFolderDialog(
         }
     }
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = {
-            Text("Add Songs to Folder", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search songs...") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+        ) {
+            Text("Add Songs to Folder", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+            Spacer(modifier = Modifier.height(14.dp))
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search songs...") },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${filteredList.size} available",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                TextButton(
+                    onClick = {
+                        if (selectedTracks.size == filteredList.size) {
+                            selectedTracks.clear()
+                        } else {
+                            selectedTracks.clear()
+                            selectedTracks.addAll(filteredList)
+                        }
+                    }
+                ) {
+                    Text(if (selectedTracks.size == filteredList.size) "Deselect All" else "Select All")
+                }
+            }
+
+            if (filteredList.isEmpty()) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .height(160.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "${filteredList.size} available",
-                        fontSize = 12.sp,
+                        text = if (searchQuery.isNotBlank()) "No matching songs" else "All songs are already in this folder",
+                        fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    TextButton(
-                        onClick = {
-                            if (selectedTracks.size == filteredList.size) {
-                                selectedTracks.clear()
-                            } else {
-                                selectedTracks.clear()
-                                selectedTracks.addAll(filteredList)
-                            }
-                        }
-                    ) {
-                        Text(if (selectedTracks.size == filteredList.size) "Deselect All" else "Select All")
-                    }
                 }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(filteredList.size) { i ->
+                        val track = filteredList[i]
+                        val isSelected = selectedTracks.any { it.uri == track.uri }
 
-                if (filteredList.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (searchQuery.isNotBlank()) "No matching songs" else "All songs are already in this folder",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(280.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        items(filteredList.size) { i ->
-                            val track = filteredList[i]
-                            val isSelected = selectedTracks.any { it.uri == track.uri }
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable {
-                                        if (isSelected) selectedTracks.removeAll { it.uri == track.uri }
-                                        else selectedTracks.add(track)
-                                    }
-                                    .padding(vertical = 4.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = isSelected,
-                                    onCheckedChange = { checked ->
-                                        if (checked) {
-                                            if (!selectedTracks.any { it.uri == track.uri }) selectedTracks.add(track)
-                                        } else {
-                                            selectedTracks.removeAll { it.uri == track.uri }
-                                        }
-                                    }
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = track.displayTitle,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = "${track.displayArtist} • ${track.formattedDuration}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    if (isSelected) selectedTracks.removeAll { it.uri == track.uri }
+                                    else selectedTracks.add(track)
                                 }
+                                .padding(vertical = 4.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = isSelected,
+                                onCheckedChange = { checked ->
+                                    if (checked) {
+                                        if (!selectedTracks.any { it.uri == track.uri }) selectedTracks.add(track)
+                                    } else {
+                                        selectedTracks.removeAll { it.uri == track.uri }
+                                    }
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = track.displayTitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${track.displayArtist} • ${track.formattedDuration}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(selectedTracks.toList()) },
-                enabled = selectedTracks.isNotEmpty()
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text("Add (${selectedTracks.size})", fontWeight = FontWeight.Bold)
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                TextButton(
+                    onClick = { onConfirm(selectedTracks.toList()) },
+                    enabled = selectedTracks.isNotEmpty()
+                ) {
+                    Text("Add (${selectedTracks.size})", fontWeight = FontWeight.Bold)
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-        shape = RoundedCornerShape(24.dp)
-    )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
 }

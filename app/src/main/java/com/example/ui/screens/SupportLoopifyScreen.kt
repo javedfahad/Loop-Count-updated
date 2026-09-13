@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -43,7 +44,7 @@ import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VolunteerActivism
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -54,6 +55,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -61,6 +63,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -109,11 +112,22 @@ fun SupportLoopifyScreen(
         }
     }
 
-    // Step 2: Honest Confirmation Card (pops up when clicking Accept)
+    // Step 2: Honest Confirmation Panel (slides up when clicking Accept)
     if (showAcceptanceDisclaimerDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showAcceptanceDisclaimerDialog = false },
-            icon = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Box(
                     modifier = Modifier
                         .size(54.dp)
@@ -128,76 +142,73 @@ fun SupportLoopifyScreen(
                         modifier = Modifier.size(28.dp)
                     )
                 }
-            },
-            title = {
+                Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = "Thank You from the Developer!",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "A heartfelt note before you proceed:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "I am a solo, small developer who genuinely relies on your support. Your contribution directly helps me pay for my expenses and time so I can keep building real-time, helpful apps that truly make life better for you.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 20.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "A heartfelt note before you proceed:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                        text = "💡 Please note: You will not receive any \"Pro\" badges, subscriptions, or paywalled locks. You already have the entire, unlocked app for free! Your donation is purely genuine support for an indie developer.",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(12.dp),
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "I am a solo, small developer who genuinely relies on your support. Your contribution directly helps me pay for my expenses and time so I can keep building real-time, helpful apps that truly make life better for you.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 20.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.fillMaxWidth()
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = { showAcceptanceDisclaimerDialog = false },
+                        modifier = Modifier.testTag("support_dialog_back_btn")
                     ) {
-                        Text(
-                            text = "💡 Please note: You will not receive any \"Pro\" badges, subscriptions, or paywalled locks. You already have the entire, unlocked app for free! Your donation is purely genuine support for an indie developer.",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(12.dp),
-                            textAlign = TextAlign.Center
-                        )
+                        Text("Back")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Button(
+                        onClick = {
+                            showAcceptanceDisclaimerDialog = false
+                            currentStep = SupportStep.PAYMENT_QR
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.testTag("support_proceed_btn")
+                    ) {
+                        Text("Proceed to Support", fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showAcceptanceDisclaimerDialog = false
-                        currentStep = SupportStep.PAYMENT_QR
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.testTag("support_proceed_btn")
-                ) {
-                    Text("Proceed to Support", fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showAcceptanceDisclaimerDialog = false },
-                    modifier = Modifier.testTag("support_dialog_back_btn")
-                ) {
-                    Text("Back")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
     }
 
     Scaffold(

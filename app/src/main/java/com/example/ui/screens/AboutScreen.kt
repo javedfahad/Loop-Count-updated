@@ -122,7 +122,7 @@ fun AboutScreen(
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "Version 1.0.0 • Updated Sep 13, 2026 • 100% Offline & Private",
+                text = "Version 1.0.0 • Updated Sep 14, 2026 • 100% Offline & Private",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )

@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.RingVolume
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -101,192 +100,274 @@ fun TrackOptionsDialog(
     }
 
     if (isCreatingFolder) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { isCreatingFolder = false },
-            title = { Text("New Custom Folder", fontWeight = FontWeight.Bold) },
-            text = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "New Custom Folder",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = newFolderText,
                     onValueChange = { newFolderText = it },
                     label = { Text("Folder Name") },
                     placeholder = { Text("e.g. Focus Loops, Favorites") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (newFolderText.isNotBlank()) {
-                            onCreateFolderWithTrack?.invoke(newFolderText.toProperTitleCase())
-                            isCreatingFolder = false
-                            isPickingFolder = false
-                            onDismiss()
-                        }
-                    },
-                    enabled = newFolderText.isNotBlank()
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Create & Add", fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { isCreatingFolder = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(
+                        onClick = {
+                            if (newFolderText.isNotBlank()) {
+                                onCreateFolderWithTrack?.invoke(newFolderText.toProperTitleCase())
+                                isCreatingFolder = false
+                                isPickingFolder = false
+                                onDismiss()
+                            }
+                        },
+                        enabled = newFolderText.isNotBlank()
+                    ) {
+                        Text("Create & Add", fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { isCreatingFolder = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
         return
     }
 
     if (isPickingFolder) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { isPickingFolder = false },
-            title = { Text("Add Track to Folder", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    // Create New Folder Option
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { isCreatingFolder = true }
-                            .padding(vertical = 10.dp, horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "+ Create New Folder",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Add Track to Folder",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(16.dp))
 
-                    if (userFolders.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        HorizontalDivider()
-                        Spacer(modifier = Modifier.height(6.dp))
+                // Create New Folder Option
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { isCreatingFolder = true }
+                        .padding(vertical = 12.dp, horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "+ Create New Folder",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
 
-                        LazyColumn(modifier = Modifier.height(200.dp)) {
-                            items(userFolders) { folder ->
-                                val alreadyIn = folder.tracks.any { it.uri == track.uri }
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable(enabled = !alreadyIn) {
-                                            onAddToFolder?.invoke(folder.id)
-                                            isPickingFolder = false
-                                            onDismiss()
-                                        }
-                                        .padding(vertical = 10.dp, horizontal = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.FolderSpecial,
-                                        contentDescription = null,
-                                        tint = if (alreadyIn) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = folder.name,
-                                            fontWeight = FontWeight.Medium,
-                                            color = if (alreadyIn) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = if (alreadyIn) "Already in folder" else "${folder.tracks.size} tracks",
-                                            fontSize = 11.sp,
-                                            color = if (alreadyIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                if (userFolders.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    LazyColumn(modifier = Modifier.height(240.dp)) {
+                        items(userFolders) { folder ->
+                            val alreadyIn = folder.tracks.any { it.uri == track.uri }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable(enabled = !alreadyIn) {
+                                        onAddToFolder?.invoke(folder.id)
+                                        isPickingFolder = false
+                                        onDismiss()
                                     }
+                                    .padding(vertical = 12.dp, horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FolderSpecial,
+                                    contentDescription = null,
+                                    tint = if (alreadyIn) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = folder.name,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (alreadyIn) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (alreadyIn) "Already in folder" else "${folder.tracks.size} tracks",
+                                        fontSize = 12.sp,
+                                        color = if (alreadyIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }
                     }
                 }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { isPickingFolder = false }) {
-                    Text("Cancel")
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = { isPickingFolder = false }) {
+                        Text("Cancel")
+                    }
                 }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
         return
     }
 
     if (isRenaming) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { isRenaming = false },
-            title = { Text("Rename Audio", fontWeight = FontWeight.Bold) },
-            text = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Rename Audio",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = renameText,
                     onValueChange = { renameText = it },
                     label = { Text("Title") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("rename_text_field")
                 )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onRename(renameText.toProperTitleCase())
-                        isRenaming = false
-                        onDismiss()
-                    },
-                    modifier = Modifier.testTag("rename_confirm_button")
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Save", fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { isRenaming = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(
+                        onClick = {
+                            onRename(renameText.toProperTitleCase())
+                            isRenaming = false
+                            onDismiss()
+                        },
+                        modifier = Modifier.testTag("rename_confirm_button")
+                    ) {
+                        Text("Save", fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { isRenaming = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
         return
     }
 
     if (isConfirmingDelete) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { isConfirmingDelete = false },
-            title = { Text("Delete Audio", fontWeight = FontWeight.Bold) },
-            text = {
-                Text("Are you sure you want to permanently delete \"${track.displayTitle}\" from your device? This cannot be undone.")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        isConfirmingDelete = false
-                        onDelete()
-                        onDismiss()
-                    },
-                    modifier = Modifier.testTag("delete_confirm_button")
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Delete Audio",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Are you sure you want to permanently delete \"${track.displayTitle}\" from your device? This cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { isConfirmingDelete = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(
+                        onClick = {
+                            isConfirmingDelete = false
+                            onDelete()
+                            onDismiss()
+                        },
+                        modifier = Modifier.testTag("delete_confirm_button")
+                    ) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { isConfirmingDelete = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
         return
     }
 

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -59,7 +60,7 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -88,6 +89,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -116,8 +118,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.example.model.AudioTrack
 import com.example.model.DeviceFolder
 import com.example.model.UserFolder
@@ -560,38 +560,66 @@ fun ShareToScreen(
         }
     }
 
-    // Popup alert message when user attempts to select more than 2 folders
+    // Bottom sheet alert message when user attempts to select more than 2 folders
     if (showMaxFolderDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showMaxFolderDialog = false },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Folder,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp)
-                )
-            },
-            title = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = "Maximum 2 Folders",
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
                 )
-            },
-            text = {
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "You can select a maximum of 2 folders to send at a time. To choose a different folder, please deselect one of your currently selected folders first."
+                    text = "You can select a maximum of 2 folders to send at a time. To choose a different folder, please deselect one of your currently selected folders first.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 20.sp,
+                    textAlign = TextAlign.Center
                 )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showMaxFolderDialog = false },
-                    shape = RoundedCornerShape(12.dp)
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("OK")
+                    Button(
+                        onClick = { showMaxFolderDialog = false },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("OK", fontWeight = FontWeight.Bold)
+                    }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
             }
-        )
+        }
     }
 
     // Nearby Device Radar Bottom Sheet
@@ -627,30 +655,28 @@ fun ShareToScreen(
         )
     }
 
-    // Active Live Transfer Dialog (Sending)
+    // Active Live Transfer Modal Panel (Sending)
     if (showSendProgressDialog && senderProgress != null) {
         val progress = senderProgress!!
-        Dialog(
+        ModalBottomSheet(
             onDismissRequest = {
                 if (progress.isCompleted || progress.errorMessage != null) {
                     showSendProgressDialog = false
                     transferManager.resetSenderState()
                 }
             },
-            properties = DialogProperties(dismissOnBackPress = progress.isCompleted, dismissOnClickOutside = false)
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 12.dp,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
                     // Header
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -849,7 +875,6 @@ fun ShareToScreen(
                             }
                         }
                     }
-                }
             }
         }
     }
@@ -2040,6 +2065,7 @@ fun NearbyDeviceRadarSheet(
  * Dedicated dialog for establishing Hotspot-mode transfer with active auto-probing,
  * direct settings shortcuts, and step-by-step guidance.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HotspotConnectDialog(
     transferManager: WifiTransferManager,
@@ -2085,24 +2111,20 @@ fun HotspotConnectDialog(
         }
     }
 
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
+        Column(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .padding(vertical = 16.dp)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 22.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(22.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
                 // Header icon
                 Box(
                     modifier = Modifier
@@ -2343,6 +2365,5 @@ fun HotspotConnectDialog(
                     }
                 }
             }
-        }
     }
 }

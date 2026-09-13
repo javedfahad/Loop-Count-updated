@@ -63,7 +63,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.SortByAlpha
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -76,6 +76,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -85,6 +86,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -290,180 +292,254 @@ fun HomeScreen(
         }
     }
 
-    // Batch Add To Folder Dialog
+    // Batch Add To Folder Sheet
     if (showBatchAddToFolderDialog) {
         var createNewInBatch by remember { mutableStateOf(false) }
         var batchFolderName by remember { mutableStateOf("") }
 
-        AlertDialog(
-            onDismissRequest = { showBatchAddToFolderDialog = false },
-            title = { Text("Add ${selectedTracks.size} Songs to Folder", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    if (createNewInBatch) {
-                        OutlinedTextField(
-                            value = batchFolderName,
-                            onValueChange = { batchFolderName = it },
-                            label = { Text("New Folder Name") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        Text("Select a folder or create a new one:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            item {
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable { createNewInBatch = true }
-                                        .padding(vertical = 8.dp, horizontal = 6.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("+ Create New Folder", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        ModalBottomSheet(
+            onDismissRequest = {
+                showBatchAddToFolderDialog = false
+                createNewInBatch = false
+                batchFolderName = ""
+            },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Add ${selectedTracks.size} Songs to Folder",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (createNewInBatch) {
+                    OutlinedTextField(
+                        value = batchFolderName,
+                        onValueChange = { batchFolderName = it },
+                        label = { Text("New Folder Name") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { createNewInBatch = false }) {
+                            Text("Back")
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        TextButton(
+                            onClick = {
+                                if (batchFolderName.isNotBlank()) {
+                                    val toAdd = selectedTracks.toList()
+                                    onCreateFolderWithMultipleTracks?.invoke(batchFolderName.toProperTitleCase(), toAdd) ?: run {
+                                        onCreateFolder(batchFolderName.toProperTitleCase())
                                     }
+                                    showBatchAddToFolderDialog = false
+                                    isMultiSelectMode = false
+                                    selectedTracks.clear()
+                                }
+                            },
+                            enabled = batchFolderName.isNotBlank()
+                        ) {
+                            Text("Create & Add", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    Text("Select a folder or create a new one:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        item {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { createNewInBatch = true }
+                                    .padding(vertical = 10.dp, horizontal = 10.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text("+ Create New Folder", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 }
                             }
-                            items(userFolders.size) { idx ->
-                                val uf = userFolders[idx]
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            val toAdd = selectedTracks.toList()
-                                            onAddMultipleTracksToFolder?.invoke(uf.id, toAdd) ?: run {
-                                                toAdd.forEach { onAddTrackToFolder(uf.id, it) }
-                                            }
-                                            showBatchAddToFolderDialog = false
-                                            isMultiSelectMode = false
-                                            selectedTracks.clear()
+                        }
+                        items(userFolders.size) { idx ->
+                            val uf = userFolders[idx]
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        val toAdd = selectedTracks.toList()
+                                        onAddMultipleTracksToFolder?.invoke(uf.id, toAdd) ?: run {
+                                            toAdd.forEach { onAddTrackToFolder(uf.id, it) }
                                         }
-                                        .padding(vertical = 8.dp, horizontal = 6.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(uf.name, fontWeight = FontWeight.Medium)
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Text("${uf.tracks.size} tracks", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        showBatchAddToFolderDialog = false
+                                        isMultiSelectMode = false
+                                        selectedTracks.clear()
                                     }
+                                    .padding(vertical = 10.dp, horizontal = 10.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(uf.name, fontWeight = FontWeight.Medium)
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text("${uf.tracks.size} tracks", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showBatchAddToFolderDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
                 }
-            },
-            confirmButton = {
-                if (createNewInBatch) {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+
+    // Batch Delete Sheet
+    if (showBatchDeleteConfirmDialog) {
+        ModalBottomSheet(
+            onDismissRequest = { showBatchDeleteConfirmDialog = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Delete ${selectedTracks.size} Songs",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Are you sure you want to delete ${selectedTracks.size} selected songs? This action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = { showBatchDeleteConfirmDialog = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
                     TextButton(
                         onClick = {
-                            if (batchFolderName.isNotBlank()) {
-                                val toAdd = selectedTracks.toList()
-                                onCreateFolderWithMultipleTracks?.invoke(batchFolderName.toProperTitleCase(), toAdd) ?: run {
-                                    onCreateFolder(batchFolderName.toProperTitleCase())
-                                }
-                                showBatchAddToFolderDialog = false
-                                isMultiSelectMode = false
-                                selectedTracks.clear()
+                            val toDelete = selectedTracks.toList()
+                            onDeleteMultipleTracks?.invoke(toDelete) ?: run {
+                                toDelete.forEach { onDeleteTrack(it) }
                             }
+                            showBatchDeleteConfirmDialog = false
+                            isMultiSelectMode = false
+                            selectedTracks.clear()
                         },
-                        enabled = batchFolderName.isNotBlank()
+                        modifier = Modifier.testTag("confirm_batch_delete_tracks_btn")
                     ) {
-                        Text("Create & Add", fontWeight = FontWeight.Bold)
+                        Text("Delete Songs", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                     }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showBatchAddToFolderDialog = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
     }
 
-    // Batch Delete Dialog
-    if (showBatchDeleteConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showBatchDeleteConfirmDialog = false },
-            title = { Text("Delete ${selectedTracks.size} Songs", fontWeight = FontWeight.Bold) },
-            text = {
-                Text("Are you sure you want to delete ${selectedTracks.size} selected songs? This action cannot be undone.")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val toDelete = selectedTracks.toList()
-                        onDeleteMultipleTracks?.invoke(toDelete) ?: run {
-                            toDelete.forEach { onDeleteTrack(it) }
-                        }
-                        showBatchDeleteConfirmDialog = false
-                        isMultiSelectMode = false
-                        selectedTracks.clear()
-                    },
-                    modifier = Modifier.testTag("confirm_batch_delete_tracks_btn")
-                ) {
-                    Text("Delete Songs", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showBatchDeleteConfirmDialog = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
-    }
-
-    // Create folder dialog
+    // Create folder sheet
     if (showCreateFolderDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showCreateFolderDialog = false },
-            title = { Text("New Custom Folder", fontWeight = FontWeight.Bold) },
-            text = {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "New Custom Folder",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = newFolderName,
                     onValueChange = { newFolderName = it },
                     label = { Text("Folder Name") },
                     placeholder = { Text("e.g. Study Loops, Mantras, Workout") },
                     singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("create_folder_text_field")
                 )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (newFolderName.isNotBlank()) {
-                            onCreateFolder(newFolderName.toProperTitleCase())
-                            newFolderName = ""
-                            showCreateFolderDialog = false
-                        }
-                    },
-                    enabled = newFolderName.isNotBlank(),
-                    modifier = Modifier.testTag("create_folder_confirm_button")
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Create", fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { showCreateFolderDialog = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(
+                        onClick = {
+                            if (newFolderName.isNotBlank()) {
+                                onCreateFolder(newFolderName.toProperTitleCase())
+                                newFolderName = ""
+                                showCreateFolderDialog = false
+                            }
+                        },
+                        enabled = newFolderName.isNotBlank(),
+                        modifier = Modifier.testTag("create_folder_confirm_button")
+                    ) {
+                        Text("Create", fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateFolderDialog = false }) {
-                    Text("Cancel")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
     }
 
     // Track options dialog

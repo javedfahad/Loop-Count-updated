@@ -1611,7 +1611,7 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
                     </svg>
-                    Download APK (September 13, 2026)
+                    Download APK (September 14, 2026)
                 </a>
 
                 <button class="cyber-btn-secondary" onclick="document.getElementById('simulator').scrollIntoView({behavior: 'smooth'})">
@@ -1636,7 +1636,7 @@
                         <span class="status-dot-green"></span>
                         <span>NEWS: UPDATE AVAILABLE</span>
                     </div>
-                    <div class="release-title">September 13, 2026 — Batch Selection Dock &amp; Bottom Sheets</div>
+                    <div class="release-title">September 14, 2026 — Batch Selection Dock &amp; Bottom Sheets</div>
                     <div class="release-subtitle">Universal Android APK • Floating Batch Dock, Direct Long-Press Multi-Select &amp; Smooth Bottom Sheets • EERT LAB</div>
                 </div>
                 <a href="loopify-music.apk" download="loopify-music.apk" class="release-download-link">
@@ -2064,7 +2064,7 @@
                 <div class="footer-col">
                     <h5>Engineering</h5>
                     <ul class="footer-links">
-                        <li><a href="loopify-music.apk" download="loopify-music.apk">Download APK (September 13, 2026)</a></li>
+                        <li><a href="loopify-music.apk" download="loopify-music.apk">Download APK (September 14, 2026)</a></li>
                         <li><a href="#privacy">Privacy Protocol</a></li>
                         <li><a href="#contact">Contact Lab</a></li>
                         <li><a href="privacy-policy.html">Full Legal Disclosure</a></li>
@@ -2105,12 +2105,13 @@
             }
         })();
 
-        // Live Clock
+        // Live Clock (Indian Standard Time IST / UTC synced)
         function updateClock() {
             var now = new Date();
             var clockEl = document.getElementById('liveClock');
             if (clockEl) {
-                clockEl.innerText = now.toUTCString().slice(17, 25) + " UTC // SYNCED";
+                var istTime = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false });
+                clockEl.innerText = istTime + " IST (INDIA) // SYNCED";
             }
         }
         setInterval(updateClock, 1000);
