@@ -172,7 +172,7 @@ fun NavigationDrawerContent(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "© 2026 Fahad Javed",
+                    text = "© 2026 EERT LAB",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )

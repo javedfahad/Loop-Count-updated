@@ -3,7 +3,7 @@ package com.example.util
 /**
  * Formats user entered strings into clean, proper Title Case (capitalizes each word,
  * normalizes casing, and removes extra spaces).
- * For example: "faHad Javed" -> "Fahad Javed", "mY cOoL fOLdEr" -> "My Cool Folder".
+ * For example: "eErT lAb" -> "Eert Lab", "mY cOoL fOLdEr" -> "My Cool Folder".
  */
 fun String.toProperTitleCase(): String {
     val trimmed = this.trim()

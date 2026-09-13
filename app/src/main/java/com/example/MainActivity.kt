@@ -13,11 +13,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -222,10 +228,63 @@ class MainActivity : ComponentActivity() {
                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
                         modifier = Modifier.fillMaxSize()
                     ) { _ ->
-                        Box(
+                        AnimatedContent(
+                            targetState = currentScreen,
+                            transitionSpec = {
+                                if (targetState is Screen.NowPlaying) {
+                                    // When tapping an audio track card or mini player, slide up smoothly from bottom!
+                                    (slideInVertically(
+                                        initialOffsetY = { fullHeight -> fullHeight },
+                                        animationSpec = tween(380, easing = FastOutSlowInEasing)
+                                    ) + fadeIn(animationSpec = tween(280)))
+                                        .togetherWith(
+                                            slideOutVertically(
+                                                targetOffsetY = { -it / 6 },
+                                                animationSpec = tween(380, easing = FastOutSlowInEasing)
+                                            ) + fadeOut(animationSpec = tween(200))
+                                        )
+                                } else if (initialState is Screen.NowPlaying) {
+                                    // When collapsing or going back, slide down smoothly to bottom!
+                                    (slideInVertically(
+                                        initialOffsetY = { -it / 6 },
+                                        animationSpec = tween(340, easing = FastOutSlowInEasing)
+                                    ) + fadeIn(animationSpec = tween(240)))
+                                        .togetherWith(
+                                            slideOutVertically(
+                                                targetOffsetY = { fullHeight -> fullHeight },
+                                                animationSpec = tween(340, easing = FastOutSlowInEasing)
+                                            ) + fadeOut(animationSpec = tween(220))
+                                        )
+                                } else if (targetState is Screen.FolderDetail || targetState is Screen.Appearance || targetState is Screen.About || targetState is Screen.ShareTo || targetState is Screen.Support) {
+                                    (slideInHorizontally(
+                                        initialOffsetX = { fullWidth -> fullWidth },
+                                        animationSpec = tween(320, easing = FastOutSlowInEasing)
+                                    ) + fadeIn(animationSpec = tween(240)))
+                                        .togetherWith(
+                                            slideOutHorizontally(
+                                                targetOffsetX = { -it / 3 },
+                                                animationSpec = tween(320, easing = FastOutSlowInEasing)
+                                            ) + fadeOut(animationSpec = tween(180))
+                                        )
+                                } else if (initialState is Screen.FolderDetail || initialState is Screen.Appearance || initialState is Screen.About || initialState is Screen.ShareTo || initialState is Screen.Support) {
+                                    (slideInHorizontally(
+                                        initialOffsetX = { -it / 3 },
+                                        animationSpec = tween(300, easing = FastOutSlowInEasing)
+                                    ) + fadeIn(animationSpec = tween(220)))
+                                        .togetherWith(
+                                            slideOutHorizontally(
+                                                targetOffsetX = { fullWidth -> fullWidth },
+                                                animationSpec = tween(300, easing = FastOutSlowInEasing)
+                                            ) + fadeOut(animationSpec = tween(220))
+                                        )
+                                } else {
+                                    fadeIn(animationSpec = tween(260)) togetherWith fadeOut(animationSpec = tween(200))
+                                }
+                            },
+                            label = "screen_transition",
                             modifier = Modifier.fillMaxSize()
-                        ) {
-                            when (val screen = currentScreen) {
+                        ) { screen ->
+                            when (screen) {
                                 is Screen.Splash -> {
                                     SplashScreen(
                                         onSplashFinished = {
@@ -381,6 +440,13 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onRenameFolder = { folderId, newName ->
                                             viewModel.renameUserFolder(folderId, newName)
+                                        },
+                                        userFolders = uiState.userFolders,
+                                        onAddMultipleTracksToFolder = { folderId, tracksToAdd ->
+                                            viewModel.addTracksToFolder(folderId, tracksToAdd)
+                                        },
+                                        onCreateFolderWithMultipleTracks = { folderName, tracksToAdd ->
+                                            viewModel.createUserFolderWithTracks(folderName, tracksToAdd)
                                         }
                                     )
                                 }

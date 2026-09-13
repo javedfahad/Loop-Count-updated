@@ -47,6 +47,17 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -55,11 +66,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -78,6 +91,8 @@ import com.example.ui.dialogs.RingtoneDialog
 import com.example.sync.BluetoothSyncManager
 import com.example.sync.DualSyncConnectionState
 import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -182,25 +197,6 @@ fun NowPlayingScreen(
                     }
                 },
                 actions = {
-                    // Dual Listen (Offline Bluetooth Together) Button
-                    IconButton(
-                        onClick = { showDualListenSheet = true },
-                        modifier = Modifier.testTag("now_playing_dual_listen_btn")
-                    ) {
-                        Icon(
-                            imageVector = if (syncState.connectionState == DualSyncConnectionState.CONNECTED)
-                                Icons.Default.BluetoothConnected
-                            else
-                                Icons.Default.Headphones,
-                            contentDescription = "Dual Listen Offline",
-                            tint = if (syncState.connectionState == DualSyncConnectionState.CONNECTED)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
                     if (track != null) {
                         IconButton(
                             onClick = { showRingtoneDialog = true },
@@ -290,7 +286,7 @@ fun NowPlayingScreen(
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(20.dp))
+                                .clip(RoundedCornerShape(18.dp))
                                 .clickable {
                                     if (playbackState.isMagicRemixActive) {
                                         playerManager.next()
@@ -299,15 +295,15 @@ fun NowPlayingScreen(
                                     }
                                 }
                                 .testTag("now_playing_repeat_card"),
-                            shape = RoundedCornerShape(20.dp),
+                            shape = RoundedCornerShape(18.dp),
                             color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiaryContainer
-                            else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primaryContainer
-                            else MaterialTheme.colorScheme.surfaceVariant,
+                            else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                            else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp,
                                 if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
                                 else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
                             )
                         ) {
                             Row(
@@ -491,102 +487,21 @@ fun NowPlayingScreen(
                             }
                         }
 
-                        // Playback Controls Bar
-                        Surface(
-                            shape = RoundedCornerShape(28.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
+                        // Modern Studio Playback Controls Bar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
+                            InteractivePlaybackControls(
+                                playbackState = playbackState,
+                                playerManager = playerManager,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                IconButton(
-                                    onClick = { playerManager.toggleShuffle() },
-                                    modifier = Modifier.testTag("btn_shuffle")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Shuffle,
-                                        contentDescription = "Shuffle",
-                                        tint = if (playbackState.isShuffle) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { playerManager.previous() },
-                                    modifier = Modifier.testTag("btn_previous")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.SkipPrevious,
-                                        contentDescription = "Previous track",
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { playerManager.seekBackward10() },
-                                    modifier = Modifier.testTag("btn_rewind_10")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Replay10,
-                                        contentDescription = "Rewind 10 seconds",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(26.dp)
-                                    )
-                                }
-
-                                FilledIconButton(
-                                    onClick = { playerManager.togglePlayPause() },
-                                    shape = CircleShape,
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary
-                                    ),
-                                    modifier = Modifier
-                                        .size(64.dp)
-                                        .shadow(6.dp, CircleShape)
-                                        .testTag("btn_play_pause")
-                                ) {
-                                    Icon(
-                                        imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                        contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
-                                        modifier = Modifier.size(34.dp)
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { playerManager.seekForward10() },
-                                    modifier = Modifier.testTag("btn_forward_10")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Forward10,
-                                        contentDescription = "Forward 10 seconds",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(26.dp)
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { playerManager.next() },
-                                    modifier = Modifier.testTag("btn_next")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.SkipNext,
-                                        contentDescription = "Next track",
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
-                            }
+                                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                            )
                         }
                     }
                 }
@@ -641,7 +556,7 @@ fun NowPlayingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .widthIn(max = 480.dp)
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(18.dp))
                             .clickable {
                                 if (playbackState.isMagicRemixActive) {
                                     playerManager.next()
@@ -650,15 +565,15 @@ fun NowPlayingScreen(
                                 }
                             }
                             .testTag("now_playing_repeat_card"),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(18.dp),
                         color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiaryContainer
-                        else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceVariant,
+                        else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                        else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f),
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
                             if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
                             else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
                         )
                     ) {
                         Row(
@@ -899,106 +814,260 @@ fun NowPlayingScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Surface(
-                        shape = RoundedCornerShape(28.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                        ),
-                        modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = { playerManager.toggleShuffle() },
-                                modifier = Modifier.testTag("btn_shuffle")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Shuffle,
-                                    contentDescription = "Shuffle",
-                                    tint = if (playbackState.isShuffle) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { playerManager.previous() },
-                                modifier = Modifier.testTag("btn_previous")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.SkipPrevious,
-                                    contentDescription = "Previous track",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { playerManager.seekBackward10() },
-                                modifier = Modifier.testTag("btn_rewind_10")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Replay10,
-                                    contentDescription = "Rewind 10 seconds",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            }
-
-                            FilledIconButton(
-                                onClick = { playerManager.togglePlayPause() },
-                                shape = CircleShape,
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                ),
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .shadow(6.dp, CircleShape)
-                                    .testTag("btn_play_pause")
-                            ) {
-                                Icon(
-                                    imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
-                                    modifier = Modifier.size(34.dp)
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { playerManager.seekForward10() },
-                                modifier = Modifier.testTag("btn_forward_10")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Forward10,
-                                    contentDescription = "Forward 10 seconds",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { playerManager.next() },
-                                modifier = Modifier.testTag("btn_next")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.SkipNext,
-                                    contentDescription = "Next track",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                        }
-                    }
+                    // Modern Studio Animated Playback Controls Bar
+                    InteractivePlaybackControls(
+                        playbackState = playbackState,
+                        playerManager = playerManager,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 480.dp)
+                            .padding(horizontal = 4.dp, vertical = 8.dp)
+                    )
 
                     Spacer(modifier = Modifier.height(24.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun InteractivePlaybackControls(
+    playbackState: PlaybackState,
+    playerManager: AudioPlayerManager,
+    modifier: Modifier = Modifier
+) {
+    val coroutineScope = rememberCoroutineScope()
+
+    var rewindKick by remember { mutableStateOf(false) }
+    var forwardKick by remember { mutableStateOf(false) }
+    var prevKick by remember { mutableStateOf(false) }
+    var nextKick by remember { mutableStateOf(false) }
+    var playPressed by remember { mutableStateOf(false) }
+
+    val shuffleRotation by animateFloatAsState(
+        targetValue = if (playbackState.isShuffle) 360f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "shuffle_rot"
+    )
+    val shuffleScale by animateFloatAsState(
+        targetValue = if (playbackState.isShuffle) 1.15f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy),
+        label = "shuffle_scale"
+    )
+
+    val rewindAngle by animateFloatAsState(
+        targetValue = if (rewindKick) -35f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy),
+        label = "rewind_angle"
+    )
+
+    val forwardAngle by animateFloatAsState(
+        targetValue = if (forwardKick) 35f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy),
+        label = "forward_angle"
+    )
+
+    val prevOffset by animateFloatAsState(
+        targetValue = if (prevKick) -10f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "prev_offset"
+    )
+    val prevScale by animateFloatAsState(
+        targetValue = if (prevKick) 0.85f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy),
+        label = "prev_scale"
+    )
+
+    val nextOffset by animateFloatAsState(
+        targetValue = if (nextKick) 10f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "next_offset"
+    )
+    val nextScale by animateFloatAsState(
+        targetValue = if (nextKick) 0.85f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy),
+        label = "next_scale"
+    )
+
+    val playScale by animateFloatAsState(
+        targetValue = if (playPressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessMedium),
+        label = "play_scale"
+    )
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Shuffle button with continuous spin & bounce
+        IconButton(
+            onClick = { playerManager.toggleShuffle() },
+            modifier = Modifier
+                .size(46.dp)
+                .graphicsLayer {
+                    rotationZ = shuffleRotation
+                    scaleX = shuffleScale
+                    scaleY = shuffleScale
+                }
+                .testTag("btn_shuffle")
+        ) {
+            Icon(
+                imageVector = Icons.Default.Shuffle,
+                contentDescription = "Shuffle",
+                tint = if (playbackState.isShuffle) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        // Rewind 10 seconds button with rotation kick animation
+        IconButton(
+            onClick = {
+                coroutineScope.launch {
+                    rewindKick = true
+                    delay(160)
+                    rewindKick = false
+                }
+                playerManager.seekBackward10()
+            },
+            modifier = Modifier
+                .size(46.dp)
+                .graphicsLayer {
+                    rotationZ = rewindAngle
+                    scaleX = if (rewindKick) 0.88f else 1f
+                    scaleY = if (rewindKick) 0.88f else 1f
+                }
+                .testTag("btn_rewind_10")
+        ) {
+            Icon(
+                imageVector = Icons.Default.Replay10,
+                contentDescription = "Rewind 10 seconds",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(25.dp)
+            )
+        }
+
+        // Previous track button with horizontal nudge & bounce
+        IconButton(
+            onClick = {
+                coroutineScope.launch {
+                    prevKick = true
+                    delay(160)
+                    prevKick = false
+                }
+                playerManager.previous()
+            },
+            modifier = Modifier
+                .size(50.dp)
+                .graphicsLayer {
+                    translationX = prevOffset
+                    scaleX = prevScale
+                    scaleY = prevScale
+                }
+                .testTag("btn_previous")
+        ) {
+            Icon(
+                imageVector = Icons.Default.SkipPrevious,
+                contentDescription = "Previous track",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(34.dp)
+            )
+        }
+
+        // Central Play / Pause button with spring morph & press bounce
+        FilledIconButton(
+            onClick = {
+                coroutineScope.launch {
+                    playPressed = true
+                    delay(150)
+                    playPressed = false
+                }
+                playerManager.togglePlayPause()
+            },
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            modifier = Modifier
+                .size(72.dp)
+                .graphicsLayer {
+                    scaleX = playScale
+                    scaleY = playScale
+                }
+                .shadow(12.dp, CircleShape, spotColor = MaterialTheme.colorScheme.primary)
+                .testTag("btn_play_pause")
+        ) {
+            AnimatedContent(
+                targetState = playbackState.isPlaying,
+                transitionSpec = {
+                    (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn())
+                        .togetherWith(scaleOut() + fadeOut())
+                },
+                label = "play_pause_icon_anim"
+            ) { isPlaying ->
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    modifier = Modifier.size(38.dp)
+                )
+            }
+        }
+
+        // Next track button with horizontal nudge & bounce
+        IconButton(
+            onClick = {
+                coroutineScope.launch {
+                    nextKick = true
+                    delay(160)
+                    nextKick = false
+                }
+                playerManager.next()
+            },
+            modifier = Modifier
+                .size(50.dp)
+                .graphicsLayer {
+                    translationX = nextOffset
+                    scaleX = nextScale
+                    scaleY = nextScale
+                }
+                .testTag("btn_next")
+        ) {
+            Icon(
+                imageVector = Icons.Default.SkipNext,
+                contentDescription = "Next track",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(34.dp)
+            )
+        }
+
+        // Forward 10 seconds button with rotation kick animation
+        IconButton(
+            onClick = {
+                coroutineScope.launch {
+                    forwardKick = true
+                    delay(160)
+                    forwardKick = false
+                }
+                playerManager.seekForward10()
+            },
+            modifier = Modifier
+                .size(46.dp)
+                .graphicsLayer {
+                    rotationZ = forwardAngle
+                    scaleX = if (forwardKick) 0.88f else 1f
+                    scaleY = if (forwardKick) 0.88f else 1f
+                }
+                .testTag("btn_forward_10")
+        ) {
+            Icon(
+                imageVector = Icons.Default.Forward10,
+                contentDescription = "Forward 10 seconds",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(25.dp)
+            )
         }
     }
 }

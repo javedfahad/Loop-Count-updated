@@ -36,6 +36,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -113,37 +114,70 @@ fun NowPlayingArtworkCard(
     isPlaying: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "vinyl_spin")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
+    val infiniteTransition = rememberInfiniteTransition(label = "artwork_ambient")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isPlaying) 1.025f else 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 16000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "vinyl_rotation"
+        label = "artwork_pulse"
     )
 
-    Surface(
-        modifier = modifier
-            .size(240.dp)
-            .clip(RoundedCornerShape(32.dp)),
-        shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shadowElevation = 12.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            1.5.dp,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-        )
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
     ) {
-        TrackArtwork(
-            track = track,
-            isPlaying = isPlaying,
-            shape = RoundedCornerShape(32.dp),
-            iconSize = 64.dp,
-            showDetailsOnFallback = true,
-            modifier = Modifier.fillMaxSize()
-        )
+        // Ambient soft color glow behind artwork when playing
+        if (isPlaying) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize(0.92f)
+                    .graphicsLayer {
+                        scaleX = pulseScale * 1.08f
+                        scaleY = pulseScale * 1.08f
+                        alpha = 0.35f
+                    }
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+        }
+
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = if (isPlaying) pulseScale else 1f
+                    scaleY = if (isPlaying) pulseScale else 1f
+                }
+                .clip(RoundedCornerShape(28.dp)),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shadowElevation = if (isPlaying) 16.dp else 6.dp,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+            )
+        ) {
+            TrackArtwork(
+                track = track,
+                isPlaying = isPlaying,
+                shape = RoundedCornerShape(28.dp),
+                iconSize = 64.dp,
+                showDetailsOnFallback = true,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 

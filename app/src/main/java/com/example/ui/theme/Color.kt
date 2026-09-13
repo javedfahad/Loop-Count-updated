@@ -2,33 +2,33 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Bento Grid Warm neutrals
-val BentoBackgroundLight = Color(0xFFFDF8F6)
+// Obsidian Studio Modern neutrals
+val BentoBackgroundLight = Color(0xFFF8F9FC)
 val BentoSurfaceLight = Color(0xFFFFFFFF)
-val BentoSurfaceVariantLight = Color(0xFFF3EDF7)
-val BentoBorderLight = Color(0xFFCAC4D0)
-val BentoTextPrimaryLight = Color(0xFF1D1B20)
-val BentoTextSecondaryLight = Color(0xFF49454F)
+val BentoSurfaceVariantLight = Color(0xFFEEF1F8)
+val BentoBorderLight = Color(0xFFD6DBE7)
+val BentoTextPrimaryLight = Color(0xFF111424)
+val BentoTextSecondaryLight = Color(0xFF5A6275)
 
-val BentoBackgroundDark = Color(0xFF141218)
-val BentoSurfaceDark = Color(0xFF1E1A22)
-val BentoSurfaceVariantDark = Color(0xFF2B2831)
-val BentoBorderDark = Color(0xFF49454F)
-val BentoTextPrimaryDark = Color(0xFFE6E1E5)
-val BentoTextSecondaryDark = Color(0xFFCAC4D0)
+val BentoBackgroundDark = Color(0xFF0C0A14)
+val BentoSurfaceDark = Color(0xFF151221)
+val BentoSurfaceVariantDark = Color(0xFF1F1A30)
+val BentoBorderDark = Color(0xFF2C2544)
+val BentoTextPrimaryDark = Color(0xFFF3F2F8)
+val BentoTextSecondaryDark = Color(0xFFA5A0B8)
 
 // Bento Accent Containers
-val BentoPurpleContainer = Color(0xFFEADDFF)
-val BentoBlueContainer = Color(0xFFD0E4FF)
-val BentoGreenContainer = Color(0xFFE6FFD1)
-val BentoRoseContainer = Color(0xFFFFDADA)
-val BentoYellowContainer = Color(0xFFFFE088)
+val BentoPurpleContainer = Color(0xFFE8E0FF)
+val BentoBlueContainer = Color(0xFFD8EEFF)
+val BentoGreenContainer = Color(0xFFDDF7DC)
+val BentoRoseContainer = Color(0xFFFFDFE5)
+val BentoYellowContainer = Color(0xFFFFF2C6)
 
 enum class ThemeAccent(val displayName: String, val primaryColor: Color) {
-    PURPLE("Purple", Color(0xFF6750A4)),
-    BLUE("Blue", Color(0xFF00639B)),
-    GREEN("Green", Color(0xFF386B01)),
-    ROSE("Rose", Color(0xFF9C4146))
+    PURPLE("Studio Purple", Color(0xFF8B5CF6)),
+    BLUE("Neon Cyan", Color(0xFF00B4D8)),
+    GREEN("Emerald", Color(0xFF10B981)),
+    ROSE("Sunset Rose", Color(0xFFF43F5E))
 }
 
 enum class ThemeMode(val displayName: String) {

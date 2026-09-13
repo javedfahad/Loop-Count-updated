@@ -81,6 +81,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,6 +91,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.AudioTrack
 import com.example.model.UserFolder
 import com.example.playback.PlaybackState
+import com.example.ui.components.FancySelectionBottomBar
 import com.example.ui.components.MiniPlayerBar
 import com.example.ui.components.TrackArtwork
 import com.example.ui.dialogs.FolderTimerDialog
@@ -117,12 +120,19 @@ fun FolderDetailScreen(
     onRemoveMultipleTracks: ((List<String>) -> Unit)? = null,
     onDeleteTracks: ((List<AudioTrack>) -> Unit)? = null,
     onDeleteFolder: ((Long) -> Unit)? = null,
-    onRenameFolder: ((Long, String) -> Unit)? = null
+    onRenameFolder: ((Long, String) -> Unit)? = null,
+    userFolders: List<UserFolder> = emptyList(),
+    onAddMultipleTracksToFolder: ((Long, List<AudioTrack>) -> Unit)? = null,
+    onCreateFolderWithMultipleTracks: ((String, List<AudioTrack>) -> Unit)? = null
 ) {
+    val haptic = LocalHapticFeedback.current
     var showAddTracksDialog by remember { mutableStateOf(false) }
     var showTimerDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showBatchDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showBatchAddToFolderDialog by remember { mutableStateOf(false) }
+    var batchFolderName by remember { mutableStateOf("") }
+    var createNewInBatch by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameInputText by remember { mutableStateOf(folder.name) }
     var showMenu by remember { mutableStateOf(false) }
@@ -284,14 +294,116 @@ fun FolderDetailScreen(
         )
     }
 
+    if (showBatchAddToFolderDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showBatchAddToFolderDialog = false
+                createNewInBatch = false
+                batchFolderName = ""
+            },
+            title = { Text("Add ${selectedTracks.size} Songs to Folder", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (createNewInBatch) {
+                        OutlinedTextField(
+                            value = batchFolderName,
+                            onValueChange = { batchFolderName = it },
+                            label = { Text("New Folder Name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        Text("Select a folder or create a new one:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            item {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { createNewInBatch = true }
+                                        .padding(vertical = 8.dp, horizontal = 6.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("+ Create New Folder", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                            items(userFolders.size) { idx ->
+                                val uf = userFolders[idx]
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            val toAdd = selectedTracks.toList()
+                                            onAddMultipleTracksToFolder?.invoke(uf.id, toAdd)
+                                            showBatchAddToFolderDialog = false
+                                            isMultiSelectMode = false
+                                            selectedTracks.clear()
+                                        }
+                                        .padding(vertical = 8.dp, horizontal = 6.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.PlaylistAdd, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(uf.name, fontWeight = FontWeight.Medium)
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        Text("${uf.tracks.size} tracks", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (createNewInBatch) {
+                    TextButton(
+                        onClick = {
+                            if (batchFolderName.isNotBlank()) {
+                                val toAdd = selectedTracks.toList()
+                                onCreateFolderWithMultipleTracks?.invoke(batchFolderName.toProperTitleCase(), toAdd)
+                                showBatchAddToFolderDialog = false
+                                isMultiSelectMode = false
+                                selectedTracks.clear()
+                            }
+                        },
+                        enabled = batchFolderName.isNotBlank()
+                    ) {
+                        Text("Create & Add", fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showBatchAddToFolderDialog = false
+                    createNewInBatch = false
+                    batchFolderName = ""
+                }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
     Scaffold(
         topBar = {
             if (isMultiSelectMode) {
-                // Multi-select top bar
+                // Multi-select top bar - Clean and focused
                 TopAppBar(
                     title = {
                         Text(
-                            text = "${selectedTracks.size} Selected",
+                            text = if (selectedTracks.isEmpty()) "Select Songs" else "${selectedTracks.size} Selected",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -305,52 +417,11 @@ fun FolderDetailScreen(
                             },
                             modifier = Modifier.testTag("exit_multi_select_button")
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = "Cancel selection")
+                            Icon(Icons.Default.Close, contentDescription = "Exit selection mode")
                         }
                     },
                     actions = {
-                        // Select All / Deselect All
-                        IconButton(
-                            onClick = {
-                                if (selectedTracks.size == localTracks.size) {
-                                    selectedTracks.clear()
-                                } else {
-                                    selectedTracks.clear()
-                                    selectedTracks.addAll(localTracks)
-                                }
-                            },
-                            modifier = Modifier.testTag("multi_select_toggle_all")
-                        ) {
-                            Icon(Icons.Default.SelectAll, contentDescription = "Select all")
-                        }
-
-                        // Play Selected
-                        if (selectedTracks.isNotEmpty()) {
-                            IconButton(
-                                onClick = {
-                                    onPlayFolder(selectedTracks.toList(), 0, false)
-                                    isMultiSelectMode = false
-                                    selectedTracks.clear()
-                                },
-                                modifier = Modifier.testTag("multi_play_button")
-                            ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = "Play selected")
-                            }
-                        }
-
-                        // Delete / Remove Selected
-                        if (selectedTracks.isNotEmpty()) {
-                            IconButton(
-                                onClick = { showBatchDeleteConfirmDialog = true },
-                                modifier = Modifier.testTag("multi_delete_button")
-                            ) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete selected",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
+                        // Clean: Actions are hosted in the fancy bottom dock
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -497,7 +568,31 @@ fun FolderDetailScreen(
             }
         },
         bottomBar = {
-            if (playbackState?.currentTrack != null && onOpenNowPlaying != null && onPlayPause != null && onNext != null) {
+            if (isMultiSelectMode) {
+                FancySelectionBottomBar(
+                    isVisible = isMultiSelectMode,
+                    selectedCount = selectedTracks.size,
+                    totalCount = localTracks.size,
+                    onSelectAllToggle = {
+                        if (selectedTracks.size == localTracks.size) {
+                            selectedTracks.clear()
+                        } else {
+                            selectedTracks.clear()
+                            selectedTracks.addAll(localTracks)
+                        }
+                    },
+                    onPutInFolder = {
+                        if (selectedTracks.isNotEmpty()) {
+                            showBatchAddToFolderDialog = true
+                        }
+                    },
+                    onDelete = {
+                        if (selectedTracks.isNotEmpty()) {
+                            showBatchDeleteConfirmDialog = true
+                        }
+                    }
+                )
+            } else if (playbackState?.currentTrack != null && onOpenNowPlaying != null && onPlayPause != null && onNext != null) {
                 MiniPlayerBar(
                     playbackState = playbackState,
                     onClick = onOpenNowPlaying,
@@ -874,9 +969,18 @@ fun FolderDetailScreen(
                                             }
                                         },
                                         onLongClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             if (!isMultiSelectMode) {
                                                 isMultiSelectMode = true
+                                                selectedTracks.clear()
                                                 selectedTracks.add(track)
+                                            } else {
+                                                if (isSelected) {
+                                                    selectedTracks.removeAll { it.uri == track.uri }
+                                                    if (selectedTracks.isEmpty()) isMultiSelectMode = false
+                                                } else {
+                                                    selectedTracks.add(track)
+                                                }
                                             }
                                         }
                                     )

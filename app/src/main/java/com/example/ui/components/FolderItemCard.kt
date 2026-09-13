@@ -79,11 +79,11 @@ fun FolderItemCard(
                 onLongClick = onLongClick
             )
             .testTag("folder_item_$name"),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
         ),
         tonalElevation = 1.dp
     ) {

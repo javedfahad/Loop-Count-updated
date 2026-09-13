@@ -31,16 +31,19 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.RingVolume
 import androidx.compose.material.icons.filled.StopCircle
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -287,22 +290,19 @@ fun TrackOptionsDialog(
         return
     }
 
-    BasicAlertDialog(
-        onDismissRequest = onDismiss
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
+        Column(
             modifier = Modifier
-                .widthIn(max = 340.dp)
-                .wrapContentHeight()
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 4.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
                 // Header with compact icon badge
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -398,17 +398,6 @@ fun TrackOptionsDialog(
                 )
 
                 OptionMenuItem(
-                    icon = Icons.Default.Checklist,
-                    title = "Select Multiple",
-                    subtitle = "Enter batch selection mode",
-                    onClick = {
-                        onDismiss()
-                        onSelectMultiple?.invoke()
-                    },
-                    testTag = "option_select_multiple"
-                )
-
-                OptionMenuItem(
                     icon = Icons.Default.DriveFileRenameOutline,
                     title = "Rename",
                     onClick = {
@@ -447,7 +436,6 @@ fun TrackOptionsDialog(
                 }
             }
         }
-    }
 }
 
 @Composable

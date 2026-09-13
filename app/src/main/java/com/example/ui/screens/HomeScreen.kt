@@ -117,6 +117,7 @@ import com.example.model.AudioTrack
 import com.example.model.UserFolder
 import com.example.playback.AudioPlayerManager
 import com.example.playback.PlaybackState
+import com.example.ui.components.FancySelectionBottomBar
 import com.example.ui.components.FolderItemCard
 import com.example.ui.components.LoopifyLogo
 import com.example.ui.components.MiniPlayerBar
@@ -502,12 +503,6 @@ fun HomeScreen(
             },
             onCreateFolderWithTrack = { folderName ->
                 onCreateFolderWithTrack(folderName, track)
-            },
-            onSelectMultiple = {
-                isMultiSelectMode = true
-                if (!selectedTracks.any { it.uri == track.uri }) {
-                    selectedTracks.add(track)
-                }
             }
         )
     }
@@ -579,7 +574,7 @@ fun HomeScreen(
         topBar = {
             Column {
                 if (isMultiSelectMode) {
-                    // Contextual Multi-Select Bar
+                    // Contextual Multi-Select Bar - Clean and focused
                     TopAppBar(
                         navigationIcon = {
                             IconButton(
@@ -589,71 +584,19 @@ fun HomeScreen(
                                 },
                                 modifier = Modifier.testTag("home_exit_multi_select")
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Close multi select")
+                                Icon(Icons.Default.Close, contentDescription = "Exit selection mode")
                             }
                         },
                         title = {
                             Text(
-                                text = "${selectedTracks.size} Selected",
+                                text = if (selectedTracks.isEmpty()) "Select Songs" else "${selectedTracks.size} Selected",
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         },
                         actions = {
-                            // Select All / Deselect All
-                            IconButton(
-                                onClick = {
-                                    if (selectedTracks.size == filteredTracks.size) {
-                                        selectedTracks.clear()
-                                    } else {
-                                        selectedTracks.clear()
-                                        selectedTracks.addAll(filteredTracks)
-                                    }
-                                },
-                                modifier = Modifier.testTag("home_select_all_btn")
-                            ) {
-                                Icon(Icons.Default.SelectAll, contentDescription = "Select all tracks")
-                            }
-
-                            // Play Selected
-                            if (selectedTracks.isNotEmpty()) {
-                                IconButton(
-                                    onClick = {
-                                        playerManager.playTrack(selectedTracks.first(), selectedTracks.toList())
-                                        onOpenNowPlaying()
-                                        isMultiSelectMode = false
-                                        selectedTracks.clear()
-                                    },
-                                    modifier = Modifier.testTag("home_play_selected_btn")
-                                ) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = "Play selected")
-                                }
-                            }
-
-                            // Add to Folder
-                            if (selectedTracks.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { showBatchAddToFolderDialog = true },
-                                    modifier = Modifier.testTag("home_add_selected_to_folder_btn")
-                                ) {
-                                    Icon(Icons.Default.PlaylistAdd, contentDescription = "Add to folder")
-                                }
-                            }
-
-                            // Delete Selected
-                            if (selectedTracks.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { showBatchDeleteConfirmDialog = true },
-                                    modifier = Modifier.testTag("home_delete_selected_btn")
-                                ) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Delete selected",
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            }
+                            // Intentionally clean - actions are hosted in the fancy bottom dock
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -687,20 +630,7 @@ fun HomeScreen(
                                 )
                             }
                         },
-                        actions = {
-                            if (onOpenDualListen != null) {
-                                IconButton(
-                                    onClick = onOpenDualListen,
-                                    modifier = Modifier.testTag("home_dual_listen_btn")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Headphones,
-                                        contentDescription = "Dual Listen Together [Beta]",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        },
+                        actions = {},
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background
                         )
@@ -791,7 +721,7 @@ fun HomeScreen(
             ) {
                 // When music plays, the mini player smoothly slides up ABOVE the bottom dock with comfortable clearance
                 AnimatedVisibility(
-                    visible = playbackState.currentTrack != null,
+                    visible = playbackState.currentTrack != null && !isMultiSelectMode,
                     enter = fadeIn(animationSpec = tween(200)) + slideInVertically(
                         animationSpec = tween(200),
                         initialOffsetY = { it }
@@ -810,7 +740,7 @@ fun HomeScreen(
                     )
                 }
 
-                // Permanent Bottom Dock (Search, Filter/Sort, Refresh & New Folder / New Song)
+                // Permanent Bottom Dock when normal, OR Fancy 3-Action Selection Dock during multi-select
                 if (!isMultiSelectMode) {
                     BottomOneHandedDock(
                         searchQuery = searchQuery,
@@ -825,98 +755,29 @@ fun HomeScreen(
                         onCreateFolderClick = { showCreateFolderDialog = true }
                     )
                 } else {
-                    // Floating Multi-Select Batch Operations Bar
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        tonalElevation = 6.dp,
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                // Select All / Deselect button
-                                TextButton(
-                                    onClick = {
-                                        if (selectedTracks.size == filteredTracks.size) {
-                                            selectedTracks.clear()
-                                            isMultiSelectMode = false
-                                        } else {
-                                            selectedTracks.clear()
-                                            selectedTracks.addAll(filteredTracks)
-                                        }
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                    modifier = Modifier.testTag("multi_select_all_btn")
-                                ) {
-                                    Text(
-                                        text = if (selectedTracks.size == filteredTracks.size) "Deselect" else "All (${filteredTracks.size})",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                // Play Selected
-                                FilledTonalButton(
-                                    onClick = {
-                                        if (selectedTracks.isNotEmpty()) {
-                                            val listToPlay = selectedTracks.toList()
-                                            playerManager.playTrack(listToPlay.first(), listToPlay)
-                                            onOpenNowPlaying()
-                                            isMultiSelectMode = false
-                                            selectedTracks.clear()
-                                        }
-                                    },
-                                    enabled = selectedTracks.isNotEmpty(),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier.testTag("multi_select_play_btn")
-                                ) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(15.dp))
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text("Play (${selectedTracks.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                // Add to Folder
-                                Button(
-                                    onClick = { showBatchAddToFolderDialog = true },
-                                    enabled = selectedTracks.isNotEmpty(),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier.testTag("multi_select_add_folder_btn")
-                                ) {
-                                    Icon(Icons.Default.PlaylistAdd, contentDescription = null, modifier = Modifier.size(15.dp))
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text("Folder", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
+                    FancySelectionBottomBar(
+                        isVisible = isMultiSelectMode,
+                        selectedCount = selectedTracks.size,
+                        totalCount = filteredTracks.size,
+                        onSelectAllToggle = {
+                            if (selectedTracks.size == filteredTracks.size) {
+                                selectedTracks.clear()
+                            } else {
+                                selectedTracks.clear()
+                                selectedTracks.addAll(filteredTracks)
                             }
-
-                            // Done / Close Multi-Select
-                            IconButton(
-                                onClick = {
-                                    isMultiSelectMode = false
-                                    selectedTracks.clear()
-                                },
-                                modifier = Modifier.size(36.dp).testTag("multi_select_close_btn")
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "Close multi-select", modifier = Modifier.size(18.dp))
+                        },
+                        onPutInFolder = {
+                            if (selectedTracks.isNotEmpty()) {
+                                showBatchAddToFolderDialog = true
+                            }
+                        },
+                        onDelete = {
+                            if (selectedTracks.isNotEmpty()) {
+                                showBatchDeleteConfirmDialog = true
                             }
                         }
-                    }
+                    )
                 }
             }
         },
@@ -1451,17 +1312,17 @@ fun BottomOneHandedDock(
     }
 
     Surface(
-        shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.95f),
         tonalElevation = 6.dp,
         shadowElevation = 8.dp,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             if (isSearchActive) {
@@ -1529,7 +1390,7 @@ fun BottomOneHandedDock(
                         shape = RoundedCornerShape(18.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                             focusedContainerColor = MaterialTheme.colorScheme.surface,
                             unfocusedContainerColor = MaterialTheme.colorScheme.surface
                         ),
@@ -1562,7 +1423,7 @@ fun BottomOneHandedDock(
                         color = MaterialTheme.colorScheme.surface,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
                         ),
                         modifier = Modifier
                             .weight(1f)

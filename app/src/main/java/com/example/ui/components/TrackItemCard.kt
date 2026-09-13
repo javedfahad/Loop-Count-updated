@@ -38,6 +38,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +63,7 @@ fun TrackItemCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val haptic = LocalHapticFeedback.current
 
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.975f else 1f,
@@ -70,8 +73,8 @@ fun TrackItemCard(
 
     val animatedCardBg by animateColorAsState(
         targetValue = when {
-            isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
-            isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+            isCurrentTrack -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f)
             else -> MaterialTheme.colorScheme.surface
         },
         label = "track_card_bg"
@@ -80,8 +83,8 @@ fun TrackItemCard(
     val animatedBorderColor by animateColorAsState(
         targetValue = when {
             isSelected -> MaterialTheme.colorScheme.primary
-            isCurrentTrack -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+            isCurrentTrack -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
         },
         label = "track_card_border"
     )
@@ -93,18 +96,21 @@ fun TrackItemCard(
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(18.dp))
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = androidx.compose.material3.ripple(),
                 onClick = onClick,
-                onLongClick = onLongClick
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongClick()
+                }
             )
             .testTag("track_item_${track.id}"),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         color = animatedCardBg,
         border = androidx.compose.foundation.BorderStroke(if (isSelected) 1.5.dp else 1.dp, animatedBorderColor),
-        tonalElevation = if (isSelected || isCurrentTrack) 4.dp else 1.dp
+        tonalElevation = if (isSelected || isCurrentTrack) 3.dp else 0.dp
     ) {
         Row(
             modifier = Modifier
