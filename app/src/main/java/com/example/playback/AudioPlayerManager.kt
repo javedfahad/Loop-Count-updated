@@ -10,6 +10,7 @@ import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -320,6 +321,7 @@ class AudioPlayerManager(
 
         val mediaItem = buildMediaItem(track)
         player.setMediaItem(mediaItem)
+        player.playbackParameters = PlaybackParameters(_state.value.playbackSpeed)
         player.prepare()
         if (startPositionMs > 0) {
             player.seekTo(startPositionMs)
@@ -364,6 +366,13 @@ class AudioPlayerManager(
             isInternalMagicCall = true
         )
     }
+
+    fun stopMagicRemix() {
+        _state.update { it.copy(isMagicRemixActive = false) }
+        exoPlayer?.volume = 1.0f
+    }
+
+    fun getMagicTracks(): List<AudioTrack> = magicTracksList
 
     private fun nextMagicSlice() {
         if (!_state.value.isMagicRemixActive || magicTracksList.isEmpty()) return
@@ -644,6 +653,31 @@ class AudioPlayerManager(
                 queueIndex = currentTrack?.let { t -> newQueue.indexOfFirst { q -> q.uri == t.uri } } ?: 0
             )
         }
+    }
+
+    /**
+     * Set playback speed (1x, 2x, 3x, 4x, etc.)
+     * Uses ExoPlayer's PlaybackParameters to dynamically alter playback speed in real-time.
+     */
+    fun setPlaybackSpeed(speed: Float) {
+        val safeSpeed = speed.coerceIn(0.5f, 4.0f)
+        _state.update { it.copy(playbackSpeed = safeSpeed) }
+        exoPlayer?.let { player ->
+            player.playbackParameters = PlaybackParameters(safeSpeed)
+        }
+    }
+
+    /**
+     * Cycle through requested speeds: 1x -> 2x -> 3x -> 4x -> 1x
+     */
+    fun cyclePlaybackSpeed() {
+        val nextSpeed = when (_state.value.playbackSpeed) {
+            1.0f -> 2.0f
+            2.0f -> 3.0f
+            3.0f -> 4.0f
+            else -> 1.0f
+        }
+        setPlaybackSpeed(nextSpeed)
     }
 
     // --- REPEAT COUNT & STOP LOGIC (CRITICAL) ---

@@ -5,10 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BluetoothConnected
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headphones
@@ -30,6 +33,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.RingVolume
 import androidx.compose.material.icons.filled.Shuffle
@@ -161,9 +165,39 @@ fun NowPlayingScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                color = MaterialTheme.colorScheme.background,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Collapse / Down-arrow Navigation Button
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .testTag("now_playing_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Collapse",
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    // Centered Now Playing Title & Track Info
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp)
+                    ) {
                         Text(
                             text = if (syncState.connectionState == DualSyncConnectionState.CONNECTED)
                                 "SYNCED WITH ${syncState.connectedDeviceName?.uppercase() ?: "FRIEND"}"
@@ -175,7 +209,7 @@ fun NowPlayingScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = track?.displayTitle ?: "Loopify Music",
+                            text = track?.displayTitle ?: "Tuny Music",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -183,38 +217,11 @@ fun NowPlayingScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.testTag("now_playing_back_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Collapse",
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                },
-                actions = {
-                    if (track != null) {
-                        IconButton(
-                            onClick = { showRingtoneDialog = true },
-                            modifier = Modifier.testTag("now_playing_ringtone_action_btn")
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_set_ringtone),
-                                contentDescription = "Set as Ringtone",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
+
+                    // Top Bar Spacer to balance collapse arrow
+                    Spacer(modifier = Modifier.size(44.dp))
+                }
+            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
@@ -238,7 +245,7 @@ fun NowPlayingScreen(
                     horizontalArrangement = Arrangement.spacedBy(32.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left Pane: Artwork & Track Info
+                    // Left Pane: Artwork, Track Info & Quick Actions
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -271,6 +278,23 @@ fun NowPlayingScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Capsule 1: Ringtone and Shuffle Capsule
+                        RingtoneAndShuffleCapsule(
+                            playbackState = playbackState,
+                            playerManager = playerManager,
+                            onRingtoneClick = { showRingtoneDialog = true }
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Capsule 2: 2x, 3x, 4x Playback Speed Option Capsule
+                        NowPlayingSpeedCapsule(
+                            playbackState = playbackState,
+                            playerManager = playerManager
                         )
                     }
 
@@ -488,21 +512,14 @@ fun NowPlayingScreen(
                         }
 
                         // Modern Studio Playback Controls Bar
-                        Row(
+                        InteractivePlaybackControls(
+                            playbackState = playbackState,
+                            playerManager = playerManager,
+                            onRepeatClick = { showRepeatDialog = true },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 4.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            InteractivePlaybackControls(
-                                playbackState = playbackState,
-                                playerManager = playerManager,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 8.dp)
-                            )
-                        }
+                                .padding(horizontal = 8.dp, vertical = 8.dp)
+                        )
                     }
                 }
             } else {
@@ -547,6 +564,23 @@ fun NowPlayingScreen(
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Capsule 1: Ringtone and Shuffle Capsule
+                        RingtoneAndShuffleCapsule(
+                            playbackState = playbackState,
+                            playerManager = playerManager,
+                            onRingtoneClick = { showRingtoneDialog = true }
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Capsule 2: 2x, 3x, 4x Playback Speed Option Capsule
+                        NowPlayingSpeedCapsule(
+                            playbackState = playbackState,
+                            playerManager = playerManager
                         )
                     }
 
@@ -814,10 +848,11 @@ fun NowPlayingScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Modern Studio Animated Playback Controls Bar
+                    // Modern Studio Animated Playback Controls Bar (Dead-center Play/Pause)
                     InteractivePlaybackControls(
                         playbackState = playbackState,
                         playerManager = playerManager,
+                        onRepeatClick = { showRepeatDialog = true },
                         modifier = Modifier
                             .fillMaxWidth()
                             .widthIn(max = 480.dp)
@@ -835,6 +870,7 @@ fun NowPlayingScreen(
 fun InteractivePlaybackControls(
     playbackState: PlaybackState,
     playerManager: AudioPlayerManager,
+    onRepeatClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -844,17 +880,6 @@ fun InteractivePlaybackControls(
     var prevKick by remember { mutableStateOf(false) }
     var nextKick by remember { mutableStateOf(false) }
     var playPressed by remember { mutableStateOf(false) }
-
-    val shuffleRotation by animateFloatAsState(
-        targetValue = if (playbackState.isShuffle) 360f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-        label = "shuffle_rot"
-    )
-    val shuffleScale by animateFloatAsState(
-        targetValue = if (playbackState.isShuffle) 1.15f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy),
-        label = "shuffle_scale"
-    )
 
     val rewindAngle by animateFloatAsState(
         targetValue = if (rewindKick) -35f else 0f,
@@ -896,178 +921,394 @@ fun InteractivePlaybackControls(
         label = "play_scale"
     )
 
+    // Symmetrically balanced playback row with dead-center Play/Pause
     Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Shuffle button with continuous spin & bounce
-        IconButton(
-            onClick = { playerManager.toggleShuffle() },
-            modifier = Modifier
-                .size(46.dp)
-                .graphicsLayer {
-                    rotationZ = shuffleRotation
-                    scaleX = shuffleScale
-                    scaleY = shuffleScale
-                }
-                .testTag("btn_shuffle")
+        // Left side controls (weight 1f): Rewind 10, Previous
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Shuffle,
-                contentDescription = "Shuffle",
-                tint = if (playbackState.isShuffle) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        // Rewind 10 seconds button with rotation kick animation
-        IconButton(
-            onClick = {
-                coroutineScope.launch {
-                    rewindKick = true
-                    delay(160)
-                    rewindKick = false
-                }
-                playerManager.seekBackward10()
-            },
-            modifier = Modifier
-                .size(46.dp)
-                .graphicsLayer {
-                    rotationZ = rewindAngle
-                    scaleX = if (rewindKick) 0.88f else 1f
-                    scaleY = if (rewindKick) 0.88f else 1f
-                }
-                .testTag("btn_rewind_10")
-        ) {
-            Icon(
-                imageVector = Icons.Default.Replay10,
-                contentDescription = "Rewind 10 seconds",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(25.dp)
-            )
-        }
-
-        // Previous track button with horizontal nudge & bounce
-        IconButton(
-            onClick = {
-                coroutineScope.launch {
-                    prevKick = true
-                    delay(160)
-                    prevKick = false
-                }
-                playerManager.previous()
-            },
-            modifier = Modifier
-                .size(50.dp)
-                .graphicsLayer {
-                    translationX = prevOffset
-                    scaleX = prevScale
-                    scaleY = prevScale
-                }
-                .testTag("btn_previous")
-        ) {
-            Icon(
-                imageVector = Icons.Default.SkipPrevious,
-                contentDescription = "Previous track",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(34.dp)
-            )
-        }
-
-        // Central Play / Pause button with spring morph & press bounce
-        FilledIconButton(
-            onClick = {
-                coroutineScope.launch {
-                    playPressed = true
-                    delay(150)
-                    playPressed = false
-                }
-                playerManager.togglePlayPause()
-            },
-            shape = CircleShape,
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ),
-            modifier = Modifier
-                .size(72.dp)
-                .graphicsLayer {
-                    scaleX = playScale
-                    scaleY = playScale
-                }
-                .shadow(12.dp, CircleShape, spotColor = MaterialTheme.colorScheme.primary)
-                .testTag("btn_play_pause")
-        ) {
-            AnimatedContent(
-                targetState = playbackState.isPlaying,
-                transitionSpec = {
-                    (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn())
-                        .togetherWith(scaleOut() + fadeOut())
+            // Rewind 10 seconds button with rotation kick animation
+            IconButton(
+                onClick = {
+                    coroutineScope.launch {
+                        rewindKick = true
+                        delay(160)
+                        rewindKick = false
+                    }
+                    playerManager.seekBackward10()
                 },
-                label = "play_pause_icon_anim"
-            ) { isPlaying ->
+                modifier = Modifier
+                    .size(48.dp)
+                    .graphicsLayer {
+                        rotationZ = rewindAngle
+                        scaleX = if (rewindKick) 0.88f else 1f
+                        scaleY = if (rewindKick) 0.88f else 1f
+                    }
+                    .testTag("btn_rewind_10")
+            ) {
                 Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    modifier = Modifier.size(38.dp)
+                    imageVector = Icons.Default.Replay10,
+                    contentDescription = "Rewind 10 seconds",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+
+            // Previous track button with horizontal nudge & bounce
+            IconButton(
+                onClick = {
+                    coroutineScope.launch {
+                        prevKick = true
+                        delay(160)
+                        prevKick = false
+                    }
+                    playerManager.previous()
+                },
+                modifier = Modifier
+                    .size(52.dp)
+                    .graphicsLayer {
+                        translationX = prevOffset
+                        scaleX = prevScale
+                        scaleY = prevScale
+                    }
+                    .testTag("btn_previous")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SkipPrevious,
+                    contentDescription = "Previous track",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(34.dp)
                 )
             }
         }
 
-        // Next track button with horizontal nudge & bounce
-        IconButton(
-            onClick = {
-                coroutineScope.launch {
-                    nextKick = true
-                    delay(160)
-                    nextKick = false
-                }
-                playerManager.next()
-            },
-            modifier = Modifier
-                .size(50.dp)
-                .graphicsLayer {
-                    translationX = nextOffset
-                    scaleX = nextScale
-                    scaleY = nextScale
-                }
-                .testTag("btn_next")
+        // Central Play / Pause button (strictly centered at 50% width)
+        Box(
+            modifier = Modifier.padding(horizontal = 8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.SkipNext,
-                contentDescription = "Next track",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(34.dp)
-            )
+            FilledIconButton(
+                onClick = {
+                    coroutineScope.launch {
+                        playPressed = true
+                        delay(150)
+                        playPressed = false
+                    }
+                    playerManager.togglePlayPause()
+                },
+                shape = CircleShape,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                modifier = Modifier
+                    .size(72.dp)
+                    .graphicsLayer {
+                        scaleX = playScale
+                        scaleY = playScale
+                    }
+                    .shadow(12.dp, CircleShape, spotColor = MaterialTheme.colorScheme.primary)
+                    .testTag("btn_play_pause")
+            ) {
+                AnimatedContent(
+                    targetState = playbackState.isPlaying,
+                    transitionSpec = {
+                        (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn())
+                            .togetherWith(scaleOut() + fadeOut())
+                    },
+                    label = "play_pause_icon_anim"
+                ) { isPlaying ->
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(38.dp)
+                    )
+                }
+            }
         }
 
-        // Forward 10 seconds button with rotation kick animation
-        IconButton(
-            onClick = {
-                coroutineScope.launch {
-                    forwardKick = true
-                    delay(160)
-                    forwardKick = false
-                }
-                playerManager.seekForward10()
-            },
-            modifier = Modifier
-                .size(46.dp)
-                .graphicsLayer {
-                    rotationZ = forwardAngle
-                    scaleX = if (forwardKick) 0.88f else 1f
-                    scaleY = if (forwardKick) 0.88f else 1f
-                }
-                .testTag("btn_forward_10")
+        // Right side controls (weight 1f): Next, Forward 10
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Forward10,
-                contentDescription = "Forward 10 seconds",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(25.dp)
+            // Next track button with horizontal nudge & bounce
+            IconButton(
+                onClick = {
+                    coroutineScope.launch {
+                        nextKick = true
+                        delay(160)
+                        nextKick = false
+                    }
+                    playerManager.next()
+                },
+                modifier = Modifier
+                    .size(52.dp)
+                    .graphicsLayer {
+                        translationX = nextOffset
+                        scaleX = nextScale
+                        scaleY = nextScale
+                    }
+                    .testTag("btn_next")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SkipNext,
+                    contentDescription = "Next track",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(34.dp)
+                )
+            }
+
+            // Forward 10 seconds button with rotation kick animation
+            IconButton(
+                onClick = {
+                    coroutineScope.launch {
+                        forwardKick = true
+                        delay(160)
+                        forwardKick = false
+                    }
+                    playerManager.seekForward10()
+                },
+                modifier = Modifier
+                    .size(48.dp)
+                    .graphicsLayer {
+                        rotationZ = forwardAngle
+                        scaleX = if (forwardKick) 0.88f else 1f
+                        scaleY = if (forwardKick) 0.88f else 1f
+                    }
+                    .testTag("btn_forward_10")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Forward10,
+                    contentDescription = "Forward 10 seconds",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Capsule 1: Ringtone and Shuffle Capsule
+ * As requested: Ringtone and Shuffle buttons inside a dedicated horizontal capsule.
+ */
+@Composable
+fun RingtoneAndShuffleCapsule(
+    playbackState: PlaybackState,
+    playerManager: AudioPlayerManager,
+    onRingtoneClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val coroutineScope = rememberCoroutineScope()
+    var shuffleKick by remember { mutableStateOf(false) }
+
+    val shuffleRotation by animateFloatAsState(
+        targetValue = if (playbackState.isShuffle) 360f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "capsule_shuffle_rot"
+    )
+    val shuffleScale by animateFloatAsState(
+        targetValue = if (shuffleKick) 1.18f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy),
+        label = "capsule_shuffle_scale"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.90f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)
+        ),
+        shadowElevation = 2.dp,
+        modifier = modifier.testTag("ringtone_and_shuffle_capsule")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+        ) {
+            // Ringtone / Alert Action Button
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = androidx.compose.ui.graphics.Color.Transparent,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onRingtoneClick() }
+                    .testTag("now_playing_ringtone_action_btn")
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_set_ringtone),
+                        contentDescription = "Set as Ringtone or Notification",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(19.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Ringtone",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Sleek vertical divider
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 2.dp)
+                    .width(1.dp)
+                    .height(20.dp)
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.22f))
             )
+
+            // Shuffle Action Button
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = if (playbackState.isShuffle) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    androidx.compose.ui.graphics.Color.Transparent
+                },
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable {
+                        coroutineScope.launch {
+                            shuffleKick = true
+                            delay(180)
+                            shuffleKick = false
+                        }
+                        playerManager.toggleShuffle()
+                    }
+                    .testTag("btn_shuffle")
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (playbackState.isShuffle) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier
+                            .size(19.dp)
+                            .graphicsLayer {
+                                rotationZ = shuffleRotation
+                                scaleX = shuffleScale
+                                scaleY = shuffleScale
+                            }
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (playbackState.isShuffle) "Shuffle On" else "Shuffle",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (playbackState.isShuffle) FontWeight.Bold else FontWeight.Medium,
+                        color = if (playbackState.isShuffle) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Capsule 2: 2x, 3x, 4x Playback Speed Option Capsule
+ * As requested: Strictly 2x, 3x, 4x options in capsule style (no 1x).
+ * Tapping toggles / sets the speed and updates real audio playback in real-time.
+ */
+@Composable
+fun NowPlayingSpeedCapsule(
+    playbackState: PlaybackState,
+    playerManager: AudioPlayerManager,
+    modifier: Modifier = Modifier
+) {
+    val currentSpeed = playbackState.playbackSpeed
+    // Only 2x, 3x, 4x as explicitly requested
+    val speeds = listOf(2.0f, 3.0f, 4.0f)
+
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.90f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)
+        ),
+        shadowElevation = 2.dp,
+        modifier = modifier.testTag("now_playing_speed_capsule")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp)
+        ) {
+            speeds.forEachIndexed { index, speed ->
+                val isSelected = currentSpeed == speed
+                val speedLabel = "${speed.toInt()}x"
+
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        androidx.compose.ui.graphics.Color.Transparent
+                    },
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .clickable {
+                            // If tapping already selected speed, tap again reverts to standard 1x
+                            if (isSelected) {
+                                playerManager.setPlaybackSpeed(1.0f)
+                            } else {
+                                playerManager.setPlaybackSpeed(speed)
+                            }
+                        }
+                        .testTag("btn_speed_${speed.toInt()}x")
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            text = speedLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+
+                if (index < speeds.size - 1) {
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(16.dp)
+                            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
+                    )
+                }
+            }
         }
     }
 }

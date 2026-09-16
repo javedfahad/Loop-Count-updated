@@ -121,10 +121,10 @@ fun NavigationDrawerContent(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Navigation Items - Support Loopify Music
+            // Navigation Items - Support Tuny Music
             DrawerNavItem(
                 icon = Icons.Default.Favorite,
-                title = "Support Loopify Music",
+                title = "Support Tuny Music",
                 subtitle = "Keep this independent project alive",
                 iconTint = MaterialTheme.colorScheme.primary,
                 onClick = {
@@ -151,7 +151,7 @@ fun NavigationDrawerContent(
 
             DrawerNavItem(
                 icon = Icons.Default.Info,
-                title = "About Loopify Music",
+                title = "About Tuny Music",
                 subtitle = "Version & Feature Guide",
                 onClick = {
                     onCloseDrawer()
@@ -165,7 +165,7 @@ fun NavigationDrawerContent(
             // Footer
             Column(modifier = Modifier.padding(horizontal = 8.dp)) {
                 Text(
-                    text = "Loopify Music v1.0.0",
+                    text = "Tuny Music v1.0.0",
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)

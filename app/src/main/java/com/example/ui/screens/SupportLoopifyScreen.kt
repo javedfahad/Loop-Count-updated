@@ -216,7 +216,7 @@ fun SupportLoopifyScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (currentStep == SupportStep.PAYMENT_QR) "Support via UPI" else "Support Loopify Music",
+                        text = if (currentStep == SupportStep.PAYMENT_QR) "Support via UPI" else "Support Tuny Music",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleLarge
                     )
@@ -292,7 +292,7 @@ private fun SupportIntroContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Keep Loopify Music Alive",
+            text = "Keep Tuny Music Alive",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
@@ -339,7 +339,7 @@ private fun SupportIntroContent(
                 Text(
                     text = "I am a small independent developer building apps on my own with care and heart. To be completely real and open with you: I genuinely need financial support to continue developing full-time and sustain my living and project expenses.\n\n" +
                             "With your support, I can stay independent and focus on building real-time, high-quality apps and smart tools that genuinely help you and improve your daily routine.\n\n" +
-                            "Loopify Music is 100% free with zero ads, no paid subscriptions, and complete respect for your privacy. I believe helpful software should be honest, clean, and accessible to everyone.\n\n" +
+                            "Tuny Music is 100% free with zero ads, no paid subscriptions, and complete respect for your privacy. I believe helpful software should be honest, clean, and accessible to everyone.\n\n" +
                             "If you value my work and would like to support a small developer working hard to create real tools for you, even a small contribution means the world to me. Thank you from the bottom of my heart for your kindness!",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

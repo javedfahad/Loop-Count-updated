@@ -163,7 +163,7 @@ fun FolderOptionsDialog(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Delete \"$folderName\"? This removes the custom folder list from Loopify Music. Your original audio files on the device will not be deleted.",
+                    text = "Delete \"$folderName\"? This removes the custom folder list from Tuny Music. Your original audio files on the device will not be deleted.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

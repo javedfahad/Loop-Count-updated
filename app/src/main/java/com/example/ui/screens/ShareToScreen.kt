@@ -2,8 +2,6 @@ package com.example.ui.screens
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import androidx.compose.animation.AnimatedVisibility
@@ -15,10 +13,12 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -127,6 +127,7 @@ import com.example.transfer.ReceiverState
 import com.example.transfer.TransferItem
 import com.example.transfer.TransferProgress
 import com.example.transfer.WifiTransferManager
+import com.example.ui.components.LiveQrCodeScannerSheet
 import kotlinx.coroutines.launch
 
 enum class ShareMode {
@@ -174,6 +175,7 @@ fun ShareToScreen(
     // Live Transfer Active Dialog & Radar Sheet
     var showSendProgressDialog by remember { mutableStateOf(false) }
     var showDeviceRadarSheet by remember { mutableStateOf(false) }
+    var showLiveQrScanner by remember { mutableStateOf(false) }
     var showHotspotConnectDialog by remember { mutableStateOf(false) }
     var showMaxFolderDialog by remember { mutableStateOf(false) }
 
@@ -267,26 +269,14 @@ fun ShareToScreen(
         }
     }
 
-    // QR scanner launcher via camera preview
-    val qrLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        if (bitmap != null) {
-            val qrText = NetworkUtils.decodeQrFromBitmap(bitmap)
-            val ip = qrText?.let { NetworkUtils.parseIpFromPayload(it) }
-            if (!ip.isNullOrBlank()) {
-                receiverIpInput = ip
-                Toast.makeText(context, "Connected to receiver ($ip)!", Toast.LENGTH_SHORT).show()
-                startSendingToIp(ip)
-            } else {
-                Toast.makeText(context, "Could not detect QR code. Try again or tap Hotspot.", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
     // Direct step-by-step back handling to ensure user does not get kicked out to Home
     val handleBackStep: () -> Unit = {
         when {
             showSendProgressDialog && (senderProgress?.isCompleted == true || senderProgress?.errorMessage != null) -> {
                 showSendProgressDialog = false
+            }
+            showLiveQrScanner -> {
+                showLiveQrScanner = false
             }
             showDeviceRadarSheet -> {
                 showDeviceRadarSheet = false
@@ -316,18 +306,11 @@ fun ShareToScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = "Share to",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "High-Speed Wi-Fi Music Sharing",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "Share to",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
                 },
                 navigationIcon = {
                     IconButton(
@@ -631,7 +614,8 @@ fun ShareToScreen(
                 startSendingToIp(ip)
             },
             onScanQr = {
-                qrLauncher.launch(null)
+                showDeviceRadarSheet = false
+                showLiveQrScanner = true
             },
             onSendViaHotspot = {
                 showDeviceRadarSheet = false
@@ -640,6 +624,24 @@ fun ShareToScreen(
             manualIp = receiverIpInput,
             onManualIpChanged = { receiverIpInput = it },
             onDismiss = { showDeviceRadarSheet = false }
+        )
+    }
+
+    // Live In-App Camera QR Code Scanner Sheet
+    if (showLiveQrScanner) {
+        LiveQrCodeScannerSheet(
+            onQrCodeDetected = { rawQrPayload ->
+                val ip = NetworkUtils.parseIpFromPayload(rawQrPayload)
+                if (!ip.isNullOrBlank()) {
+                    showLiveQrScanner = false
+                    receiverIpInput = ip
+                    Toast.makeText(context, "Connected to receiver ($ip)!", Toast.LENGTH_SHORT).show()
+                    startSendingToIp(ip)
+                } else {
+                    Toast.makeText(context, "Scanned: $rawQrPayload (Unknown receiver)", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onDismiss = { showLiveQrScanner = false }
         )
     }
 
@@ -883,6 +885,7 @@ fun ShareToScreen(
 /**
  * UI for Receive Mode with Radar Animation, QR Code, and Incoming File Progress.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReceiveModeContent(
     receiverState: ReceiverState,
@@ -890,6 +893,8 @@ fun ReceiveModeContent(
     onOpenLibrary: () -> Unit,
     onRestartReceiver: () -> Unit
 ) {
+    var showManualIpAddress by remember { mutableStateOf(false) }
+
     val infiniteTransition = rememberInfiniteTransition(label = "radar_pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.9f,
@@ -987,65 +992,134 @@ fun ReceiveModeContent(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Friendly Device Status Card (No technical IP address)
+                    // Friendly Device Status Card with double-tap secret/manual reveal
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surface,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                            if (showManualIpAddress) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                         ),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .combinedClickable(
+                                onClick = { /* Single tap feedback */ },
+                                onDoubleClick = {
+                                    showManualIpAddress = !showManualIpAddress
+                                }
+                            )
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PhoneAndroid,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PhoneAndroid,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "Receiver Device Name",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = receiverState.deviceName.ifBlank { "Tuny Receiver" },
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Receiver Device Name",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                    modifier = Modifier.clip(RoundedCornerShape(10.dp)).combinedClickable(
+                                        onClick = { /* Tap */ },
+                                        onDoubleClick = { showManualIpAddress = !showManualIpAddress }
                                     )
+                                ) {
                                     Text(
-                                        text = receiverState.deviceName.ifBlank { "Loopify Receiver" },
-                                        style = MaterialTheme.typography.titleMedium,
+                                        text = "READY",
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }
                             }
 
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                            ) {
-                                Text(
-                                    text = "READY",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+                            // If double-tapped, reveal IP address and port to put manually into sender
+                            AnimatedVisibility(visible = showManualIpAddress) {
+                                Column(modifier = Modifier.padding(top = 10.dp)) {
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                                        modifier = Modifier.padding(vertical = 6.dp)
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = "Manual Connection IP Address",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = if (receiverState.localIp.isNotBlank())
+                                                    "${receiverState.localIp}:${receiverState.port}"
+                                                else "Connecting to network...",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+
+                                        if (receiverState.localIp.isNotBlank()) {
+                                            IconButton(
+                                                onClick = { onCopyIp(receiverState.localIp) },
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.ContentCopy,
+                                                    contentDescription = "Copy IP",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        text = "Enter this IP manually on the sender phone if QR code or auto-detect is not working.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 11.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -1337,78 +1411,6 @@ fun SendModeContent(
             .fillMaxSize()
             .padding(horizontal = 16.dp)
     ) {
-        // Clean, elegant Status Banner (No raw IP field clutter)
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = if (discoveredDevices.isNotEmpty())
-                Color(0xFF4CAF50).copy(alpha = 0.12f)
-            else
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                if (discoveredDevices.isNotEmpty()) Color(0xFF4CAF50).copy(alpha = 0.4f)
-                else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-            ),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = if (discoveredDevices.isNotEmpty()) Icons.Default.CheckCircle else Icons.Default.Wifi,
-                        contentDescription = null,
-                        tint = if (discoveredDevices.isNotEmpty()) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = if (discoveredDevices.isNotEmpty())
-                                "Receiver Detected: ${discoveredDevices.first().name}"
-                            else
-                                "Wi-Fi Music Sharing",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = if (discoveredDevices.isNotEmpty())
-                                "Ready to send • Tap 'Send to Phone' below"
-                            else
-                                "Select songs or folders, then tap 'Send to Phone'",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                if (discoveredDevices.isNotEmpty()) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF4CAF50).copy(alpha = 0.25f)
-                    ) {
-                        Text(
-                            text = "READY",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF1B5E20),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
         // Selection Tabs: "Songs" vs "Folders"
         TabRow(
             selectedTabIndex = selectionTab.ordinal,
@@ -1968,7 +1970,7 @@ fun NearbyDeviceRadarSheet(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Make sure the other phone has 'Receive' open in Loopify",
+                    text = "Make sure the other phone has 'Receive' open in Tuny Music",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
                     textAlign = TextAlign.Center
@@ -2320,7 +2322,7 @@ fun HotspotConnectDialog(
                                 if (target != null) {
                                     onConnectToIp(target)
                                 } else {
-                                    connectionError = "Receiver phone not detected yet.\nMake sure the other phone has 'Receive' mode open in Loopify."
+                                    connectionError = "Receiver phone not detected yet.\nMake sure the other phone has 'Receive' mode open in Tuny Music."
                                 }
                             }
                         },

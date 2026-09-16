@@ -11,6 +11,7 @@ data class PlaybackState(
     val queue: List<AudioTrack> = emptyList(),
     val queueIndex: Int = -1,
     val isShuffle: Boolean = false,
+    val playbackSpeed: Float = 1.0f, // 1.0f, 2.0f, 3.0f, 4.0f
 
     // Repeat Count Feature
     val repeatCountTotal: Int = 0, // 0 = Off, >0 = Total selected (e.g. 1..15, 108)

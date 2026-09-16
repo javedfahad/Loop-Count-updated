@@ -254,12 +254,12 @@ object QRCodeHelper {
                 putExtra(Intent.EXTRA_STREAM, uri)
                 putExtra(
                     Intent.EXTRA_TEXT,
-                    "Support Loopify Music independent development!\nUPI ID: $UPI_ID\nScan to pay with any UPI app (GPay, PhonePe, Paytm)."
+                    "Support Tuny Music independent development!\nUPI ID: $UPI_ID\nScan to pay with any UPI app (GPay, PhonePe, Paytm)."
                 )
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
 
-            val chooser = Intent.createChooser(shareIntent, "Share Loopify Music QR Code")
+            val chooser = Intent.createChooser(shareIntent, "Share Tuny Music QR Code")
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(chooser)
         } catch (e: Exception) {

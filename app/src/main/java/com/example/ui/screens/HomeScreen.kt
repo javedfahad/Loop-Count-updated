@@ -698,7 +698,7 @@ fun HomeScreen(
                                 LoopifyLogo(size = 30.dp)
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "Loopify Music",
+                                    text = "Tuny Music",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 19.sp,
                                     color = MaterialTheme.colorScheme.onSurface,

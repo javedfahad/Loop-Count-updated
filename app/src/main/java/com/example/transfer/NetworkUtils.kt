@@ -273,17 +273,12 @@ object NetworkUtils {
     }
 
     /**
-     * Extracts IP from QR payload: "loopify-share://192.168.1.5:8888" or "192.168.1.5"
+     * Extracts IP from QR payload: "loopify-share://192.168.1.5:8888", "http://192.168.1.5:8888", or raw "192.168.1.5"
      */
     fun parseIpFromPayload(payload: String): String? {
         val clean = payload.trim()
-        if (clean.startsWith("loopify-share://")) {
-            val hostPort = clean.removePrefix("loopify-share://")
-            return hostPort.substringBefore(":")
-        }
-        if (clean.matches(Regex("""\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"""))) {
-            return clean
-        }
-        return null
+        val regex = Regex("""(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})""")
+        val match = regex.find(clean)
+        return match?.value
     }
 }

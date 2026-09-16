@@ -188,7 +188,7 @@ fun FolderDetailScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Delete \"${folder.name}\"? This removes the folder list from Loopify Music. Your original audio files on the device will not be deleted.",
+                    text = "Delete \"${folder.name}\"? This removes the folder list from Tuny Music. Your original audio files on the device will not be deleted.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -884,17 +884,17 @@ fun FolderDetailScreen(
                                     .fillMaxWidth()
                                     .padding(bottom = 8.dp)
                                     .testTag("folder_detail_magic_remix_active_banner"),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(999.dp),
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(36.dp)
+                                            .size(34.dp)
                                             .clip(CircleShape)
                                             .background(MaterialTheme.colorScheme.primary),
                                         contentAlignment = Alignment.Center
@@ -910,14 +910,14 @@ fun FolderDetailScreen(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = "✨ Magic Remix Active • Cut #${playbackState?.magicTransitionCount ?: 1}",
+                                                text = "✨ Remix • Cut #${playbackState?.magicTransitionCount ?: 1}",
                                                 style = MaterialTheme.typography.titleSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Surface(
-                                                shape = RoundedCornerShape(6.dp),
+                                                shape = RoundedCornerShape(999.dp),
                                                 color = MaterialTheme.colorScheme.primary
                                             ) {
                                                 Text(
@@ -925,20 +925,20 @@ fun FolderDetailScreen(
                                                     fontSize = 9.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.onPrimary,
-                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                                                 )
                                             }
                                         }
                                         Text(
-                                            text = "Next drop in ${playbackState?.magicSliceRemainingSeconds ?: 0}s • Non-stop mashup",
+                                            text = "Next drop in ${playbackState?.magicSliceRemainingSeconds ?: 0}s",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                         )
                                     }
                                     FilledTonalButton(
                                         onClick = { onNext?.invoke() },
-                                        shape = RoundedCornerShape(10.dp),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                        shape = RoundedCornerShape(999.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                                         modifier = Modifier.height(34.dp)
                                     ) {
                                         Text("Next Cut", fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -950,10 +950,10 @@ fun FolderDetailScreen(
                                 onClick = { onMagicRemix?.invoke(localTracks) },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(42.dp)
+                                    .height(44.dp)
                                     .padding(bottom = 6.dp)
                                     .testTag("folder_detail_magic_remix_button"),
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(999.dp),
                                 colors = ButtonDefaults.filledTonalButtonColors(
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
                                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer
@@ -973,7 +973,7 @@ fun FolderDetailScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
-                                    shape = RoundedCornerShape(6.dp),
+                                    shape = RoundedCornerShape(999.dp),
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                                 ) {
                                     Text(
@@ -981,7 +981,7 @@ fun FolderDetailScreen(
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                                     )
                                 }
                             }
