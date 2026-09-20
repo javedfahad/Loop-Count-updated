@@ -56,10 +56,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
+import com.google.zxing.DecodeHintType
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.PlanarYUVLuminanceSource
+import com.google.zxing.common.GlobalHistogramBinarizer
 import com.google.zxing.common.HybridBinarizer
+import java.util.EnumMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -113,6 +117,9 @@ fun LiveQrCodeScannerSheet(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Header Bar with Title and Close Button
+            var cameraControl by remember { mutableStateOf<androidx.camera.core.CameraControl?>(null) }
+            var isTorchOn by remember { mutableStateOf(false) }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -142,15 +149,34 @@ fun LiveQrCodeScannerSheet(
                     )
                 }
 
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (hasCameraPermission && cameraControl != null) {
+                        IconButton(
+                            onClick = {
+                                val nextTorch = !isTorchOn
+                                isTorchOn = nextTorch
+                                cameraControl?.enableTorch(nextTorch)
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FlashOn,
+                                contentDescription = "Toggle Flashlight",
+                                tint = if (isTorchOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(6.dp))
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -188,7 +214,14 @@ fun LiveQrCodeScannerSheet(
                                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                     .build()
 
-                                val multiFormatReader = MultiFormatReader()
+                                val hints = EnumMap<DecodeHintType, Any>(DecodeHintType::class.java).apply {
+                                    put(DecodeHintType.POSSIBLE_FORMATS, listOf(BarcodeFormat.QR_CODE))
+                                    put(DecodeHintType.TRY_HARDER, java.lang.Boolean.TRUE)
+                                    put(DecodeHintType.CHARACTER_SET, "UTF-8")
+                                }
+                                val multiFormatReader = MultiFormatReader().apply {
+                                    setHints(hints)
+                                }
 
                                 imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
                                     if (hasHandledResult.get()) {
@@ -207,12 +240,15 @@ fun LiveQrCodeScannerSheet(
 
                                 try {
                                     cameraProvider.unbindAll()
-                                    cameraProvider.bindToLifecycle(
+                                    val camera = cameraProvider.bindToLifecycle(
                                         lifecycleOwner,
                                         CameraSelector.DEFAULT_BACK_CAMERA,
                                         preview,
                                         imageAnalysis
                                     )
+                                    previewView.post {
+                                        cameraControl = camera.cameraControl
+                                    }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
                                 }
@@ -272,8 +308,9 @@ fun LiveQrCodeScannerSheet(
 }
 
 /**
- * Extracts grayscale plane from ImageProxy and decodes QR matrix using ZXing.
+ * Extracts grayscale plane from ImageProxy with proper rowStride handling and decodes QR matrix using ZXing.
  * Accounts for camera sensor rotation so that portrait orientation scans accurately.
+ * Includes fallback to GlobalHistogramBinarizer if HybridBinarizer struggles with lighting or glare.
  */
 private fun decodeBarcode(
     imageProxy: ImageProxy,
@@ -282,18 +319,36 @@ private fun decodeBarcode(
     return try {
         val plane = imageProxy.planes[0]
         val buffer = plane.buffer
-        val bytes = ByteArray(buffer.remaining())
-        buffer.get(bytes)
-
-        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+        val rowStride = plane.rowStride
+        val pixelStride = plane.pixelStride
         val width = imageProxy.width
         val height = imageProxy.height
 
+        // Extract tightly packed Y (luminance) byte array, respecting rowStride and pixelStride
+        val yBytes = ByteArray(width * height)
+        buffer.rewind()
+        if (rowStride == width && pixelStride == 1) {
+            buffer.get(yBytes, 0, width * height)
+        } else {
+            for (row in 0 until height) {
+                buffer.position(row * rowStride)
+                if (pixelStride == 1) {
+                    buffer.get(yBytes, row * width, width)
+                } else {
+                    for (col in 0 until width) {
+                        yBytes[row * width + col] = buffer.get(row * rowStride + col * pixelStride)
+                    }
+                }
+            }
+        }
+
+        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+
         val rotatedBytes = when (rotationDegrees) {
-            90 -> rotateNv21Degree90(bytes, width, height)
-            180 -> rotateNv21Degree180(bytes, width, height)
-            270 -> rotateNv21Degree270(bytes, width, height)
-            else -> bytes
+            90 -> rotateNv21Degree90(yBytes, width, height)
+            180 -> rotateNv21Degree180(yBytes, width, height)
+            270 -> rotateNv21Degree270(yBytes, width, height)
+            else -> yBytes
         }
 
         val effectiveWidth = if (rotationDegrees == 90 || rotationDegrees == 270) height else width
@@ -309,9 +364,48 @@ private fun decodeBarcode(
             effectiveHeight,
             false
         )
-        val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
-        val result = reader.decodeWithState(binaryBitmap)
-        result.text
+
+        // Attempt 1: Standard HybridBinarizer (best for variable contrast)
+        try {
+            val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
+            val result = reader.decodeWithState(binaryBitmap)
+            if (result != null && result.text.isNotBlank()) {
+                return result.text
+            }
+        } catch (_: Exception) {
+            // Fallthrough to attempt 2
+        } finally {
+            reader.reset()
+        }
+
+        // Attempt 2: GlobalHistogramBinarizer (fallback for high glare or low light screens)
+        try {
+            val binaryBitmap = BinaryBitmap(GlobalHistogramBinarizer(source))
+            val result = reader.decodeWithState(binaryBitmap)
+            if (result != null && result.text.isNotBlank()) {
+                return result.text
+            }
+        } catch (_: Exception) {
+            // Fallthrough
+        } finally {
+            reader.reset()
+        }
+
+        // Attempt 3: Inverted luminance source (useful for dark themes or inverted screen QR codes)
+        try {
+            val invertedSource = source.invert()
+            val binaryBitmap = BinaryBitmap(HybridBinarizer(invertedSource))
+            val result = reader.decodeWithState(binaryBitmap)
+            if (result != null && result.text.isNotBlank()) {
+                return result.text
+            }
+        } catch (_: Exception) {
+            null
+        } finally {
+            reader.reset()
+        }
+
+        null
     } catch (_: Exception) {
         null
     } finally {

@@ -635,8 +635,12 @@ fun ShareToScreen(
                 if (!ip.isNullOrBlank()) {
                     showLiveQrScanner = false
                     receiverIpInput = ip
-                    Toast.makeText(context, "Connected to receiver ($ip)!", Toast.LENGTH_SHORT).show()
-                    startSendingToIp(ip)
+                    if (tracksToSend.isEmpty()) {
+                        Toast.makeText(context, "QR scanned: connected to receiver ($ip). Select tracks to send.", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "QR scanned: sending ${tracksToSend.size} tracks to receiver ($ip)...", Toast.LENGTH_SHORT).show()
+                        startSendingToIp(ip)
+                    }
                 } else {
                     Toast.makeText(context, "Scanned: $rawQrPayload (Unknown receiver)", Toast.LENGTH_SHORT).show()
                 }
@@ -1290,17 +1294,46 @@ fun ReceiveModeContent(
 
                     if (qrBitmap != null) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             color = Color.White,
+                            shadowElevation = 4.dp,
+                            border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                             modifier = Modifier
-                                .size(170.dp)
+                                .size(200.dp)
                                 .padding(4.dp)
                         ) {
-                            Image(
-                                bitmap = qrBitmap.asImageBitmap(),
-                                contentDescription = "Receiver QR Code",
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(10.dp)
+                            ) {
+                                Image(
+                                    bitmap = qrBitmap.asImageBitmap(),
+                                    contentDescription = "Receiver QR Code",
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    text = "Connect to Wi-Fi or turn on Hotspot to display connection QR code",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
 
