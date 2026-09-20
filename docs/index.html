@@ -1703,10 +1703,10 @@
 
             <!-- Realtime Live APK Download Counter HUD -->
             <div style="margin-bottom: 28px; display: flex; justify-content: center;">
-                <div class="download-counter-badge" id="heroDownloadCounterBadge" title="Total verified APK downloads worldwide">
+                <div class="download-counter-badge" id="heroDownloadCounterBadge" title="Total verified APK downloads">
                     <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--neon-emerald); box-shadow: 0 0 10px var(--neon-emerald); animation: pulseDot 2s infinite;"></span>
                     <span>TOTAL DOWNLOADS:</span>
-                    <span class="download-counter-val" id="heroDownloadCountDisplay">14,820</span>
+                    <span class="download-counter-val" id="heroDownloadCountDisplay">90</span>
                     <span style="font-size: 0.76rem; color: var(--text-muted); font-family: var(--font-mono);">[LIVE]</span>
                 </div>
             </div>
@@ -1729,7 +1729,7 @@
                         Direct APK (27 MB)
                     </a>
                     <span style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--neon-cyan); letter-spacing: 0.03em;">
-                        ⚡ <span id="releaseCardCountDisplay">14,820</span> installs
+                        ⚡ <span id="releaseCardCountDisplay">90</span> installs
                     </span>
                 </div>
             </div>
@@ -2766,11 +2766,12 @@
 
         // =========================================================
         // REALTIME PERSISTENT APK DOWNLOAD COUNTER SYSTEM
+        // Real worldwide count with CountAPI + local persistent fallback
         // =========================================================
         (function initDownloadTracker() {
-            var BASE_DOWNLOAD_COUNT = 14820; // Verified authentic baseline installs
-            var STORAGE_KEY_COUNT = 'tuny_apk_download_total_count';
-            var STORAGE_KEY_USER_DOWNLOADED = 'tuny_apk_user_downloaded';
+            var BASE_DOWNLOAD_COUNT = 90; // Real known count requested by developer
+            var STORAGE_KEY_COUNT = 'tuny_apk_real_download_count_v2';
+            var COUNT_API_URL = 'https://api.counterapi.dev/v1/tunymusic_official_apk/downloads';
 
             function getStoredCount() {
                 var stored = localStorage.getItem(STORAGE_KEY_COUNT);
@@ -2779,11 +2780,12 @@
                     return BASE_DOWNLOAD_COUNT;
                 }
                 var parsed = parseInt(stored, 10);
-                return isNaN(parsed) ? BASE_DOWNLOAD_COUNT : parsed;
+                return isNaN(parsed) || parsed < BASE_DOWNLOAD_COUNT ? BASE_DOWNLOAD_COUNT : parsed;
             }
 
             function setStoredCount(newCount) {
-                localStorage.setItem(STORAGE_KEY_COUNT, newCount.toString());
+                var safeCount = Math.max(newCount, BASE_DOWNLOAD_COUNT);
+                localStorage.setItem(STORAGE_KEY_COUNT, safeCount.toString());
             }
 
             function formatNumber(num) {
@@ -2809,6 +2811,30 @@
                 }
             }
 
+            // Fetch live remote count from shared counter API
+            function fetchRemoteCount() {
+                try {
+                    fetch(COUNT_API_URL, { method: 'GET' })
+                        .then(function(res) {
+                            if (res.ok) return res.json();
+                            return null;
+                        })
+                        .then(function(data) {
+                            if (data && typeof data.count === 'number') {
+                                // Real remote downloads + our known baseline 90
+                                var total = BASE_DOWNLOAD_COUNT + data.count;
+                                setStoredCount(total);
+                                updateCounterDisplays(total, false);
+                            }
+                        })
+                        .catch(function() {
+                            // Fallback to local storage if offline or blocked
+                        });
+                } catch (e) {
+                    // Silent fallback
+                }
+            }
+
             // Global toast notification when APK download starts
             function showDownloadToast(currentTotal) {
                 var existing = document.getElementById('apkDownloadToast');
@@ -2824,18 +2850,16 @@
                     '<div>' +
                         '<div style="font-weight: 800; font-size: 0.95rem; color: #FFFFFF; letter-spacing: 0.02em;">DOWNLOADING TUNY MUSIC APK (27 MB)...</div>' +
                         '<div style="font-size: 0.82rem; color: var(--neon-cyan); margin-top: 3px; font-family: var(--font-mono);">' +
-                            'Verified Package • You are install #' + formatNumber(currentTotal) + ' worldwide!' +
+                            'Verified Package • You are install #' + formatNumber(currentTotal) + '!' +
                         '</div>' +
                     '</div>';
 
                 document.body.appendChild(toast);
 
-                // Trigger animation
                 requestAnimationFrame(function() {
                     toast.classList.add('show');
                 });
 
-                // Auto hide after 4.5 seconds
                 setTimeout(function() {
                     toast.classList.remove('show');
                     setTimeout(function() {
@@ -2844,22 +2868,40 @@
                 }, 4500);
             }
 
-            // Handle download event
+            // Handle real download click
             function handleDownloadClick(evt) {
                 var currentCount = getStoredCount();
                 var newCount = currentCount + 1;
                 setStoredCount(newCount);
-                localStorage.setItem(STORAGE_KEY_USER_DOWNLOADED, 'true');
-
                 updateCounterDisplays(newCount, true);
                 showDownloadToast(newCount);
+
+                // Increment the global shared cloud counter
+                try {
+                    fetch(COUNT_API_URL + '/up', { method: 'GET' })
+                        .then(function(res) {
+                            if (res.ok) return res.json();
+                            return null;
+                        })
+                        .then(function(data) {
+                            if (data && typeof data.count === 'number') {
+                                var remoteTotal = BASE_DOWNLOAD_COUNT + data.count;
+                                setStoredCount(remoteTotal);
+                                updateCounterDisplays(remoteTotal, false);
+                            }
+                        })
+                        .catch(function() {});
+                } catch (e) {}
             }
 
-            // Initialize counter display on load
+            // Initialize display immediately with local stored count (defaults to 90)
             var initialCount = getStoredCount();
             updateCounterDisplays(initialCount, false);
 
-            // Attach listener to all APK download links across the page
+            // Check if global remote counter has fresh data
+            fetchRemoteCount();
+
+            // Attach listener to all APK download links
             var downloadLinks = document.querySelectorAll('a[download]');
             downloadLinks.forEach(function(link) {
                 link.addEventListener('click', handleDownloadClick);
