@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -46,6 +47,37 @@ class AudioPlayerManager(
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
+    private val wakeLock: PowerManager.WakeLock? by lazy {
+        try {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TunyMusic:AudioPlaybackWakeLock")?.apply {
+                setReferenceCounted(false)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun acquireWakeLock() {
+        try {
+            if (wakeLock?.isHeld == false) {
+                wakeLock?.acquire(6 * 60 * 60 * 1000L) // Safe 6-hour max timeout
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+
     // Real-time listener for Bluetooth Dual Offline Synchronization
     var onSyncEvent: ((event: String, positionMs: Long, track: AudioTrack?) -> Unit)? = null
 
@@ -53,8 +85,10 @@ class AudioPlayerManager(
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _state.update { it.copy(isPlaying = isPlaying) }
             if (isPlaying) {
+                acquireWakeLock()
                 startPositionTracker()
             } else {
+                releaseWakeLock()
                 saveCurrentTrackPosition()
             }
             // Real-time synchronization broadcast hook
@@ -900,6 +934,7 @@ class AudioPlayerManager(
     }
 
     fun release() {
+        releaseWakeLock()
         positionUpdateJob?.cancel()
         exoPlayer?.removeListener(playerListener)
         exoPlayer?.release()

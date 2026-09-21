@@ -39,35 +39,30 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.components.LoopifyLogo
+import com.example.ui.components.TunyMusicLogo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * Opening Splash Animation:
- * 1. Logo scales up with a smooth sonic pulse (keeping original custom adaptive icon emblem).
- * 2. Animated Morphing Sequence: Starts displaying "Loopify", then smoothly transforms/reveals "Tuny Music".
- * 3. Elegant "by EERT LABS" badge appears underneath with subtle neon glow and letter spacing.
+ * 1. Shows only "Tuny Music by Eert Labs" along with the correct logo emblem.
+ * 2. Clean, elegant entrance with smooth ambient neon pulse.
  */
 @Composable
 fun SplashScreen(
     onSplashFinished: () -> Unit
 ) {
     // Logo entrance animation
-    val logoScale = remember { Animatable(0.5f) }
+    val logoScale = remember { Animatable(0.7f) }
     val logoAlpha = remember { Animatable(0f) }
 
-    // Phase 1: "Loopify" entrance and exit
-    val loopifyAlpha = remember { Animatable(0f) }
-    val loopifyScale = remember { Animatable(0.9f) }
+    // "Tuny Music" entrance
+    val titleAlpha = remember { Animatable(0f) }
+    val titleScale = remember { Animatable(0.92f) }
 
-    // Phase 2: "Tuny Music" entrance
-    val tunyAlpha = remember { Animatable(0f) }
-    val tunyScale = remember { Animatable(0.85f) }
-
-    // Phase 3: "by EERT LABS" entrance
+    // "by Eert Labs" subtitle entrance
     val eertLabsAlpha = remember { Animatable(0f) }
-    val eertLabsSlide = remember { Animatable(10f) }
+    val eertLabsSlide = remember { Animatable(8f) }
 
     // Subtle continuous ambient pulse
     val infiniteTransition = rememberInfiniteTransition(label = "ambient_splash")
@@ -82,46 +77,32 @@ fun SplashScreen(
     )
 
     LaunchedEffect(Unit) {
-        // 1. Logo & Initial Brand Entrance
+        // 1. Logo & Emblem Entrance
         launch {
-            logoAlpha.animateTo(1f, animationSpec = tween(400, easing = FastOutSlowInEasing))
+            logoAlpha.animateTo(1f, animationSpec = tween(500, easing = FastOutSlowInEasing))
         }
         launch {
-            logoScale.animateTo(1f, animationSpec = tween(450, easing = FastOutSlowInEasing))
+            logoScale.animateTo(1f, animationSpec = tween(500, easing = FastOutSlowInEasing))
         }
 
-        // Show "Loopify" first
-        launch {
-            loopifyAlpha.animateTo(1f, animationSpec = tween(350, easing = FastOutSlowInEasing))
-            loopifyScale.animateTo(1f, animationSpec = tween(350, easing = FastOutSlowInEasing))
-        }
-
-        // Hold "Loopify" momentarily so the transition is clear
-        delay(650)
-
-        // Fade out "Loopify"
-        launch {
-            loopifyAlpha.animateTo(0f, animationSpec = tween(250, easing = FastOutSlowInEasing))
-            loopifyScale.animateTo(1.08f, animationSpec = tween(250, easing = FastOutSlowInEasing))
-        }
-
-        delay(150)
-
-        // Transform/reveal "Tuny Music"
-        launch {
-            tunyAlpha.animateTo(1f, animationSpec = tween(400, easing = FastOutSlowInEasing))
-            tunyScale.animateTo(1f, animationSpec = tween(400, easing = FastOutSlowInEasing))
-        }
-
-        // Reveal "by EERT LABS"
         delay(200)
+
+        // 2. "Tuny Music" title blooms in smoothly
         launch {
-            eertLabsAlpha.animateTo(1f, animationSpec = tween(350, easing = FastOutSlowInEasing))
-            eertLabsSlide.animateTo(0f, animationSpec = tween(350, easing = FastOutSlowInEasing))
+            titleAlpha.animateTo(1f, animationSpec = tween(450, easing = FastOutSlowInEasing))
+            titleScale.animateTo(1f, animationSpec = tween(450, easing = FastOutSlowInEasing))
         }
 
-        // Display finished state
-        delay(850)
+        delay(180)
+
+        // 3. "by Eert Labs" badge slides and fades in
+        launch {
+            eertLabsAlpha.animateTo(1f, animationSpec = tween(400, easing = FastOutSlowInEasing))
+            eertLabsSlide.animateTo(0f, animationSpec = tween(400, easing = FastOutSlowInEasing))
+        }
+
+        // Hold display smoothly before proceeding into the app
+        delay(1200)
         onSplashFinished()
     }
 
@@ -143,7 +124,7 @@ fun SplashScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Emblem: The original custom icon design preserved exactly
+            // Emblem: The official app logo emblem
             Box(
                 modifier = Modifier
                     .scale(logoScale.value)
@@ -165,7 +146,7 @@ fun SplashScreen(
                             )
                         )
                 )
-                LoopifyLogo(
+                TunyMusicLogo(
                     size = 96.dp,
                     animated = true
                 )
@@ -173,43 +154,21 @@ fun SplashScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Animated Morphing Title: "Loopify" -> "Tuny Music"
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.height(44.dp)
-            ) {
-                // Phase 1: "Loopify" fading out
-                if (loopifyAlpha.value > 0.01f) {
-                    Text(
-                        text = "Loopify",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
-                        letterSpacing = (-0.5).sp,
-                        modifier = Modifier
-                            .scale(loopifyScale.value)
-                            .alpha(loopifyAlpha.value)
-                    )
-                }
+            // Title: "Tuny Music"
+            Text(
+                text = "Tuny Music",
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onBackground,
+                letterSpacing = (-0.5).sp,
+                modifier = Modifier
+                    .scale(titleScale.value)
+                    .alpha(titleAlpha.value)
+            )
 
-                // Phase 2: "Tuny Music" blooming in
-                if (tunyAlpha.value > 0.01f) {
-                    Text(
-                        text = "Tuny Music",
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        letterSpacing = (-0.5).sp,
-                        modifier = Modifier
-                            .scale(tunyScale.value)
-                            .alpha(tunyAlpha.value)
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.height(10.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Phase 3: "small by eert labs" subtitle badge
+            // Subtitle Badge: "by Eert Labs"
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -231,14 +190,14 @@ fun SplashScreen(
                     ) {
                         Text(
                             text = "by ",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Normal,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
                             letterSpacing = 0.5.sp
                         )
                         Text(
-                            text = "EERT LABS",
-                            fontSize = 11.sp,
+                            text = "Eert Labs",
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF00DFD8),
                             letterSpacing = 1.2.sp

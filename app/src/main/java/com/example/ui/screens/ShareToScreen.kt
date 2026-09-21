@@ -249,15 +249,23 @@ fun ShareToScreen(
         tracksToSend.sumOf { (it.durationMs * 16L).coerceAtLeast(1024L * 1024L) }
     }
 
-    // Direct helper to send to any target IP
-    val startSendingToIp: (String) -> Unit = { targetIp ->
+    // Direct helper to send to any target IP (supports raw IP, ip:port, or loopify/http URL)
+    val startSendingToIp: (String) -> Unit = { rawTarget ->
         showDeviceRadarSheet = false
         focusManager.clearFocus()
+        val parsedIp = NetworkUtils.parseIpFromPayload(rawTarget) ?: rawTarget.trim()
+        val port = if (rawTarget.contains(":")) {
+            val portStr = rawTarget.substringAfterLast(":").filter { it.isDigit() }
+            portStr.toIntOrNull() ?: WifiTransferManager.DEFAULT_PORT
+        } else {
+            WifiTransferManager.DEFAULT_PORT
+        }
         scope.launch {
             val items = transferManager.prepareTransferItems(tracksToSend)
             showSendProgressDialog = true
             transferManager.sendItems(
-                receiverIp = targetIp.trim(),
+                receiverIp = parsedIp,
+                receiverPort = port,
                 items = items,
                 onSuccess = {
                     Toast.makeText(context, "All songs sent successfully!", Toast.LENGTH_LONG).show()
@@ -630,6 +638,7 @@ fun ShareToScreen(
     // Live In-App Camera QR Code Scanner Sheet
     if (showLiveQrScanner) {
         LiveQrCodeScannerSheet(
+            initialManualIp = receiverIpInput,
             onQrCodeDetected = { rawQrPayload ->
                 val ip = NetworkUtils.parseIpFromPayload(rawQrPayload)
                 if (!ip.isNullOrBlank()) {
@@ -643,6 +652,16 @@ fun ShareToScreen(
                     }
                 } else {
                     Toast.makeText(context, "Scanned: $rawQrPayload (Unknown receiver)", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onManualConnect = { manualIp ->
+                showLiveQrScanner = false
+                receiverIpInput = manualIp
+                if (tracksToSend.isEmpty()) {
+                    Toast.makeText(context, "Connected to receiver ($manualIp). Select tracks to send.", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(context, "Connecting and sending ${tracksToSend.size} tracks to $manualIp...", Toast.LENGTH_SHORT).show()
+                    startSendingToIp(manualIp)
                 }
             },
             onDismiss = { showLiveQrScanner = false }
@@ -2073,9 +2092,19 @@ fun NearbyDeviceRadarSheet(
                         value = manualIp,
                         onValueChange = onManualIpChanged,
                         label = { Text("Receiver IP") },
-                        placeholder = { Text("192.168.43.1") },
+                        placeholder = { Text("192.168.43.1 or 192.168.43.1:8888") },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (manualIp.isNotBlank()) {
+                                    onSendToDevice(manualIp.trim())
+                                }
+                            }
+                        ),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.weight(1f)
                     )

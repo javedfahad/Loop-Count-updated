@@ -704,7 +704,7 @@ class WifiTransferManager(private val context: Context) {
                                     probeSocket.connect(InetSocketAddress(ip, DEFAULT_PORT), 1200)
                                     val isHotspot = ip.startsWith("192.168.43.") || ip.endsWith(".1")
                                     val dev = DiscoveredDevice(
-                                        name = if (isHotspot) "Loopify Receiver (Hotspot)" else "Loopify Receiver",
+                                        name = if (isHotspot) "Tuny Music Receiver (Hotspot)" else "Tuny Music Receiver",
                                         ip = ip,
                                         port = DEFAULT_PORT,
                                         isHotspotGateway = isHotspot

@@ -158,3 +158,26 @@ fun LoopifyLogo(
         }
     }
 }
+
+/**
+ * Official Tuny Music Sonic Emblem.
+ */
+@Composable
+fun TunyMusicLogo(
+    modifier: Modifier = Modifier,
+    size: Dp = 64.dp,
+    animated: Boolean = false,
+    colorStart: Color = Color(0xFFFF3366),
+    colorMid: Color = Color(0xFF7928CA),
+    colorEnd: Color = Color(0xFF00DFD8)
+) {
+    LoopifyLogo(
+        modifier = modifier,
+        size = size,
+        animated = animated,
+        colorStart = colorStart,
+        colorMid = colorMid,
+        colorEnd = colorEnd
+    )
+}
+

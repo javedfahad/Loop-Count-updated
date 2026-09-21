@@ -76,7 +76,7 @@ class BluetoothSyncManager(
 ) {
     companion object {
         val SYNC_UUID: UUID = UUID.fromString("9f82d54e-3c2b-4fa8-b22e-13c54d7e8901")
-        const val SERVICE_NAME = "LoopifyDualSync"
+        const val SERVICE_NAME = "TunyMusicDualSync"
         const val TCP_SYNC_PORT = 8890
         const val MAX_PARTY_DEVICES = 15
 
@@ -428,7 +428,7 @@ class BluetoothSyncManager(
     }
 
     /**
-     * Connect to host friend via local Wi-Fi / Hotspot IP address on port 8890.
+     * Connect to host friend via local Wi-Fi / Hotspot IP address on port 8890 (or custom port).
      */
     fun connectToHostIp(hostIp: String, hostLabel: String = "DJ Host") {
         disconnect()
@@ -440,9 +440,16 @@ class BluetoothSyncManager(
             )
         }
 
+        val parsedHost = if (hostIp.contains(":")) hostIp.substringBefore(":") else hostIp
+        val parsedPort = if (hostIp.contains(":")) {
+            hostIp.substringAfter(":").filter { it.isDigit() }.toIntOrNull() ?: TCP_SYNC_PORT
+        } else {
+            TCP_SYNC_PORT
+        }
+
         scope.launch {
             try {
-                val socket = Socket(hostIp, TCP_SYNC_PORT)
+                val socket = Socket(parsedHost.trim(), parsedPort)
                 setupClientConnection(btSocket = null, tcpSocket = socket, hostName = hostLabel)
             } catch (e: Exception) {
                 _uiState.update {
