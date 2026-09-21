@@ -520,44 +520,41 @@
             box-shadow: 0 0 30px rgba(255, 0, 122, 0.5);
         }
 
-        /* Live APK Download Counter HUD Badge */
-        .download-counter-badge {
+        /* Heartful Solo Developer Note Badge */
+        .developer-heart-badge {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            background: linear-gradient(135deg, rgba(11, 7, 22, 0.92) 0%, rgba(20, 14, 38, 0.95) 100%);
-            border: 1px solid rgba(0, 242, 254, 0.35);
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 242, 254, 0.18);
+            gap: 12px;
+            background: linear-gradient(135deg, rgba(16, 10, 30, 0.95) 0%, rgba(28, 14, 45, 0.95) 100%);
+            border: 1px solid rgba(255, 0, 122, 0.4);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 0, 122, 0.2);
             border-radius: 999px;
-            padding: 7px 18px;
+            padding: 8px 22px;
             font-family: var(--font-tech);
             font-size: 0.88rem;
             color: var(--text-secondary);
             backdrop-filter: blur(12px);
             transition: all 0.3s ease;
-            user-select: none;
+            max-width: 95%;
+            text-align: center;
         }
 
-        .download-counter-badge:hover {
-            border-color: var(--neon-cyan);
-            box-shadow: 0 0 25px rgba(0, 242, 254, 0.35);
+        .developer-heart-badge:hover {
+            border-color: var(--neon-magenta);
+            box-shadow: 0 0 25px rgba(255, 0, 122, 0.35);
         }
 
-        .download-counter-val {
-            font-family: var(--font-mono);
-            font-weight: 800;
-            color: var(--neon-cyan);
-            letter-spacing: 0.05em;
-            font-size: 0.96rem;
-            text-shadow: 0 0 12px rgba(0, 242, 254, 0.6);
-            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.25s ease;
-            display: inline-block;
+        .developer-heart-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--neon-magenta);
+            animation: pulseHeart 1.8s ease-in-out infinite;
         }
 
-        .download-counter-val.bump {
-            transform: scale(1.35);
-            color: var(--neon-emerald);
-            text-shadow: 0 0 16px rgba(0, 245, 160, 0.8);
+        @keyframes pulseHeart {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.18); }
         }
 
         .download-toast {
@@ -1701,13 +1698,18 @@
                 </a>
             </div>
 
-            <!-- Realtime Live APK Download Counter HUD -->
+            <!-- Heartful Solo Developer Note & Community Care -->
             <div style="margin-bottom: 28px; display: flex; justify-content: center;">
-                <div class="download-counter-badge" id="heroDownloadCounterBadge" title="Total verified APK downloads">
-                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--neon-emerald); box-shadow: 0 0 10px var(--neon-emerald); animation: pulseDot 2s infinite;"></span>
-                    <span>TOTAL DOWNLOADS:</span>
-                    <span class="download-counter-val" id="heroDownloadCountDisplay">90</span>
-                    <span style="font-size: 0.76rem; color: var(--text-muted); font-family: var(--font-mono);">[LIVE]</span>
+                <div class="developer-heart-badge">
+                    <span class="developer-heart-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                    </span>
+                    <span style="line-height: 1.5;">
+                        <strong style="color: #FFFFFF; font-weight: 700;">A Note from the Solo Developer:</strong>
+                        <span style="color: var(--text-secondary); margin-left: 4px;">I am a single independent developer crafting this app by hand with all my heart. There may occasionally be small lags or minor bugs — please bear with me with kindness and patience. I am dedicated to listening, polishing, and resolving every question and glitch step by step. Thank you so much for your warmth and support!</span>
+                    </span>
                 </div>
             </div>
 
@@ -1718,7 +1720,7 @@
                         <span class="status-dot-green"></span>
                         <span>NEWS: UPDATE AVAILABLE</span>
                     </div>
-                    <div class="release-title">September 20, 2026 — Dual Quick Capsules &amp; 2x-3x-4x Speed Control</div>
+                    <div class="release-title">September 22, 2026 — Dual Quick Capsules &amp; 2x-3x-4x Speed Control</div>
                     <div class="release-subtitle">Universal Android APK • Ringtone &amp; Shuffle Capsule, Instant 2x/3x/4x Playback Speed, Adaptive Fold/Tablet/Phone Layout • EERT LAB</div>
                 </div>
                 <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
@@ -1729,7 +1731,7 @@
                         Direct APK (27 MB)
                     </a>
                     <span style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--neon-cyan); letter-spacing: 0.03em;">
-                        ⚡ <span id="releaseCardCountDisplay">90</span> installs
+                        ⚡ Updated Today • Verified Package
                     </span>
                 </div>
             </div>
@@ -2765,78 +2767,11 @@
         })();
 
         // =========================================================
-        // REALTIME PERSISTENT APK DOWNLOAD COUNTER SYSTEM
-        // Real worldwide count with CountAPI + local persistent fallback
+        // APK DOWNLOAD NOTIFICATION
         // =========================================================
         (function initDownloadTracker() {
-            var BASE_DOWNLOAD_COUNT = 90; // Real known count requested by developer
-            var STORAGE_KEY_COUNT = 'tuny_apk_real_download_count_v2';
-            var COUNT_API_URL = 'https://api.counterapi.dev/v1/tunymusic_official_apk/downloads';
-
-            function getStoredCount() {
-                var stored = localStorage.getItem(STORAGE_KEY_COUNT);
-                if (!stored) {
-                    localStorage.setItem(STORAGE_KEY_COUNT, BASE_DOWNLOAD_COUNT.toString());
-                    return BASE_DOWNLOAD_COUNT;
-                }
-                var parsed = parseInt(stored, 10);
-                return isNaN(parsed) || parsed < BASE_DOWNLOAD_COUNT ? BASE_DOWNLOAD_COUNT : parsed;
-            }
-
-            function setStoredCount(newCount) {
-                var safeCount = Math.max(newCount, BASE_DOWNLOAD_COUNT);
-                localStorage.setItem(STORAGE_KEY_COUNT, safeCount.toString());
-            }
-
-            function formatNumber(num) {
-                return num.toLocaleString();
-            }
-
-            function updateCounterDisplays(count, bumpAnim) {
-                var heroDisplay = document.getElementById('heroDownloadCountDisplay');
-                var releaseDisplay = document.getElementById('releaseCardCountDisplay');
-                var formatted = formatNumber(count);
-
-                if (heroDisplay) {
-                    heroDisplay.innerText = formatted;
-                    if (bumpAnim) {
-                        heroDisplay.classList.add('bump');
-                        setTimeout(function() {
-                            heroDisplay.classList.remove('bump');
-                        }, 400);
-                    }
-                }
-                if (releaseDisplay) {
-                    releaseDisplay.innerText = formatted;
-                }
-            }
-
-            // Fetch live remote count from shared counter API
-            function fetchRemoteCount() {
-                try {
-                    fetch(COUNT_API_URL, { method: 'GET' })
-                        .then(function(res) {
-                            if (res.ok) return res.json();
-                            return null;
-                        })
-                        .then(function(data) {
-                            if (data && typeof data.count === 'number') {
-                                // Real remote downloads + our known baseline 90
-                                var total = BASE_DOWNLOAD_COUNT + data.count;
-                                setStoredCount(total);
-                                updateCounterDisplays(total, false);
-                            }
-                        })
-                        .catch(function() {
-                            // Fallback to local storage if offline or blocked
-                        });
-                } catch (e) {
-                    // Silent fallback
-                }
-            }
-
             // Global toast notification when APK download starts
-            function showDownloadToast(currentTotal) {
+            function showDownloadToast() {
                 var existing = document.getElementById('apkDownloadToast');
                 if (existing) {
                     existing.remove();
@@ -2850,7 +2785,7 @@
                     '<div>' +
                         '<div style="font-weight: 800; font-size: 0.95rem; color: #FFFFFF; letter-spacing: 0.02em;">DOWNLOADING TUNY MUSIC APK (27 MB)...</div>' +
                         '<div style="font-size: 0.82rem; color: var(--neon-cyan); margin-top: 3px; font-family: var(--font-mono);">' +
-                            'Verified Package • You are install #' + formatNumber(currentTotal) + '!' +
+                            'Verified Android Package • Clean, 100% Offline &amp; Ad-Free' +
                         '</div>' +
                     '</div>';
 
@@ -2870,36 +2805,8 @@
 
             // Handle real download click
             function handleDownloadClick(evt) {
-                var currentCount = getStoredCount();
-                var newCount = currentCount + 1;
-                setStoredCount(newCount);
-                updateCounterDisplays(newCount, true);
-                showDownloadToast(newCount);
-
-                // Increment the global shared cloud counter
-                try {
-                    fetch(COUNT_API_URL + '/up', { method: 'GET' })
-                        .then(function(res) {
-                            if (res.ok) return res.json();
-                            return null;
-                        })
-                        .then(function(data) {
-                            if (data && typeof data.count === 'number') {
-                                var remoteTotal = BASE_DOWNLOAD_COUNT + data.count;
-                                setStoredCount(remoteTotal);
-                                updateCounterDisplays(remoteTotal, false);
-                            }
-                        })
-                        .catch(function() {});
-                } catch (e) {}
+                showDownloadToast();
             }
-
-            // Initialize display immediately with local stored count (defaults to 90)
-            var initialCount = getStoredCount();
-            updateCounterDisplays(initialCount, false);
-
-            // Check if global remote counter has fresh data
-            fetchRemoteCount();
 
             // Attach listener to all APK download links
             var downloadLinks = document.querySelectorAll('a[download]');

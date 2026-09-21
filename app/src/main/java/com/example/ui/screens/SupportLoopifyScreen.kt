@@ -337,10 +337,10 @@ private fun SupportIntroContent(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "I am a small independent developer building apps on my own with care and heart. To be completely real and open with you: I genuinely need financial support to continue developing full-time and sustain my living and project expenses.\n\n" +
-                            "With your support, I can stay independent and focus on building real-time, high-quality apps and smart tools that genuinely help you and improve your daily routine.\n\n" +
-                            "Tuny Music is 100% free with zero ads, no paid subscriptions, and complete respect for your privacy. I believe helpful software should be honest, clean, and accessible to everyone.\n\n" +
-                            "If you value my work and would like to support a small developer working hard to create real tools for you, even a small contribution means the world to me. Thank you from the bottom of my heart for your kindness!",
+                    text = "I am a single independent developer building apps on my own with care, passion, and heart. Because I develop and maintain everything alone, there may occasionally be small lags or minor bugs — please be patient with me, as I am dedicated to listening closely and resolving every question and issue steadily.\n\n" +
+                            "To be completely real and open with you: I genuinely need financial support to continue developing full-time and sustain my living and project expenses.\n\n" +
+                            "With your support, I can stay independent and focus on building high-quality, smart tools that genuinely help you and improve your daily routine.\n\n" +
+                            "Tuny Music is 100% free with zero ads, no paid subscriptions, and complete respect for your privacy. If you value my work and would like to support a solo developer working hard to create honest tools for you, even a small contribution means the world to me. Thank you from the bottom of my heart for your kindness and patience!",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 22.sp
