@@ -315,7 +315,14 @@ class AudioPlayerManager(
         try {
             val serviceIntent = android.content.Intent(context, MediaPlaybackService::class.java)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
+                try {
+                    context.startForegroundService(serviceIntent)
+                } catch (e: Exception) {
+                    try {
+                        context.startService(serviceIntent)
+                    } catch (ignored: Exception) {
+                    }
+                }
             } else {
                 context.startService(serviceIntent)
             }

@@ -28,6 +28,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -46,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.example.model.AudioTrack
 import com.example.model.UserFolder
+import com.example.ui.components.LoopifyDynamicIsland
 import com.example.ui.components.NavigationDrawerContent
 import com.example.ui.dialogs.DualListenBottomSheet
 import com.example.ui.screens.AboutScreen
@@ -228,7 +232,8 @@ class MainActivity : ComponentActivity() {
                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
                         modifier = Modifier.fillMaxSize()
                     ) { _ ->
-                        AnimatedContent(
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AnimatedContent(
                             targetState = currentScreen,
                             transitionSpec = {
                                 if (targetState is Screen.NowPlaying) {
@@ -497,6 +502,21 @@ class MainActivity : ComponentActivity() {
                                         }
                                     )
                                 }
+                            }
+                        }
+
+                        // Interactive In-App Dynamic Island HUD
+                            // Persistent as long as audio is running (except on full NowPlaying screen or splash)
+                            if (currentScreen !is Screen.NowPlaying && currentScreen !is Screen.Splash && playbackState.currentTrack != null) {
+                                LoopifyDynamicIsland(
+                                    playbackState = playbackState,
+                                    playerManager = viewModel.playerManager,
+                                    onOpenNowPlaying = { navigateTo(Screen.NowPlaying) },
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .statusBarsPadding()
+                                        .padding(top = 4.dp)
+                                )
                             }
                         }
                     }
