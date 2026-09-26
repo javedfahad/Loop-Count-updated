@@ -2,7 +2,9 @@ package com.example.playback
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import androidx.annotation.OptIn
@@ -312,22 +314,18 @@ class AudioPlayerManager(
     // --- Core Playback Methods ---
 
     fun ensureServiceStarted() {
+        if (MediaPlaybackService.isRunning) return
+        val serviceIntent = Intent(context, MediaPlaybackService::class.java)
         try {
-            val serviceIntent = android.content.Intent(context, MediaPlaybackService::class.java)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                try {
-                    context.startForegroundService(serviceIntent)
-                } catch (e: Exception) {
-                    try {
-                        context.startService(serviceIntent)
-                    } catch (ignored: Exception) {
-                    }
-                }
-            } else {
-                context.startService(serviceIntent)
-            }
+            context.startService(serviceIntent)
         } catch (e: Exception) {
-            // Ignore if service start is restricted by background execution limits
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                }
+            } catch (ignored: Exception) {
+                // Ignore if service start is restricted by background execution limits
+            }
         }
     }
 
@@ -931,6 +929,7 @@ class AudioPlayerManager(
             .setDescription(loopSubtitle)
             .setAlbumTitle(track.album.ifBlank { "Tuny Music" })
             .setDisplayTitle(track.displayTitle)
+            .setArtworkUri(track.albumArtUri)
             .build()
 
         return MediaItem.Builder()
