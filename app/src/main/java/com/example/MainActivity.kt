@@ -49,7 +49,6 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.example.model.AudioTrack
 import com.example.model.UserFolder
-import com.example.ui.components.LoopifyDynamicIsland
 import com.example.ui.components.NavigationDrawerContent
 import com.example.ui.dialogs.DualListenBottomSheet
 import com.example.ui.screens.AboutScreen
@@ -504,26 +503,12 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
-
-                        // Interactive In-App Dynamic Island HUD
-                            // Persistent as long as audio is running (except on full NowPlaying screen or splash)
-                            if (currentScreen !is Screen.NowPlaying && currentScreen !is Screen.Splash && playbackState.currentTrack != null) {
-                                LoopifyDynamicIsland(
-                                    playbackState = playbackState,
-                                    playerManager = viewModel.playerManager,
-                                    onOpenNowPlaying = { navigateTo(Screen.NowPlaying) },
-                                    modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .statusBarsPadding()
-                                        .padding(top = 4.dp)
-                                )
-                            }
-                        }
                     }
                 }
             }
         }
     }
+}
 
     private fun checkAudioPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
