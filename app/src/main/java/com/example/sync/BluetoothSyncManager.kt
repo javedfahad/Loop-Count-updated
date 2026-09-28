@@ -4,96 +4,123 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
-import android.bluetooth.BluetoothServerSocket
-import android.bluetooth.BluetoothSocket
 import android.content.Context
-import android.content.Intent
+import android.graphics.Bitmap
 import android.os.Build
-import android.provider.Settings
+import android.util.Log
 import com.example.model.AudioTrack
 import com.example.playback.AudioPlayerManager
+import com.example.transfer.NetworkUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 
 enum class DualSyncRole {
     NONE,
-    HOST,   // DJ Host: Controls music for all connected phones
-    CLIENT  // Listener: Plays in real-time sync with Host DJ
+    HOST,   // Party Host: Source of audio, controls music for all listeners
+    CLIENT  // Listener: Streams live audio from Host phone, synchronized in real time
 }
 
 enum class DualSyncConnectionState {
     DISCONNECTED,
-    ADVERTISING, // Host broadcasting & waiting for friends
-    CONNECTING,  // Attempting connection
-    CONNECTED    // Synced & active
+    ADVERTISING, // Host session ready & broadcasting
+    CONNECTING,  // Attempting to join Host party
+    CONNECTED,   // Active party
+    ERROR        // Connection failed or rejected
 }
 
-data class ConnectedClientInfo(
+data class ConnectedListener(
     val id: String,
     val name: String,
-    val isWifiClient: Boolean = false
+    val ip: String,
+    val joinedAt: Long = System.currentTimeMillis()
 )
 
 data class DualSyncUiState(
     val connectionState: DualSyncConnectionState = DualSyncConnectionState.DISCONNECTED,
     val role: DualSyncRole = DualSyncRole.NONE,
-    val connectedDeviceName: String? = null,
+    val partyName: String = "",
+    val hostIp: String = "",
+    val hostPort: Int = BluetoothSyncManager.TCP_CONTROL_PORT,
+    val httpPort: Int = BluetoothSyncManager.HTTP_STREAM_PORT,
+    val sessionId: String = "",
+    val sessionToken: String = "",
+    val qrCodeBitmap: Bitmap? = null,
+    val qrPayload: String = "",
     val connectedDeviceNames: List<String> = emptyList(),
+    val connectedListeners: List<ConnectedListener> = emptyList(),
+    val connectedDeviceName: String? = null,
     val connectedDeviceCount: Int = 0,
-    val maxDevices: Int = 15,
-    val pairedDevices: List<BluetoothDevice> = emptyList(),
+    val maxDevices: Int = BluetoothSyncManager.MAX_LISTENERS,
     val isSyncActive: Boolean = false,
+    val isWifiOrHotspotReady: Boolean = true,
     val isBluetoothEnabled: Boolean = false,
+    val pairedDevices: List<BluetoothDevice> = emptyList(),
+    val currentStreamingTitle: String? = null,
+    val currentStreamingArtist: String? = null,
+    val isHostMusicPlaying: Boolean = false,
     val missingTrackTitle: String? = null,
     val missingClientName: String? = null,
-    val statusMessage: String = "Offline DJ Dual Listen ready"
+    val statusMessage: String = "Dual Listen Offline Party ready",
+    val errorMessage: String? = null
 )
 
 /**
- * Manages 100% offline multi-device party playback synchronization (DJ Mode - up to 15 phones).
- * Uses Bluetooth RFCOMM + Local Wi-Fi / Hotspot sockets simultaneously so friends can connect
- * seamlessly without needing internet or cloud servers.
+ * Dual Listen Party Manager (100% Offline Multi-Phone Listening Session).
+ * 
+ * Architecture:
+ * - 1 Host Phone (Source of audio) + Up to 6 Connected Listeners = Maximum 7 phones total.
+ * - Streams actual audio file bytes from Host to Listeners over local Wi-Fi / Hotspot via HTTP.
+ * - Listeners buffer and play in temporary memory (Zero permanent downloads, zero storage copies).
+ * - Real-time synchronization for Play, Pause, Seek, and Track Change with latency compensation.
+ * - Smooth Late Joining: New listeners jump straight into the current song position (e.g. 01:30).
+ * - Simple QR Code pairing: Generates a temporary random session ID and auth token per party.
  */
 class BluetoothSyncManager(
     private val context: Context,
     private val playerManager: AudioPlayerManager
 ) {
     companion object {
-        val SYNC_UUID: UUID = UUID.fromString("9f82d54e-3c2b-4fa8-b22e-13c54d7e8901")
-        const val SERVICE_NAME = "TunyMusicDualSync"
-        const val TCP_SYNC_PORT = 8890
-        const val MAX_PARTY_DEVICES = 15
+        const val TAG = "DualListenManager"
+        const val TCP_CONTROL_PORT = 8890
+        const val HTTP_STREAM_PORT = 8892
+        const val MAX_LISTENERS = 6 // 1 Host + 6 Listeners = 7 phones maximum
 
+        // Control Protocol Commands
+        const val CMD_JOIN = "JOIN"
+        const val CMD_JOIN_OK = "JOIN_OK"
+        const val CMD_REJECT = "REJECT"
         const val CMD_PLAY = "PLAY"
         const val CMD_PAUSE = "PAUSE"
         const val CMD_STOP = "STOP"
         const val CMD_SEEK = "SEEK"
         const val CMD_TRACK_CHANGE = "TRACK_CHANGE"
-        const val CMD_MISSING_TRACK = "MISSING_TRACK"
-        const val CMD_REQUEST_TOGGLE = "REQUEST_TOGGLE"
+        const val CMD_SYNC_HEARTBEAT = "SYNC_HEARTBEAT"
+        const val CMD_PARTY_ENDED = "PARTY_ENDED"
+        const val CMD_LEAVE = "LEAVE"
+        const val CMD_LISTENER_COUNT_UPDATE = "LISTENER_COUNT_UPDATE"
     }
 
-    private class ClientSession(
+    private class HostClientSession(
         val id: String,
         val name: String,
-        val btSocket: BluetoothSocket? = null,
-        val tcpSocket: Socket? = null,
+        val socket: Socket,
         val writer: PrintWriter
     )
 
@@ -105,65 +132,39 @@ class BluetoothSyncManager(
     private val _uiState = MutableStateFlow(DualSyncUiState())
     val uiState: StateFlow<DualSyncUiState> = _uiState.asStateFlow()
 
-    private var btServerSocket: BluetoothServerSocket? = null
-    private var tcpServerSocket: ServerSocket? = null
+    // Dedicated HTTP Audio Streaming Server
+    private val audioStreamServer = DualListenAudioStreamServer(context, HTTP_STREAM_PORT)
 
-    // Multi-device client connections for Host (up to 15 devices)
-    private val connectedClients = CopyOnWriteArrayList<ClientSession>()
+    // Host Sockets & Sessions
+    private var hostServerSocket: ServerSocket? = null
+    private val connectedClients = CopyOnWriteArrayList<HostClientSession>()
+    private var heartbeatJob: Job? = null
 
-    // For Client mode (single uplink to Host)
-    private var clientBtSocket: BluetoothSocket? = null
-    private var clientTcpSocket: Socket? = null
+    // Listener (Client) Uplink
+    private var clientSocket: Socket? = null
     private var clientWriter: PrintWriter? = null
+    private var clientReaderJob: Job? = null
 
-    private var isListening = false
+    @Volatile
+    private var isPartyActive = false
+
+    @Volatile
     private var isInternalCommandExecuting = false
 
     init {
         updateBluetoothState()
     }
 
-    fun isBluetoothAvailable(): Boolean = bluetoothAdapter != null
+    fun isHost(): Boolean = _uiState.value.role == DualSyncRole.HOST
+    fun isClient(): Boolean = _uiState.value.role == DualSyncRole.CLIENT
+    fun isSyncConnected(): Boolean = _uiState.value.connectionState == DualSyncConnectionState.CONNECTED
 
+    fun isBluetoothAvailable(): Boolean = bluetoothAdapter != null
     fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
 
     fun updateBluetoothState() {
         val isEnabled = bluetoothAdapter?.isEnabled == true
         _uiState.update { it.copy(isBluetoothEnabled = isEnabled) }
-        if (isEnabled) {
-            refreshPairedDevices()
-        }
-    }
-
-    @SuppressLint("MissingPermission")
-    fun toggleBluetooth(openSettingsFallback: () -> Unit) {
-        val adapter = bluetoothAdapter ?: run {
-            openSettingsFallback()
-            return
-        }
-        try {
-            if (adapter.isEnabled) {
-                // On modern Android (API 33+), programmatic disable is restricted, open settings if needed
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    openSettingsFallback()
-                } else {
-                    @Suppress("DEPRECATION")
-                    val ok = adapter.disable()
-                    if (!ok) openSettingsFallback()
-                }
-            } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    openSettingsFallback()
-                } else {
-                    @Suppress("DEPRECATION")
-                    val ok = adapter.enable()
-                    if (!ok) openSettingsFallback()
-                }
-            }
-        } catch (_: Exception) {
-            openSettingsFallback()
-        }
-        updateBluetoothState()
     }
 
     @SuppressLint("MissingPermission")
@@ -181,565 +182,809 @@ class BluetoothSyncManager(
         }
     }
 
-    /**
-     * Start hosting DJ session: Accept up to 15 phones simultaneously.
-     * Host broadcasts play, pause, seek, stop, and track changes to everyone.
-     */
-    @SuppressLint("MissingPermission")
-    fun startHost() {
-        disconnect()
-        updateBluetoothState()
+    fun getUserDeviceName(): String {
+        val model = Build.MODEL ?: "Phone"
+        val manufacturer = Build.MANUFACTURER ?: ""
+        return if (manufacturer.isNotBlank() && !model.startsWith(manufacturer, ignoreCase = true)) {
+            "${manufacturer.replaceFirstChar { it.uppercase() }} $model"
+        } else {
+            model
+        }
+    }
 
-        val isBtOn = bluetoothAdapter?.isEnabled == true
+    // =========================================================================
+    // HOST FLOW: CREATE PARTY & STREAM AUDIO
+    // =========================================================================
+
+    /**
+     * Creates a new Dual Listen party session as Host.
+     * Generates a temporary session token, starts the HTTP stream server and TCP control server,
+     * and produces the QR code for up to 6 friends to scan and join.
+     */
+    fun createParty() {
+        disconnect()
+
+        val hostIp = NetworkUtils.getLocalIpAddress(context)
+        val isLocalIpValid = hostIp.isNotBlank() && hostIp != "127.0.0.1" && hostIp != "0.0.0.0"
+
+        val sessionId = UUID.randomUUID().toString().take(8)
+        val sessionToken = UUID.randomUUID().toString().replace("-", "").take(12)
+        val partyName = "${getUserDeviceName()}'s Party"
+
+        val qrPayloadJson = JSONObject().apply {
+            put("app", "TunyMusicDual")
+            put("v", 2)
+            put("ip", hostIp)
+            put("port", TCP_CONTROL_PORT)
+            put("httpPort", HTTP_STREAM_PORT)
+            put("session", sessionId)
+            put("token", sessionToken)
+            put("name", partyName)
+        }.toString()
+
+        val qrBitmap = try {
+            NetworkUtils.generateQrCodeBitmap(qrPayloadJson, 600)
+        } catch (e: Exception) {
+            null
+        }
+
         _uiState.update {
             it.copy(
                 role = DualSyncRole.HOST,
                 connectionState = DualSyncConnectionState.ADVERTISING,
+                partyName = partyName,
+                hostIp = hostIp,
+                hostPort = TCP_CONTROL_PORT,
+                httpPort = HTTP_STREAM_PORT,
+                sessionId = sessionId,
+                sessionToken = sessionToken,
+                qrCodeBitmap = qrBitmap,
+                qrPayload = qrPayloadJson,
+                connectedListeners = emptyList(),
                 connectedDeviceNames = emptyList(),
                 connectedDeviceCount = 0,
-                statusMessage = if (isBtOn)
-                    "DJ Host Ready • Waiting for up to 15 devices to join..."
-                else
-                    "DJ Host Ready on Wi-Fi/Hotspot (Turn ON Bluetooth to also allow Bluetooth friends)"
+                isSyncActive = false,
+                isWifiOrHotspotReady = isLocalIpValid,
+                errorMessage = null,
+                statusMessage = if (isLocalIpValid) "Party Ready • Scan QR to join" else "Please turn on Hotspot or Wi-Fi"
             )
         }
 
-        isListening = true
+        isPartyActive = true
 
-        // 1. Listen on Bluetooth RFCOMM if Bluetooth is on
-        if (isBtOn && bluetoothAdapter != null) {
-            scope.launch {
-                try {
-                    btServerSocket = bluetoothAdapter.listenUsingRfcommWithServiceRecord(SERVICE_NAME, SYNC_UUID)
-                    while (isListening && isActive && connectedClients.size < MAX_PARTY_DEVICES) {
-                        val socket = btServerSocket?.accept() ?: break
-                        handleIncomingHostClient(socket = socket)
-                    }
-                } catch (_: Exception) {
-                    // Closed or interrupted
-                }
-            }
-        }
+        // 1. Start HTTP Audio Streaming Server with current track
+        val currentTrack = playerManager.state.value.currentTrack
+        audioStreamServer.start(sessionId, sessionToken, currentTrack)
 
-        // 2. Listen on TCP socket for Wi-Fi / Hotspot clients (up to 15 devices)
+        // 2. Start TCP Control Server to handle listener handshakes & commands
         scope.launch {
             try {
-                tcpServerSocket = ServerSocket(TCP_SYNC_PORT).apply {
+                hostServerSocket = ServerSocket(TCP_CONTROL_PORT).apply {
                     reuseAddress = true
                 }
-                while (isListening && isActive && connectedClients.size < MAX_PARTY_DEVICES) {
-                    val socket = tcpServerSocket?.accept() ?: break
-                    handleIncomingTcpClient(socket)
+                Log.d(TAG, "Host TCP Control Server started on port $TCP_CONTROL_PORT")
+
+                while (isPartyActive && isActive) {
+                    val socket = hostServerSocket?.accept() ?: break
+                    handleIncomingListenerConnection(socket, sessionId, sessionToken, partyName)
                 }
-            } catch (_: Exception) {
-                // Closed or interrupted
+            } catch (e: Exception) {
+                if (isPartyActive) {
+                    Log.e(TAG, "Host server socket exception: ${e.message}")
+                }
             }
         }
+
+        // 3. Start Periodic Sync Heartbeat (keeps listeners tightly synchronized)
+        startHostSyncHeartbeat()
     }
 
-    private fun handleIncomingHostClient(socket: BluetoothSocket) {
-        if (connectedClients.size >= MAX_PARTY_DEVICES) {
-            try { socket.close() } catch (_: Exception) {}
-            return
-        }
+    private fun handleIncomingListenerConnection(
+        socket: Socket,
+        activeSessionId: String,
+        activeToken: String,
+        partyName: String
+    ) {
+        scope.launch {
+            try {
+                socket.tcpNoDelay = true
+                socket.soTimeout = 10_000 // 10s handshake timeout
+                val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+                val writer = PrintWriter(socket.getOutputStream(), true)
 
-        @SuppressLint("MissingPermission")
-        val deviceName = try {
-            socket.remoteDevice?.name ?: "Friend's Phone"
-        } catch (_: Exception) {
-            "Friend's Phone"
-        }
+                val handshakeLine = reader.readLine()
+                if (handshakeLine.isNullOrBlank()) {
+                    socket.close()
+                    return@launch
+                }
 
-        try {
-            val writer = PrintWriter(socket.outputStream, true)
-            val session = ClientSession(
-                id = UUID.randomUUID().toString(),
-                name = deviceName,
-                btSocket = socket,
-                writer = writer
-            )
-            connectedClients.add(session)
-            updateHostConnectedState()
+                val handshakeJson = JSONObject(handshakeLine)
+                if (handshakeJson.optString("action") != CMD_JOIN) {
+                    socket.close()
+                    return@launch
+                }
 
-            // Push current playing track to new friend immediately
-            pushCurrentTrackToClient(writer)
+                val reqSession = handshakeJson.optString("session")
+                val reqToken = handshakeJson.optString("token")
+                val clientDeviceName = handshakeJson.optString("name", "Friend's Phone")
 
-            // Start reader loop for this client
-            scope.launch {
-                try {
-                    val reader = BufferedReader(InputStreamReader(socket.inputStream))
-                    while (isListening && isActive) {
-                        val line = reader.readLine() ?: break
-                        handleHostIncomingMessage(session, line)
+                // Security & Session Validation
+                if (reqSession != activeSessionId || reqToken != activeToken) {
+                    val reject = JSONObject().apply {
+                        put("action", CMD_REJECT)
+                        put("reason", "EXPIRED")
+                        put("message", "Invalid or expired party QR code.")
                     }
-                } catch (_: Exception) {
-                    // Client disconnected
-                } finally {
-                    removeClientSession(session)
+                    writer.println(reject.toString())
+                    socket.close()
+                    return@launch
                 }
-            }
-        } catch (_: Exception) {
-            try { socket.close() } catch (_: Exception) {}
-        }
-    }
 
-    private fun handleIncomingTcpClient(socket: Socket) {
-        if (connectedClients.size >= MAX_PARTY_DEVICES) {
-            try { socket.close() } catch (_: Exception) {}
-            return
-        }
-
-        val deviceName = "Wi-Fi Device (${socket.inetAddress.hostAddress})"
-
-        try {
-            val writer = PrintWriter(socket.getOutputStream(), true)
-            val session = ClientSession(
-                id = UUID.randomUUID().toString(),
-                name = deviceName,
-                tcpSocket = socket,
-                writer = writer
-            )
-            connectedClients.add(session)
-            updateHostConnectedState()
-
-            pushCurrentTrackToClient(writer)
-
-            scope.launch {
-                try {
-                    val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-                    while (isListening && isActive) {
-                        val line = reader.readLine() ?: break
-                        handleHostIncomingMessage(session, line)
+                // Check 6 listener limit (1 Host + 6 Listeners = 7 total maximum)
+                if (connectedClients.size >= MAX_LISTENERS) {
+                    val reject = JSONObject().apply {
+                        put("action", CMD_REJECT)
+                        put("reason", "FULL")
+                        put("message", "Party is full — maximum 6 listeners.")
                     }
-                } catch (_: Exception) {
-                    // Disconnected
-                } finally {
-                    removeClientSession(session)
+                    writer.println(reject.toString())
+                    socket.close()
+                    return@launch
                 }
-            }
-        } catch (_: Exception) {
-            try { socket.close() } catch (_: Exception) {}
-        }
-    }
 
-    private fun removeClientSession(session: ClientSession) {
-        connectedClients.remove(session)
-        try { session.btSocket?.close() } catch (_: Exception) {}
-        try { session.tcpSocket?.close() } catch (_: Exception) {}
-        try { session.writer.close() } catch (_: Exception) {}
-        updateHostConnectedState()
-    }
+                // Reset timeout for persistent connection
+                socket.soTimeout = 0
 
-    private fun updateHostConnectedState() {
-        val names = connectedClients.map { it.name }
-        val count = connectedClients.size
-        _uiState.update {
-            it.copy(
-                connectionState = if (count > 0) DualSyncConnectionState.CONNECTED else DualSyncConnectionState.ADVERTISING,
-                role = DualSyncRole.HOST,
-                connectedDeviceName = names.firstOrNull(),
-                connectedDeviceNames = names,
-                connectedDeviceCount = count,
-                isSyncActive = count > 0,
-                statusMessage = if (count > 0)
-                    "DJ Host: In Sync with $count phone(s) • You control the music"
-                else
-                    "Broadcasting as Host DJ... Waiting for friends to join"
-            )
-        }
-    }
+                val clientId = UUID.randomUUID().toString()
+                val session = HostClientSession(
+                    id = clientId,
+                    name = clientDeviceName,
+                    socket = socket,
+                    writer = writer
+                )
+                connectedClients.add(session)
+                updateHostListenersState()
 
-    private fun pushCurrentTrackToClient(writer: PrintWriter) {
-        val currentPlayback = playerManager.state.value
-        currentPlayback.currentTrack?.let { track ->
-            scope.launch {
-                try {
-                    val json = JSONObject().apply {
-                        put("action", CMD_TRACK_CHANGE)
-                        put("title", track.displayTitle)
-                        put("artist", track.displayArtist)
-                        put("duration", track.durationMs)
+                // Prepare JOIN_OK with current track & playback position for late joining
+                val currentPlayback = playerManager.state.value
+                val curTrack = currentPlayback.currentTrack
+                val trackObj = if (curTrack != null) {
+                    val hostIp = _uiState.value.hostIp
+                    val streamUrl = "http://$hostIp:$HTTP_STREAM_PORT/audio?session=$activeSessionId&token=$activeToken"
+                    JSONObject().apply {
+                        put("title", curTrack.displayTitle)
+                        put("artist", curTrack.displayArtist)
+                        put("duration", curTrack.durationMs)
+                        put("streamUrl", streamUrl)
                         put("pos", currentPlayback.currentPositionMs)
                         put("isPlaying", currentPlayback.isPlaying)
                         put("ts", System.currentTimeMillis())
                     }
-                    writer.println(json.toString())
-                } catch (_: Exception) {}
+                } else null
+
+                val joinOk = JSONObject().apply {
+                    put("action", CMD_JOIN_OK)
+                    put("partyName", partyName)
+                    put("listenerCount", connectedClients.size)
+                    put("maxListeners", MAX_LISTENERS)
+                    if (trackObj != null) {
+                        put("currentTrack", trackObj)
+                    }
+                }
+                writer.println(joinOk.toString())
+
+                // Broadcast listener count update to other connected phones
+                broadcastListenerCount()
+
+                // Reader loop for this connected listener
+                while (isPartyActive && isActive) {
+                    val line = reader.readLine() ?: break
+                    handleHostClientMessage(session, line)
+                }
+            } catch (_: Exception) {
+                // Client disconnected
+            } finally {
+                removeHostClientSession(socket)
             }
         }
     }
 
-    private fun handleHostIncomingMessage(session: ClientSession, jsonString: String) {
+    private fun handleHostClientMessage(session: HostClientSession, message: String) {
         try {
-            val json = JSONObject(jsonString)
+            val json = JSONObject(message)
             when (json.optString("action")) {
-                CMD_MISSING_TRACK -> {
-                    val title = json.optString("title")
-                    val client = json.optString("client", session.name)
-                    _uiState.update {
-                        it.copy(
-                            missingTrackTitle = title,
-                            missingClientName = client,
-                            statusMessage = "⚠️ $client is missing \"$title\""
-                        )
-                    }
-                }
-                CMD_REQUEST_TOGGLE -> {
-                    // Client asked DJ to toggle playback
-                    scope.launch(Dispatchers.Main) {
-                        playerManager.togglePlayPause()
-                    }
+                CMD_LEAVE -> {
+                    session.socket.close()
                 }
             }
         } catch (_: Exception) {}
     }
 
-    /**
-     * Connect to host friend's device via Bluetooth.
-     */
-    @SuppressLint("MissingPermission")
-    fun connectToDevice(device: BluetoothDevice) {
-        disconnect()
-        val deviceName = try { device.name ?: "DJ Friend" } catch (_: Exception) { "DJ Friend" }
-        _uiState.update {
-            it.copy(
-                role = DualSyncRole.CLIENT,
-                connectionState = DualSyncConnectionState.CONNECTING,
-                statusMessage = "Connecting to $deviceName..."
+    private fun removeHostClientSession(socket: Socket) {
+        val found = connectedClients.firstOrNull { it.socket == socket }
+        if (found != null) {
+            connectedClients.remove(found)
+            try { found.writer.close() } catch (_: Exception) {}
+            try { found.socket.close() } catch (_: Exception) {}
+            updateHostListenersState()
+            broadcastListenerCount()
+        }
+    }
+
+    private fun updateHostListenersState() {
+        val names = connectedClients.map { it.name }
+        val listeners = connectedClients.map {
+            ConnectedListener(
+                id = it.id,
+                name = it.name,
+                ip = it.socket.inetAddress.hostAddress ?: ""
             )
         }
+        val count = connectedClients.size
+        _uiState.update {
+            it.copy(
+                connectionState = if (count > 0) DualSyncConnectionState.CONNECTED else DualSyncConnectionState.ADVERTISING,
+                connectedListeners = listeners,
+                connectedDeviceNames = names,
+                connectedDeviceName = names.firstOrNull(),
+                connectedDeviceCount = count,
+                isSyncActive = count > 0,
+                statusMessage = when {
+                    count >= MAX_LISTENERS -> "Party is full (6/6 listeners connected)"
+                    count > 0 -> "Party Active • $count / $MAX_LISTENERS listeners connected"
+                    else -> "Party Ready • 0 / $MAX_LISTENERS listeners connected"
+                }
+            )
+        }
+    }
 
-        scope.launch {
-            try {
-                val socket = device.createRfcommSocketToServiceRecord(SYNC_UUID)
-                bluetoothAdapter?.cancelDiscovery()
-                socket.connect()
-                setupClientConnection(btSocket = socket, tcpSocket = null, hostName = deviceName)
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        connectionState = DualSyncConnectionState.DISCONNECTED,
-                        role = DualSyncRole.NONE,
-                        statusMessage = "Could not connect to $deviceName. Make sure Host started DJ session."
-                    )
+    private fun broadcastListenerCount() {
+        val count = connectedClients.size
+        val packet = JSONObject().apply {
+            put("action", CMD_LISTENER_COUNT_UPDATE)
+            put("count", count)
+            put("max", MAX_LISTENERS)
+        }
+        broadcastToListeners(packet)
+    }
+
+    private fun startHostSyncHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = scope.launch {
+            while (isPartyActive && isActive) {
+                delay(3500)
+                if (connectedClients.isNotEmpty()) {
+                    val state = playerManager.state.value
+                    val packet = JSONObject().apply {
+                        put("action", CMD_SYNC_HEARTBEAT)
+                        put("pos", state.currentPositionMs)
+                        put("isPlaying", state.isPlaying)
+                        put("ts", System.currentTimeMillis())
+                    }
+                    broadcastToListeners(packet)
                 }
             }
         }
     }
 
+    // =========================================================================
+    // LISTENER FLOW: JOIN PARTY & RECEIVE STREAM
+    // =========================================================================
+
     /**
-     * Connect to host friend via local Wi-Fi / Hotspot IP address on port 8890 (or custom port).
+     * Joins an active Host party using decoded QR code content.
      */
-    fun connectToHostIp(hostIp: String, hostLabel: String = "DJ Host") {
+    fun joinPartyFromQr(qrContent: String) {
         disconnect()
-        _uiState.update {
-            it.copy(
-                role = DualSyncRole.CLIENT,
-                connectionState = DualSyncConnectionState.CONNECTING,
-                statusMessage = "Connecting to $hostLabel..."
-            )
-        }
 
-        val parsedHost = if (hostIp.contains(":")) hostIp.substringBefore(":") else hostIp
-        val parsedPort = if (hostIp.contains(":")) {
-            hostIp.substringAfter(":").filter { it.isDigit() }.toIntOrNull() ?: TCP_SYNC_PORT
-        } else {
-            TCP_SYNC_PORT
-        }
-
-        scope.launch {
-            try {
-                val socket = Socket(parsedHost.trim(), parsedPort)
-                setupClientConnection(btSocket = null, tcpSocket = socket, hostName = hostLabel)
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        connectionState = DualSyncConnectionState.DISCONNECTED,
-                        role = DualSyncRole.NONE,
-                        statusMessage = "Could not connect to $hostLabel on Wi-Fi."
-                    )
-                }
+        val parsed = parseQrPayload(qrContent)
+        if (parsed == null) {
+            _uiState.update {
+                it.copy(
+                    connectionState = DualSyncConnectionState.ERROR,
+                    errorMessage = "Invalid QR Code. Please scan the QR code from Host's Dual Listen screen."
+                )
             }
-        }
-    }
-
-    private fun setupClientConnection(
-        btSocket: BluetoothSocket?,
-        tcpSocket: Socket?,
-        hostName: String
-    ) {
-        clientBtSocket = btSocket
-        clientTcpSocket = tcpSocket
-
-        val outStream = btSocket?.outputStream ?: tcpSocket?.getOutputStream() ?: run {
-            disconnect()
             return
         }
-        clientWriter = PrintWriter(outStream, true)
+
+        val (hostIp, hostPort, httpPort, sessionId, token, hostPartyName) = parsed
 
         _uiState.update {
             it.copy(
-                connectionState = DualSyncConnectionState.CONNECTED,
                 role = DualSyncRole.CLIENT,
-                connectedDeviceName = hostName,
-                connectedDeviceNames = listOf(hostName),
-                connectedDeviceCount = 1,
-                isSyncActive = true,
-                statusMessage = "Synced with DJ $hostName • Enjoy the mix!"
+                connectionState = DualSyncConnectionState.CONNECTING,
+                partyName = hostPartyName,
+                hostIp = hostIp,
+                hostPort = hostPort,
+                httpPort = httpPort,
+                sessionId = sessionId,
+                sessionToken = token,
+                errorMessage = null,
+                statusMessage = "Connecting to $hostPartyName..."
             )
         }
 
-        isListening = true
+        isPartyActive = true
+
         scope.launch {
-            val inStream = btSocket?.inputStream ?: tcpSocket?.getInputStream() ?: return@launch
             try {
-                val reader = BufferedReader(InputStreamReader(inStream))
-                while (isListening && isActive) {
-                    val line = reader.readLine() ?: break
-                    handleClientIncomingMessage(line)
+                val socket = Socket(hostIp, hostPort).apply {
+                    tcpNoDelay = true
+                    soTimeout = 8_000 // 8s handshake timeout
                 }
-            } catch (_: Exception) {
-                // Uplink disconnected
-            } finally {
+                clientSocket = socket
+
+                val writer = PrintWriter(socket.getOutputStream(), true)
+                clientWriter = writer
+                val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+
+                // Send JOIN handshake
+                val joinRequest = JSONObject().apply {
+                    put("action", CMD_JOIN)
+                    put("session", sessionId)
+                    put("token", token)
+                    put("name", getUserDeviceName())
+                }
+                writer.println(joinRequest.toString())
+
+                // Wait for Host response
+                val responseLine = reader.readLine()
+                if (responseLine.isNullOrBlank()) {
+                    throw Exception("Host did not respond to join request.")
+                }
+
+                val responseJson = JSONObject(responseLine)
+                val action = responseJson.optString("action")
+
+                if (action == CMD_REJECT) {
+                    val message = responseJson.optString("message", "Connection was rejected by Host.")
+                    _uiState.update {
+                        it.copy(
+                            connectionState = DualSyncConnectionState.ERROR,
+                            role = DualSyncRole.NONE,
+                            errorMessage = message,
+                            statusMessage = message
+                        )
+                    }
+                    socket.close()
+                    return@launch
+                }
+
+                if (action != CMD_JOIN_OK) {
+                    throw Exception("Unexpected response from Host: $action")
+                }
+
+                // Successful connection!
+                socket.soTimeout = 0 // Persistent connection
+                val partyTitle = responseJson.optString("partyName", hostPartyName)
+                val count = responseJson.optInt("listenerCount", 1)
+                val max = responseJson.optInt("maxListeners", MAX_LISTENERS)
+
+                _uiState.update {
+                    it.copy(
+                        connectionState = DualSyncConnectionState.CONNECTED,
+                        role = DualSyncRole.CLIENT,
+                        partyName = partyTitle,
+                        connectedDeviceName = partyTitle,
+                        connectedDeviceCount = count,
+                        maxDevices = max,
+                        isSyncActive = true,
+                        errorMessage = null,
+                        statusMessage = "Connected • Synced with $partyTitle"
+                    )
+                }
+
+                // Check if Host has a track currently playing (Late Joining!)
+                val trackObj = responseJson.optJSONObject("currentTrack")
+                if (trackObj != null) {
+                    handleTrackStreamFromHost(trackObj)
+                }
+
+                // Start Listener Command Receiver Loop
+                startListenerMessageLoop(reader)
+            } catch (e: Exception) {
+                Log.e(TAG, "Client join error: ${e.message}")
+                _uiState.update {
+                    it.copy(
+                        connectionState = DualSyncConnectionState.ERROR,
+                        role = DualSyncRole.NONE,
+                        errorMessage = if (e is SocketTimeoutException)
+                            "Could not reach Host. Ensure you are connected to Host's Wi-Fi Hotspot."
+                        else
+                            "Connection failed: ${e.localizedMessage ?: "Unknown error"}",
+                        statusMessage = "Could not connect to party"
+                    )
+                }
                 disconnect()
             }
         }
     }
 
-    private fun handleClientIncomingMessage(jsonString: String) {
+    private fun startListenerMessageLoop(reader: BufferedReader) {
+        clientReaderJob?.cancel()
+        clientReaderJob = scope.launch {
+            try {
+                while (isPartyActive && isActive) {
+                    val line = reader.readLine() ?: break
+                    handleIncomingHostMessage(line)
+                }
+            } catch (_: Exception) {
+                // Disconnected from Host
+            } finally {
+                if (isPartyActive && _uiState.value.role == DualSyncRole.CLIENT) {
+                    _uiState.update {
+                        it.copy(
+                            connectionState = DualSyncConnectionState.DISCONNECTED,
+                            role = DualSyncRole.NONE,
+                            errorMessage = "Disconnected from party.",
+                            statusMessage = "Party ended or connection dropped."
+                        )
+                    }
+                    scope.launch(Dispatchers.Main) {
+                        playerManager.stop()
+                    }
+                }
+                disconnect()
+            }
+        }
+    }
+
+    private fun handleIncomingHostMessage(line: String) {
         try {
-            val json = JSONObject(jsonString)
-            val action = json.optString("action")
+            val json = JSONObject(line)
+            when (json.optString("action")) {
+                CMD_TRACK_CHANGE -> {
+                    handleTrackStreamFromHost(json)
+                }
+                CMD_PLAY -> {
+                    val pos = json.optLong("pos", 0L)
+                    val ts = json.optLong("ts", System.currentTimeMillis())
+                    val latency = (System.currentTimeMillis() - ts).coerceAtLeast(0L)
+                    val targetPos = pos + latency
 
-            isInternalCommandExecuting = true
-            scope.launch(Dispatchers.Main) {
-                try {
-                    when (action) {
-                        CMD_PLAY -> {
-                            val pos = json.optLong("pos", -1L)
-                            if (pos >= 0) {
-                                playerManager.seekTo(pos)
-                            }
+                    isInternalCommandExecuting = true
+                    scope.launch(Dispatchers.Main) {
+                        try {
+                            if (targetPos > 0) playerManager.seekTo(targetPos)
                             playerManager.play()
-                        }
-                        CMD_PAUSE -> {
-                            val pos = json.optLong("pos", -1L)
-                            if (pos >= 0) {
-                                playerManager.seekTo(pos)
-                            }
-                            playerManager.pause()
-                        }
-                        CMD_STOP -> {
-                            playerManager.stop()
-                        }
-                        CMD_SEEK -> {
-                            val pos = json.optLong("pos", 0L)
-                            playerManager.seekTo(pos)
-                        }
-                        CMD_TRACK_CHANGE -> {
-                            val trackTitle = json.optString("title", "")
-                            val trackDuration = json.optLong("duration", 0L)
-                            val startPos = json.optLong("pos", 0L)
-                            val isPlaying = json.optBoolean("isPlaying", true)
-
-                            matchAndPlayLocalTrack(trackTitle, trackDuration, startPos, isPlaying)
+                            _uiState.update { it.copy(isHostMusicPlaying = true) }
+                        } finally {
+                            isInternalCommandExecuting = false
                         }
                     }
-                } finally {
-                    isInternalCommandExecuting = false
+                }
+                CMD_PAUSE -> {
+                    val pos = json.optLong("pos", -1L)
+                    isInternalCommandExecuting = true
+                    scope.launch(Dispatchers.Main) {
+                        try {
+                            if (pos >= 0) playerManager.seekTo(pos)
+                            playerManager.pause()
+                            _uiState.update { it.copy(isHostMusicPlaying = false) }
+                        } finally {
+                            isInternalCommandExecuting = false
+                        }
+                    }
+                }
+                CMD_STOP -> {
+                    isInternalCommandExecuting = true
+                    scope.launch(Dispatchers.Main) {
+                        try {
+                            playerManager.stop()
+                            _uiState.update { it.copy(isHostMusicPlaying = false) }
+                        } finally {
+                            isInternalCommandExecuting = false
+                        }
+                    }
+                }
+                CMD_SEEK -> {
+                    val pos = json.optLong("pos", 0L)
+                    isInternalCommandExecuting = true
+                    scope.launch(Dispatchers.Main) {
+                        try {
+                            playerManager.seekTo(pos)
+                        } finally {
+                            isInternalCommandExecuting = false
+                        }
+                    }
+                }
+                CMD_SYNC_HEARTBEAT -> {
+                    val pos = json.optLong("pos", 0L)
+                    val isPlaying = json.optBoolean("isPlaying", false)
+                    val ts = json.optLong("ts", System.currentTimeMillis())
+                    val latency = (System.currentTimeMillis() - ts).coerceAtLeast(0L)
+                    val expectedPos = pos + latency
+
+                    scope.launch(Dispatchers.Main) {
+                        val currentLocalPos = playerManager.state.value.currentPositionMs
+                        val drift = Math.abs(currentLocalPos - expectedPos)
+                        // If drift exceeds 800ms, gently resync position
+                        if (drift > 800L && isPlaying) {
+                            isInternalCommandExecuting = true
+                            try {
+                                playerManager.seekTo(expectedPos)
+                            } finally {
+                                isInternalCommandExecuting = false
+                            }
+                        }
+                        _uiState.update { it.copy(isHostMusicPlaying = isPlaying) }
+                    }
+                }
+                CMD_LISTENER_COUNT_UPDATE -> {
+                    val count = json.optInt("count", 1)
+                    val max = json.optInt("max", MAX_LISTENERS)
+                    _uiState.update {
+                        it.copy(
+                            connectedDeviceCount = count,
+                            maxDevices = max
+                        )
+                    }
+                }
+                CMD_PARTY_ENDED -> {
+                    _uiState.update {
+                        it.copy(
+                            connectionState = DualSyncConnectionState.DISCONNECTED,
+                            role = DualSyncRole.NONE,
+                            statusMessage = "Party was ended by Host.",
+                            errorMessage = "Party has ended."
+                        )
+                    }
+                    scope.launch(Dispatchers.Main) {
+                        playerManager.stop()
+                    }
+                    disconnect()
                 }
             }
-        } catch (_: Exception) {
-            isInternalCommandExecuting = false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing incoming host message: ${e.message}")
         }
     }
 
-    private fun matchAndPlayLocalTrack(
-        targetTitle: String,
-        targetDuration: Long,
-        startPos: Long,
-        shouldPlay: Boolean
-    ) {
-        if (targetTitle.isBlank()) return
-        val currentTrack = playerManager.state.value.currentTrack
-        if (currentTrack?.displayTitle.equals(targetTitle, ignoreCase = true)) {
-            playerManager.seekTo(startPos)
-            if (shouldPlay) playerManager.play() else playerManager.pause()
-            _uiState.update { it.copy(missingTrackTitle = null) }
-            return
+    private fun handleTrackStreamFromHost(trackJson: JSONObject) {
+        val title = trackJson.optString("title", "Live Party Stream")
+        val artist = trackJson.optString("artist", "Host Stream")
+        val duration = trackJson.optLong("duration", 0L)
+        val streamUrl = trackJson.optString("streamUrl", "")
+        val pos = trackJson.optLong("pos", 0L)
+        val isPlaying = trackJson.optBoolean("isPlaying", true)
+        val ts = trackJson.optLong("ts", System.currentTimeMillis())
+
+        if (streamUrl.isBlank()) return
+
+        val latency = (System.currentTimeMillis() - ts).coerceAtLeast(0L)
+        val startPos = pos + latency
+
+        _uiState.update {
+            it.copy(
+                currentStreamingTitle = title,
+                currentStreamingArtist = artist,
+                isHostMusicPlaying = isPlaying,
+                statusMessage = "Streaming \"$title\" from Host"
+            )
         }
 
-        // Search in all loaded tracks
-        val allTracks = com.example.LoopCountApp.instance.repository.lastLoadedTracks
-        val match = allTracks.find {
-            it.displayTitle.equals(targetTitle, ignoreCase = true) ||
-            it.title.equals(targetTitle, ignoreCase = true)
-        } ?: allTracks.find {
-            it.displayTitle.contains(targetTitle, ignoreCase = true) ||
-            (targetDuration > 0 && Math.abs(it.durationMs - targetDuration) < 2000L)
-        }
-
-        if (match != null) {
-            _uiState.update { it.copy(missingTrackTitle = null) }
-            playerManager.playTrack(match, listOf(match), startPositionMs = startPos)
-            if (!shouldPlay) {
-                playerManager.pause()
-            }
-        } else {
-            // Track not on client phone yet
-            _uiState.update {
-                it.copy(
-                    missingTrackTitle = targetTitle,
-                    statusMessage = "DJ is playing \"$targetTitle\" (Not on your phone yet)"
+        isInternalCommandExecuting = true
+        scope.launch(Dispatchers.Main) {
+            try {
+                playerManager.playRemoteStream(
+                    streamUrl = streamUrl,
+                    title = title,
+                    artist = artist,
+                    durationMs = duration,
+                    startPositionMs = startPos,
+                    autoPlay = isPlaying
                 )
+            } finally {
+                isInternalCommandExecuting = false
             }
-            // Send feedback to DJ so DJ can share it via Hotspot
-            sendMissingTrackAlert(targetTitle)
         }
     }
 
-    private fun sendMissingTrackAlert(title: String) {
-        val myName = try {
-            bluetoothAdapter?.name ?: "Listener"
-        } catch (_: Exception) {
-            "Listener"
+    private data class ParsedQr(
+        val ip: String,
+        val port: Int,
+        val httpPort: Int,
+        val session: String,
+        val token: String,
+        val name: String
+    )
+
+    private fun parseQrPayload(raw: String): ParsedQr? {
+        val clean = raw.trim()
+        try {
+            if (clean.startsWith("{") && clean.endsWith("}")) {
+                val json = JSONObject(clean)
+                val ip = json.optString("ip")
+                val port = json.optInt("port", TCP_CONTROL_PORT)
+                val httpPort = json.optInt("httpPort", HTTP_STREAM_PORT)
+                val session = json.optString("session")
+                val token = json.optString("token")
+                val name = json.optString("name", "Host's Party")
+                if (ip.isNotBlank() && session.isNotBlank() && token.isNotBlank()) {
+                    return ParsedQr(ip, port, httpPort, session, token, name)
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Fallback: URI Scheme tunymusic-dual://join?ip=...&port=...
+        try {
+            if (clean.startsWith("tunymusic-dual://", ignoreCase = true)) {
+                val uri = android.net.Uri.parse(clean)
+                val ip = uri.getQueryParameter("ip") ?: ""
+                val port = uri.getQueryParameter("port")?.toIntOrNull() ?: TCP_CONTROL_PORT
+                val httpPort = uri.getQueryParameter("httpPort")?.toIntOrNull() ?: HTTP_STREAM_PORT
+                val session = uri.getQueryParameter("session") ?: ""
+                val token = uri.getQueryParameter("token") ?: ""
+                val name = uri.getQueryParameter("name") ?: "Host's Party"
+                if (ip.isNotBlank() && session.isNotBlank()) {
+                    return ParsedQr(ip, port, httpPort, session, token, name)
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Fallback: Raw IP format (e.g. 192.168.43.1:8890)
+        val extractedIp = NetworkUtils.parseIpFromPayload(clean)
+        if (extractedIp != null) {
+            return ParsedQr(extractedIp, TCP_CONTROL_PORT, HTTP_STREAM_PORT, "default", "default", "Host's Party")
         }
-        sendPacket(JSONObject().apply {
-            put("action", CMD_MISSING_TRACK)
-            put("title", title)
-            put("client", myName)
-        })
+
+        return null
     }
 
-    // --- Outgoing Sync Commands ---
+    // =========================================================================
+    // OUTGOING SYNC EVENTS (HOST -> LISTENERS)
+    // =========================================================================
 
     fun onUserPlay(positionMs: Long) {
-        if (isInternalCommandExecuting || !isSyncConnected()) return
-        sendPacket(JSONObject().apply {
+        if (isInternalCommandExecuting || !isHost() || !isSyncConnected()) return
+        val packet = JSONObject().apply {
             put("action", CMD_PLAY)
             put("pos", positionMs)
             put("ts", System.currentTimeMillis())
-        })
+        }
+        broadcastToListeners(packet)
     }
 
     fun onUserPause(positionMs: Long) {
-        if (isInternalCommandExecuting || !isSyncConnected()) return
-        sendPacket(JSONObject().apply {
+        if (isInternalCommandExecuting || !isHost() || !isSyncConnected()) return
+        val packet = JSONObject().apply {
             put("action", CMD_PAUSE)
             put("pos", positionMs)
             put("ts", System.currentTimeMillis())
-        })
+        }
+        broadcastToListeners(packet)
     }
 
     fun onUserStop() {
-        if (isInternalCommandExecuting || !isSyncConnected()) return
-        sendPacket(JSONObject().apply {
+        if (isInternalCommandExecuting || !isHost() || !isSyncConnected()) return
+        val packet = JSONObject().apply {
             put("action", CMD_STOP)
             put("ts", System.currentTimeMillis())
-        })
+        }
+        broadcastToListeners(packet)
     }
 
     fun onUserSeek(positionMs: Long) {
-        if (isInternalCommandExecuting || !isSyncConnected()) return
-        sendPacket(JSONObject().apply {
+        if (isInternalCommandExecuting || !isHost() || !isSyncConnected()) return
+        val packet = JSONObject().apply {
             put("action", CMD_SEEK)
             put("pos", positionMs)
             put("ts", System.currentTimeMillis())
-        })
+        }
+        broadcastToListeners(packet)
     }
 
     fun sendTrackChange(track: AudioTrack, positionMs: Long = 0L, isPlaying: Boolean = true) {
-        if (isInternalCommandExecuting || !isSyncConnected()) return
-        sendPacket(JSONObject().apply {
+        if (isInternalCommandExecuting || !isHost()) return
+
+        // Update active track on local HTTP streaming server
+        audioStreamServer.updateTrack(track)
+
+        val hostIp = _uiState.value.hostIp
+        val sessionId = _uiState.value.sessionId
+        val token = _uiState.value.sessionToken
+        val streamUrl = "http://$hostIp:$HTTP_STREAM_PORT/audio?session=$sessionId&token=$token"
+
+        val packet = JSONObject().apply {
             put("action", CMD_TRACK_CHANGE)
             put("title", track.displayTitle)
             put("artist", track.displayArtist)
             put("duration", track.durationMs)
+            put("streamUrl", streamUrl)
             put("pos", positionMs)
             put("isPlaying", isPlaying)
             put("ts", System.currentTimeMillis())
-        })
+        }
+        broadcastToListeners(packet)
     }
 
-    fun requestToggleFromHost() {
-        sendPacket(JSONObject().apply {
-            put("action", CMD_REQUEST_TOGGLE)
-            put("ts", System.currentTimeMillis())
-        })
-    }
-
-    private fun sendPacket(json: JSONObject) {
-        val packet = json.toString()
+    private fun broadcastToListeners(json: JSONObject) {
+        val payload = json.toString()
         scope.launch {
-            if (_uiState.value.role == DualSyncRole.HOST) {
-                // Broadcast to all connected party clients (up to 15)
-                val deadSessions = mutableListOf<ClientSession>()
-                for (session in connectedClients) {
-                    try {
-                        session.writer.println(packet)
-                    } catch (_: Exception) {
-                        deadSessions.add(session)
-                    }
-                }
-                for (dead in deadSessions) {
-                    removeClientSession(dead)
-                }
-            } else if (_uiState.value.role == DualSyncRole.CLIENT) {
+            val dead = mutableListOf<HostClientSession>()
+            for (client in connectedClients) {
                 try {
-                    clientWriter?.println(packet)
+                    client.writer.println(payload)
                 } catch (_: Exception) {
-                    disconnect()
+                    dead.add(client)
                 }
+            }
+            for (d in dead) {
+                connectedClients.remove(d)
+                try { d.socket.close() } catch (_: Exception) {}
+            }
+            if (dead.isNotEmpty()) {
+                updateHostListenersState()
             }
         }
     }
 
-    fun isSyncConnected(): Boolean {
-        val state = _uiState.value
-        return state.connectionState == DualSyncConnectionState.CONNECTED &&
-                (connectedClients.isNotEmpty() || clientWriter != null)
-    }
+    // =========================================================================
+    // TEARDOWN & DISCONNECT
+    // =========================================================================
 
-    fun clearMissingTrackAlert() {
-        _uiState.update { it.copy(missingTrackTitle = null, missingClientName = null) }
+    /**
+     * Ends the party if Host, or leaves the party if Listener.
+     */
+    fun endParty() {
+        if (isHost()) {
+            val endPacket = JSONObject().apply {
+                put("action", CMD_PARTY_ENDED)
+            }
+            broadcastToListeners(endPacket)
+        }
+        disconnect()
     }
 
     fun disconnect() {
-        isListening = false
+        isPartyActive = false
+        heartbeatJob?.cancel()
+        heartbeatJob = null
+        clientReaderJob?.cancel()
+        clientReaderJob = null
 
-        try { btServerSocket?.close() } catch (_: Exception) {}
-        btServerSocket = null
+        // Stop Audio Server
+        audioStreamServer.stop()
 
-        try { tcpServerSocket?.close() } catch (_: Exception) {}
-        tcpServerSocket = null
+        // Close Host Sockets
+        try { hostServerSocket?.close() } catch (_: Exception) {}
+        hostServerSocket = null
 
         for (client in connectedClients) {
-            try { client.btSocket?.close() } catch (_: Exception) {}
-            try { client.tcpSocket?.close() } catch (_: Exception) {}
             try { client.writer.close() } catch (_: Exception) {}
+            try { client.socket.close() } catch (_: Exception) {}
         }
         connectedClients.clear()
 
-        try { clientBtSocket?.close() } catch (_: Exception) {}
-        clientBtSocket = null
-
-        try { clientTcpSocket?.close() } catch (_: Exception) {}
-        clientTcpSocket = null
-
+        // Close Client Uplink
+        try {
+            clientWriter?.println(JSONObject().apply { put("action", CMD_LEAVE) }.toString())
+        } catch (_: Exception) {}
         try { clientWriter?.close() } catch (_: Exception) {}
         clientWriter = null
+
+        try { clientSocket?.close() } catch (_: Exception) {}
+        clientSocket = null
 
         _uiState.update {
             it.copy(
                 connectionState = DualSyncConnectionState.DISCONNECTED,
                 role = DualSyncRole.NONE,
-                connectedDeviceName = null,
+                partyName = "",
+                sessionId = "",
+                sessionToken = "",
+                qrCodeBitmap = null,
+                qrPayload = "",
+                connectedListeners = emptyList(),
                 connectedDeviceNames = emptyList(),
+                connectedDeviceName = null,
                 connectedDeviceCount = 0,
                 isSyncActive = false,
-                missingTrackTitle = null,
-                missingClientName = null,
-                statusMessage = "Offline DJ Dual Listen disconnected"
+                currentStreamingTitle = null,
+                currentStreamingArtist = null,
+                isHostMusicPlaying = false,
+                statusMessage = "Offline Dual Listen ready"
             )
         }
     }

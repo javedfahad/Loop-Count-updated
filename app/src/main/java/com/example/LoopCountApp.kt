@@ -41,9 +41,9 @@ class LoopCountApp : Application(), ImageLoaderFactory {
         super.onCreate()
         instance = this
 
-        // Connect player events to Bluetooth Dual Sync
+        // Connect player events to Dual Listen Party Host broadcast
         playerManager.onSyncEvent = { event, pos, track ->
-            if (bluetoothSyncManager.isSyncConnected()) {
+            if (bluetoothSyncManager.isHost()) {
                 when (event) {
                     "PLAY" -> bluetoothSyncManager.onUserPlay(pos)
                     "PAUSE" -> bluetoothSyncManager.onUserPause(pos)

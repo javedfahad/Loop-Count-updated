@@ -94,6 +94,9 @@ import com.example.ui.dialogs.RepeatCountDialog
 import com.example.ui.dialogs.RingtoneDialog
 import com.example.sync.BluetoothSyncManager
 import com.example.sync.DualSyncConnectionState
+import com.example.sync.DualSyncRole
+import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -754,7 +757,7 @@ fun NowPlayingScreen(
                     }
 
                     // Live Dual Listen Sync Status Banner if connected
-                    if (syncState.connectionState == DualSyncConnectionState.CONNECTED) {
+                    if (syncState.connectionState == DualSyncConnectionState.CONNECTED || syncState.connectionState == DualSyncConnectionState.ADVERTISING) {
                         Spacer(modifier = Modifier.height(10.dp))
                         Surface(
                             modifier = Modifier
@@ -777,7 +780,10 @@ fun NowPlayingScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.BluetoothConnected,
+                                    imageVector = if (syncState.role == DualSyncRole.HOST)
+                                        Icons.Default.Podcasts
+                                    else
+                                        Icons.Default.Groups,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
@@ -785,20 +791,28 @@ fun NowPlayingScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Dual Listen Active",
+                                        text = if (syncState.role == DualSyncRole.HOST)
+                                            "Dual Listen Host • ${syncState.connectedDeviceCount} / 6 Friends"
+                                        else
+                                            "Dual Listen Party • Synced with Host",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "Listening together with ${syncState.connectedDeviceName ?: "Friend"}",
+                                        text = if (syncState.role == DualSyncRole.HOST)
+                                            "Streaming live audio offline"
+                                        else
+                                            "Listening to ${syncState.partyName.ifBlank { "Host's Party" }}",
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                                 Text(
-                                    text = "Manage",
+                                    text = "Party",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
@@ -812,6 +826,7 @@ fun NowPlayingScreen(
                     Column(modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp)) {
                         Slider(
                             value = sliderValue,
+                            enabled = !playbackState.isDualListenStream,
                             onValueChange = { frac ->
                                 isUserSeeking = true
                                 userSeekPos = frac * duration
@@ -848,16 +863,56 @@ fun NowPlayingScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Modern Studio Animated Playback Controls Bar (Dead-center Play/Pause)
-                    InteractivePlaybackControls(
-                        playbackState = playbackState,
-                        playerManager = playerManager,
-                        onRepeatClick = { showRepeatDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 480.dp)
-                            .padding(horizontal = 4.dp, vertical = 8.dp)
-                    )
+                    if (playbackState.isDualListenStream) {
+                        // Listener Mode Indicator - Host is Master Controller
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 480.dp)
+                                .clickable { showDualListenSheet = true }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Podcasts,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "Host is controlling playback",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Audio is streaming live offline. Tap to view party.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // Modern Studio Animated Playback Controls Bar (Dead-center Play/Pause)
+                        InteractivePlaybackControls(
+                            playbackState = playbackState,
+                            playerManager = playerManager,
+                            onRepeatClick = { showRepeatDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 480.dp)
+                                .padding(horizontal = 4.dp, vertical = 8.dp)
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(24.dp))
                 }

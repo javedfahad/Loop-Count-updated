@@ -1,21 +1,18 @@
 package com.example.ui.dialogs
 
-import android.Manifest
-import android.bluetooth.BluetoothDevice
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,47 +22,43 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.BluetoothConnected
-import androidx.compose.material.icons.filled.BluetoothDisabled
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Podcasts
-import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,13 +67,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -88,8 +79,7 @@ import androidx.compose.ui.unit.sp
 import com.example.sync.BluetoothSyncManager
 import com.example.sync.DualSyncConnectionState
 import com.example.sync.DualSyncRole
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
+import com.example.ui.components.LiveQrCodeScannerSheet
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -107,63 +97,18 @@ fun DualListenBottomSheet(
     val syncState by syncManager.uiState.collectAsState()
     val context = LocalContext.current
 
-    val requiredPermissions = remember {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.BLUETOOTH_ADVERTISE
-            )
-        } else {
-            arrayOf(
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN
-            )
-        }
+    var showScannerSheet by remember { mutableStateOf(false) }
+
+    // Live QR Scanner Sheet
+    if (showScannerSheet) {
+        LiveQrCodeScannerSheet(
+            onQrCodeDetected = { qrString ->
+                showScannerSheet = false
+                syncManager.joinPartyFromQr(qrString)
+            },
+            onDismiss = { showScannerSheet = false }
+        )
     }
-
-    var hasPermission by remember { mutableStateOf(false) }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { results ->
-        val allGranted = results.values.all { it }
-        hasPermission = allGranted
-        if (allGranted) {
-            syncManager.updateBluetoothState()
-            syncManager.refreshPairedDevices()
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        permissionLauncher.launch(requiredPermissions)
-        syncManager.updateBluetoothState()
-        syncManager.refreshPairedDevices()
-    }
-
-    // Auto-refresh paired devices list every 2.5 seconds while sheet is active
-    LaunchedEffect(Unit) {
-        while (isActive) {
-            syncManager.updateBluetoothState()
-            if (syncState.isBluetoothEnabled) {
-                syncManager.refreshPairedDevices()
-            }
-            delay(2500)
-        }
-    }
-
-    var isRefreshing by remember { mutableStateOf(false) }
-    var manualHostIp by remember { mutableStateOf("") }
-    var showManualWifiJoin by remember { mutableStateOf(false) }
-    val refreshRotation by rememberInfiniteTransition(label = "ref_rot").animateFloat(
-        initialValue = 0f,
-        targetValue = if (isRefreshing) 360f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rot"
-    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -183,8 +128,8 @@ fun DualListenBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp),
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Header Row
@@ -202,27 +147,31 @@ fun DualListenBottomSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (syncState.connectionState == DualSyncConnectionState.CONNECTED)
-                                Icons.Default.Groups
-                            else
-                                Icons.Default.Headphones,
-                            contentDescription = "DJ Dual Listen",
+                            imageVector = when (syncState.connectionState) {
+                                DualSyncConnectionState.CONNECTED -> Icons.Default.Groups
+                                DualSyncConnectionState.ADVERTISING -> Icons.Default.Podcasts
+                                else -> Icons.Default.Headphones
+                            },
+                            contentDescription = "Dual Listen",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "DJ Party Mode (Dual Listen)",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
                         Text(
-                            text = "Connect up to 15 phones • 100% Offline",
+                            text = "DUAL LISTEN",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = when (syncState.role) {
+                                DualSyncRole.HOST -> "DJ Host Mode • 1 to 6 Listeners"
+                                DualSyncRole.CLIENT -> "Listener Mode • Synced with Host"
+                                else -> "Offline Party Listening • Up to 6 Friends"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -241,693 +190,694 @@ fun DualListenBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Bluetooth Power Switch Card
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = if (syncState.isBluetoothEnabled)
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                else
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (syncState.isBluetoothEnabled)
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                    else
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (syncState.isBluetoothEnabled)
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (syncState.isBluetoothEnabled)
-                                    Icons.Default.Bluetooth
-                                else
-                                    Icons.Default.BluetoothDisabled,
-                                contentDescription = "Bluetooth Status",
-                                tint = if (syncState.isBluetoothEnabled)
-                                    MaterialTheme.colorScheme.onPrimary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = if (syncState.isBluetoothEnabled) "Bluetooth is ON" else "Bluetooth is OFF",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (syncState.isBluetoothEnabled) "Ready to discover & host" else "Tap to turn ON",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+            // =================================================================
+            // SCREEN CONTENT BASED ON CONNECTION STATE
+            // =================================================================
 
-                    // Open / Close Bluetooth Toggle
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Switch(
-                            checked = syncState.isBluetoothEnabled,
-                            onCheckedChange = {
-                                syncManager.toggleBluetooth {
+            when (syncState.connectionState) {
+                DualSyncConnectionState.DISCONNECTED,
+                DualSyncConnectionState.ERROR -> {
+                    // ---------------------------------------------------------
+                    // 1. INITIAL SCREEN: [ Create Party ] and [ Join Party ]
+                    // ---------------------------------------------------------
+                    InitialDualListenView(
+                        errorMessage = syncState.errorMessage,
+                        onCreateParty = { syncManager.createParty() },
+                        onJoinParty = { showScannerSheet = true }
+                    )
+                }
+
+                DualSyncConnectionState.ADVERTISING,
+                DualSyncConnectionState.CONNECTED -> {
+                    if (syncState.role == DualSyncRole.HOST) {
+                        // -----------------------------------------------------
+                        // 2. HOST SCREEN: Party Ready, QR Code, Listener Count
+                        // -----------------------------------------------------
+                        HostPartyView(
+                            syncState = syncState,
+                            onStartMusic = onDismiss,
+                            onEndParty = { syncManager.endParty() },
+                            onRefreshNetwork = { syncManager.createParty() },
+                            onOpenHotspotSettings = {
+                                try {
+                                    val intent = Intent("android.settings.TETHER_SETTINGS").apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {
                                     try {
-                                        val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                                        val intent = Intent(Settings.ACTION_WIRELESS_SETTINGS).apply {
                                             flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                         }
                                         context.startActivity(intent)
                                     } catch (_: Exception) {}
                                 }
-                            },
-                            modifier = Modifier.testTag("bluetooth_power_switch")
+                            }
                         )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Live Connection Status Card
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                color = when (syncState.connectionState) {
-                    DualSyncConnectionState.CONNECTED -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
-                    DualSyncConnectionState.ADVERTISING,
-                    DualSyncConnectionState.CONNECTING -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                    DualSyncConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                },
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (syncState.connectionState == DualSyncConnectionState.CONNECTED)
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                    else
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                )
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        when (syncState.connectionState) {
-                            DualSyncConnectionState.CONNECTED -> {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "Connected",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            DualSyncConnectionState.ADVERTISING,
-                            DualSyncConnectionState.CONNECTING -> {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(22.dp),
-                                    strokeWidth = 2.5.dp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            DualSyncConnectionState.DISCONNECTED -> {
-                                Icon(
-                                    imageVector = Icons.Default.Groups,
-                                    contentDescription = "Ready",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = when (syncState.connectionState) {
-                                    DualSyncConnectionState.CONNECTED -> {
-                                        if (syncState.role == DualSyncRole.HOST)
-                                            "🎧 DJ Host: In Sync (${syncState.connectedDeviceCount}/${syncState.maxDevices} Devices)"
-                                        else
-                                            "📻 Listener Mode: Synced with DJ ${syncState.connectedDeviceName ?: "Host"}"
-                                    }
-                                    DualSyncConnectionState.ADVERTISING -> "🎧 DJ Mode Broadcasting (0/${syncState.maxDevices} Joined)"
-                                    DualSyncConnectionState.CONNECTING -> "Connecting to DJ..."
-                                    DualSyncConnectionState.DISCONNECTED -> "No party active"
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = syncState.statusMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        if (syncState.connectionState != DualSyncConnectionState.DISCONNECTED) {
-                            OutlinedButton(
-                                onClick = { syncManager.disconnect() },
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.testTag("dual_listen_disconnect_btn")
-                            ) {
-                                Text("Stop", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    // If Host and clients are connected, display list of connected friends' phone names
-                    if (syncState.role == DualSyncRole.HOST && syncState.connectedDeviceNames.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "CONNECTED PHONES (${syncState.connectedDeviceNames.size} of 15):",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 0.8.sp
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            syncState.connectedDeviceNames.forEach { name ->
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surface,
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                                    )
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.BluetoothConnected,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(12.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = name,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Missing Song Alert Banner (if a connected phone doesn't have the song yet)
-            if (syncState.missingTrackTitle != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (syncState.role == DualSyncRole.HOST)
-                                    "Friend needs this song to play in sync!"
-                                else
-                                    "You need this song to listen with DJ!",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "\"${syncState.missingTrackTitle}\"",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            Button(
-                                onClick = {
-                                    onDismiss()
-                                    onNavigateToShareTo?.invoke()
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.error
-                                ),
-                                modifier = Modifier.height(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Send,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = if (syncState.role == DualSyncRole.HOST)
-                                        "Send Song via Share To"
-                                    else
-                                        "Open Receive Mode in Share To",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Action Selection: Host DJ Mode or Join
-            if (syncState.connectionState == DualSyncConnectionState.DISCONNECTED) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Start DJ Host Mode Button
-                    Button(
-                        onClick = {
-                            if (!hasPermission) {
-                                permissionLauncher.launch(requiredPermissions)
-                            } else {
-                                syncManager.startHost()
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp)
-                            .testTag("dual_listen_host_btn"),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Podcasts,
-                            contentDescription = "Host DJ",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text("Start DJ Host", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("Up to 15 Phones", fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
-                        }
-                    }
-
-                    // Auto-refresh Button
-                    OutlinedButton(
-                        onClick = {
-                            if (!hasPermission) {
-                                permissionLauncher.launch(requiredPermissions)
-                            } else {
-                                isRefreshing = true
-                                syncManager.updateBluetoothState()
-                                syncManager.refreshPairedDevices()
-                            }
-                        },
-                        modifier = Modifier
-                            .height(52.dp)
-                            .testTag("dual_listen_refresh_btn"),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh paired list",
-                            modifier = Modifier
-                                .size(20.dp)
-                                .rotate(refreshRotation)
+                    } else {
+                        // -----------------------------------------------------
+                        // 3. LISTENER CONNECTED SCREEN: Synced stream card
+                        // -----------------------------------------------------
+                        ListenerConnectedView(
+                            syncState = syncState,
+                            onLeaveParty = { syncManager.disconnect() }
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Paired devices list for joining
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "TAP A PAIRED PHONE TO JOIN AS LISTENER",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.8.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Auto-refreshed",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                DualSyncConnectionState.CONNECTING -> {
+                    // ---------------------------------------------------------
+                    // 4. LISTENER CONNECTING SPINNER
+                    // ---------------------------------------------------------
+                    ListenerConnectingView(
+                        partyName = syncState.partyName,
+                        onCancel = { syncManager.disconnect() }
                     )
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val pairedList = syncState.pairedDevices
-                if (pairedList.isEmpty()) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = if (!syncState.isBluetoothEnabled)
-                                    "Turn ON Bluetooth above to see devices"
-                                else
-                                    "No paired Bluetooth phones found.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Pair with friend in Bluetooth Settings once, or tap 'Start DJ Host' above to broadcast.",
-                                style = MaterialTheme.typography.bodySmall,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 200.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(pairedList) { device ->
-                            DeviceItemCard(
-                                device = device,
-                                onConnect = {
-                                    if (!hasPermission) {
-                                        permissionLauncher.launch(requiredPermissions)
-                                    } else {
-                                        syncManager.connectToDevice(device)
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Manual Wi-Fi / Hotspot Host IP Connection Card
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Wifi,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = "Join via Wi-Fi / Hotspot",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Connect without Bluetooth pairing",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            OutlinedButton(
-                                onClick = { showManualWifiJoin = !showManualWifiJoin },
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text(
-                                    text = if (showManualWifiJoin) "Hide" else "Manual IP",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-
-                        if (showManualWifiJoin) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "Enter DJ Host IP address (e.g. 192.168.43.1):",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = manualHostIp,
-                                    onValueChange = { manualHostIp = it.trim() },
-                                    placeholder = { Text("192.168.43.1 or 192.168.43.1:8890", fontSize = 13.sp) },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Text,
-                                        imeAction = ImeAction.Done
-                                    ),
-                                    keyboardActions = KeyboardActions(
-                                        onDone = {
-                                            val trimmed = manualHostIp.trim()
-                                            if (trimmed.isNotBlank()) {
-                                                syncManager.connectToHostIp(trimmed, "DJ Host ($trimmed)")
-                                            }
-                                        }
-                                    ),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                Button(
-                                    onClick = {
-                                        val trimmed = manualHostIp.trim()
-                                        if (trimmed.isNotBlank()) {
-                                            syncManager.connectToHostIp(trimmed, "DJ Host ($trimmed)")
-                                        }
-                                    },
-                                    enabled = manualHostIp.trim().length >= 7,
-                                    shape = RoundedCornerShape(10.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Wifi,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Join DJ", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
-            } else if (syncState.connectionState == DualSyncConnectionState.CONNECTED) {
-                // Connected instruction hint
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = if (syncState.role == DualSyncRole.HOST)
-                                "🎉 DJ Party is Live! (Up to 15 Phones)"
-                            else
-                                "🎉 Synced with DJ!",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (syncState.role == DualSyncRole.HOST)
-                                "You are the Host: Play, pause, stop, or select any song. All ${syncState.connectedDeviceCount} connected phone(s) will play in sync like a speaker system!"
-                            else
-                                "You are listening to DJ ${syncState.connectedDeviceName}. Whenever the DJ plays, pauses, or stops, your phone will stay in exact sync.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Quick Bluetooth System Settings shortcut
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable {
-                        try {
-                            val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            }
-                            context.startActivity(intent)
-                        } catch (_: Exception) {}
-                    }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Pair New Phone in Bluetooth Settings",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
         }
     }
 }
 
+// =============================================================================
+// SUB-VIEWS
+// =============================================================================
+
+/**
+ * Clean, ultra-simple initial view:
+ * DUAL LISTEN
+ * [ Create Party ]
+ * [ Join Party ]
+ */
 @Composable
-private fun DeviceItemCard(
-    device: BluetoothDevice,
-    onConnect: () -> Unit
+private fun InitialDualListenView(
+    errorMessage: String?,
+    onCreateParty: () -> Unit,
+    onJoinParty: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onConnect)
-            .testTag("device_item_${device.address}"),
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
-        )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // Hero Card
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            ),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Box(
+            Column(
                 modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
-                    imageVector = Icons.Default.Bluetooth,
-                    contentDescription = "Bluetooth Device",
+                    imageVector = Icons.Default.CellTower,
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(36.dp)
                 )
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                @Suppress("MissingPermission")
-                val deviceName = try { device.name ?: "Unknown Phone" } catch (_: Exception) { "Bluetooth Phone" }
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = deviceName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = "Listen Together Offline",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = device.address,
+                    text = "The Host streams songs from their phone storage to up to 6 friends over local Wi-Fi or Hotspot. No internet or data needed.",
                     style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp
                 )
             }
-            Button(
-                onClick = onConnect,
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
-                modifier = Modifier.height(34.dp)
+        }
+
+        if (!errorMessage.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(14.dp))
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Join DJ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Create Party Button
+        Button(
+            onClick = onCreateParty,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .testTag("dual_listen_create_party_btn"),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Podcasts,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Create Party",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Join Party Button
+        OutlinedButton(
+            onClick = onJoinParty,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .testTag("dual_listen_join_party_btn"),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.QrCodeScanner,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Join Party",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+/**
+ * Host View:
+ * Party Ready
+ * 0 / 6 listeners connected
+ * [ QR CODE ]
+ * Scan this QR code to join
+ * [ Start Music ]
+ * [ End Party ]
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HostPartyView(
+    syncState: com.example.sync.DualSyncUiState,
+    onStartMusic: () -> Unit,
+    onEndParty: () -> Unit,
+    onRefreshNetwork: () -> Unit,
+    onOpenHotspotSettings: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Status & Counter Pill
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(
+                    if (syncState.connectedDeviceCount >= syncState.maxDevices)
+                        MaterialTheme.colorScheme.errorContainer
+                    else
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                )
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = if (syncState.connectedDeviceCount > 0) Icons.Default.CheckCircle else Icons.Default.CellTower,
+                contentDescription = null,
+                tint = if (syncState.connectedDeviceCount >= syncState.maxDevices)
+                    MaterialTheme.colorScheme.error
+                else
+                    MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (syncState.connectedDeviceCount >= syncState.maxDevices)
+                    "Party is Full (6 / 6 Listeners)"
+                else
+                    "${syncState.connectedDeviceCount} / ${syncState.maxDevices} listeners connected",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (syncState.connectedDeviceCount >= syncState.maxDevices)
+                    MaterialTheme.colorScheme.onErrorContainer
+                else
+                    MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Check if Hotspot / Wi-Fi is active
+        if (!syncState.isWifiOrHotspotReady) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.WifiTethering,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Wi-Fi Hotspot Required",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Turn on your phone's Portable Hotspot or connect to the same Wi-Fi so friends can scan and join.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onOpenHotspotSettings,
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Open Hotspot Settings", fontSize = 12.sp)
+                        }
+                        OutlinedButton(
+                            onClick = onRefreshNetwork,
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+        }
+
+        // QR Code Card
+        val qrBitmap = syncState.qrCodeBitmap
+        if (qrBitmap != null) {
+            Surface(
+                modifier = Modifier
+                    .size(240.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .border(
+                        2.dp,
+                        MaterialTheme.colorScheme.outlineVariant,
+                        RoundedCornerShape(20.dp)
+                    ),
+                color = Color.White
+            ) {
+                Box(
+                    modifier = Modifier.padding(14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        bitmap = qrBitmap.asImageBitmap(),
+                        contentDescription = "Party QR Code",
+                        modifier = Modifier.size(212.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "Scan this QR code to join",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Connected Listener Badges
+        if (syncState.connectedListeners.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "CONNECTED LISTENERS:",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 0.8.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                syncState.connectedListeners.forEach { listener ->
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Headphones,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = listener.name,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Action Buttons: [ Start Music ] and [ End Party ]
+        Button(
+            onClick = onStartMusic,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .testTag("host_start_music_btn"),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Start Music",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        OutlinedButton(
+            onClick = onEndParty,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .testTag("host_end_party_btn"),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "End Party",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+/**
+ * Listener Connected View:
+ * Connected
+ * Fahad's Party
+ * 3 / 6 listeners
+ * [ Currently Playing Track Card ]
+ * [ Leave Party ]
+ */
+@Composable
+private fun ListenerConnectedView(
+    syncState: com.example.sync.DualSyncUiState,
+    onLeaveParty: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "wave")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Connected Header Pill
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f))
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Connected • ${syncState.connectedDeviceCount} / ${syncState.maxDevices} listeners",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = syncState.partyName.ifBlank { "Host's Party" },
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Synced Music Player Card
+        Card(
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (syncState.isHostMusicPlaying) Icons.Default.GraphicEq else Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                if (syncState.currentStreamingTitle != null) {
+                    Text(
+                        text = syncState.currentStreamingTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = syncState.currentStreamingArtist ?: "Live Stream",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (syncState.isHostMusicPlaying)
+                                        MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha)
+                                    else
+                                        MaterialTheme.colorScheme.outline
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (syncState.isHostMusicPlaying) "Live Stream Synced • Host in control" else "Host Paused",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Waiting for Host to play music...",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "The Host phone is the DJ source. Sit back and enjoy!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "🔒 Live in-memory stream • Not saved to phone storage",
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Leave Party Button
+        OutlinedButton(
+            onClick = onLeaveParty,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .testTag("listener_leave_party_btn"),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Leave Party",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+/**
+ * Listener Connecting Spinner View.
+ */
+@Composable
+private fun ListenerConnectingView(
+    partyName: String,
+    onCancel: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 30.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(48.dp),
+            color = MaterialTheme.colorScheme.primary,
+            strokeWidth = 3.5.dp
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            text = "Connecting to Party...",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        if (partyName.isNotBlank()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = partyName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "Negotiating offline streaming session...",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        OutlinedButton(
+            onClick = onCancel,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Cancel")
         }
     }
 }

@@ -30,7 +30,10 @@ data class PlaybackState(
     val magicSliceDurationMs: Long = 0L,
     val magicSliceStartTimeMs: Long = 0L,
     val magicSliceElapsedMs: Long = 0L,
-    val magicTransitionCount: Int = 0
+    val magicTransitionCount: Int = 0,
+
+    // Dual Listen Live Stream Mode
+    val isDualListenStream: Boolean = false
 ) {
     val isRepeatActive: Boolean
         get() = repeatCountTotal > 0

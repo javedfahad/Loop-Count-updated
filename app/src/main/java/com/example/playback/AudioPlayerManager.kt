@@ -298,6 +298,7 @@ class AudioPlayerManager(
 
     fun saveCurrentTrackPosition() {
         val currentTrack = _state.value.currentTrack ?: return
+        if (currentTrack.id < 0 || _state.value.isDualListenStream) return
         val pos = exoPlayer?.currentPosition ?: return
         if (pos >= 0L) {
             val fKey = activeFolderKey
@@ -338,7 +339,7 @@ class AudioPlayerManager(
             activeFolderKey = folderKey
         }
         if (!isInternalMagicCall) {
-            _state.update { it.copy(isMagicRemixActive = false) }
+            _state.update { it.copy(isMagicRemixActive = false, isDualListenStream = false) }
             exoPlayer?.volume = 1.0f
         }
         val player = exoPlayer ?: return
@@ -365,6 +366,68 @@ class AudioPlayerManager(
         }
         player.play()
         onSyncEvent?.invoke("TRACK", startPositionMs, track)
+    }
+
+    /**
+     * Plays a temporary live audio stream from the Host phone during an offline Dual Listen party.
+     * Audio is buffered and decoded directly in memory by ExoPlayer; no file is saved to device storage.
+     */
+    fun playRemoteStream(
+        streamUrl: String,
+        title: String,
+        artist: String,
+        durationMs: Long,
+        startPositionMs: Long = 0L,
+        autoPlay: Boolean = true
+    ) {
+        val player = exoPlayer ?: return
+        val streamTrack = AudioTrack(
+            id = -99999L,
+            uri = Uri.parse(streamUrl),
+            title = title,
+            artist = artist,
+            album = "Dual Listen Party",
+            durationMs = durationMs,
+            folderName = "Dual Listen"
+        )
+
+        _state.update {
+            it.copy(
+                currentTrack = streamTrack,
+                queue = listOf(streamTrack),
+                queueIndex = 0,
+                currentPositionMs = startPositionMs,
+                durationMs = durationMs,
+                isDualListenStream = true,
+                isMagicRemixActive = false
+            )
+        }
+
+        ensureServiceStarted()
+
+        val mediaItem = MediaItem.Builder()
+            .setUri(Uri.parse(streamUrl))
+            .setMediaId("dual_listen_stream_${System.currentTimeMillis()}")
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(title)
+                    .setArtist(artist)
+                    .setAlbumTitle("Dual Listen Live Stream")
+                    .build()
+            )
+            .build()
+
+        player.setMediaItem(mediaItem)
+        player.playbackParameters = PlaybackParameters(_state.value.playbackSpeed)
+        player.prepare()
+        if (startPositionMs > 0) {
+            player.seekTo(startPositionMs)
+        }
+        if (autoPlay) {
+            player.play()
+        } else {
+            player.pause()
+        }
     }
 
     // --- MAGIC REMIX (Continuous Non-Stop DJ Mashup Engine) ---
@@ -558,6 +621,7 @@ class AudioPlayerManager(
                 isFolderTimerActive = false,
                 folderTimerExpired = false,
                 isMagicRemixActive = false,
+                isDualListenStream = false,
                 currentPositionMs = 0L
             )
         }
@@ -912,6 +976,7 @@ class AudioPlayerManager(
     private fun buildMediaItem(track: AudioTrack): MediaItem {
         val currentState = _state.value
         val loopSubtitle = when {
+            currentState.isDualListenStream -> "📻 Dual Listen • Live from Host"
             currentState.isMagicRemixActive -> "✨ Magic Remix • ${currentState.magicFolderName ?: "Folder"}"
             currentState.isInfiniteRepeat -> "Infinite Loop (∞)"
             currentState.isRepeatActive -> "Remaining: ${currentState.remainingCount}"
