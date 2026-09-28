@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Tuny Music</string>
+    <string name="playback_channel_name">Tuny Music Playback</string>
+    <string name="playback_channel_description">Active media playback controls and background notification</string>
 </resources>

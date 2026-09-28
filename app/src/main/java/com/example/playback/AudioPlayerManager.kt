@@ -172,19 +172,23 @@ class AudioPlayerManager(
 
                 override fun getAvailableCommands(): Player.Commands {
                     return super.getAvailableCommands().buildUpon()
+                        .add(Player.COMMAND_PLAY_PAUSE)
                         .add(Player.COMMAND_SEEK_TO_NEXT)
                         .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
                         .add(Player.COMMAND_SEEK_TO_PREVIOUS)
                         .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                        .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
                         .build()
                 }
 
                 override fun isCommandAvailable(command: @Player.Command Int): Boolean {
                     return when (command) {
+                        Player.COMMAND_PLAY_PAUSE,
                         Player.COMMAND_SEEK_TO_NEXT,
                         Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
                         Player.COMMAND_SEEK_TO_PREVIOUS,
-                        Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> true
+                        Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+                        Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM -> true
                         else -> super.isCommandAvailable(command)
                     }
                 }
@@ -319,13 +323,7 @@ class AudioPlayerManager(
         try {
             context.startService(serviceIntent)
         } catch (e: Exception) {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                }
-            } catch (ignored: Exception) {
-                // Ignore if service start is restricted by background execution limits
-            }
+            // Ignore if service start is restricted by background execution limits
         }
     }
 

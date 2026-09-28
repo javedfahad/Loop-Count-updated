@@ -123,9 +123,17 @@ class MainActivity : ComponentActivity() {
             val permissionLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.RequestMultiplePermissions()
             ) { results ->
-                val granted = results.values.any { it }
-                viewModel.setPermissionGranted(granted)
+                val hasAudio = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    results[Manifest.permission.READ_MEDIA_AUDIO] == true
+                } else {
+                    results[Manifest.permission.READ_EXTERNAL_STORAGE] == true || results[Manifest.permission.WRITE_EXTERNAL_STORAGE] == true
+                }
+                viewModel.setPermissionGranted(hasAudio || checkAudioPermission())
             }
+
+            val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.RequestPermission()
+            ) { /* Notification permission response */ }
 
             var pendingDeleteTrack by remember { mutableStateOf<AudioTrack?>(null) }
 
@@ -146,7 +154,7 @@ class MainActivity : ComponentActivity() {
                 viewModel.setPermissionGranted(granted)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                        permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
                 }
             }
