@@ -47,8 +47,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
 import com.example.model.AudioTrack
 import com.example.model.UserFolder
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.example.ui.components.NavigationDrawerContent
 import com.example.ui.dialogs.DualListenBottomSheet
 import com.example.ui.screens.AboutScreen
@@ -77,6 +81,7 @@ sealed class Screen {
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private val incomingAudioUri = MutableStateFlow<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,12 +90,17 @@ class MainActivity : ComponentActivity() {
         // Automatically unlock device's highest refresh rate (e.g. 90Hz, 120Hz, 144Hz) for ultra-smooth UI
         com.example.util.DisplayRefreshRateHelper.enableMaxRefreshRate(this)
 
+        // Handle opening audio directly from WhatsApp, Telegram, Files, Chrome, etc.
+        handleIncomingIntent(intent)
+
         setContent {
             val uiState by viewModel.uiState.collectAsState()
             val playbackState by viewModel.playbackState.collectAsState()
             val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
             val scope = rememberCoroutineScope()
             val snackbarHostState = remember { SnackbarHostState() }
+
+            val pendingIncomingUri by incomingAudioUri.collectAsState()
 
             var screenStack by remember { mutableStateOf<List<Screen>>(listOf(Screen.Splash)) }
             val currentScreen = screenStack.lastOrNull() ?: Screen.Home
@@ -156,6 +166,16 @@ class MainActivity : ComponentActivity() {
                     if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
+                }
+            }
+
+            // Immediately launch and play audio shared or opened from WhatsApp, Telegram, Files, etc.
+            LaunchedEffect(pendingIncomingUri) {
+                pendingIncomingUri?.let { uri ->
+                    val externalTrack = extractTrackFromUri(uri)
+                    viewModel.playerManager.playTrack(externalTrack, listOf(externalTrack))
+                    screenStack = listOf(Screen.Home, Screen.NowPlaying)
+                    incomingAudioUri.value = null
                 }
             }
 
@@ -300,7 +320,9 @@ class MainActivity : ComponentActivity() {
                                 is Screen.Splash -> {
                                     SplashScreen(
                                         onSplashFinished = {
-                                            navigateTo(Screen.Home)
+                                            if (screenStack.none { it is Screen.NowPlaying }) {
+                                                navigateTo(Screen.Home)
+                                            }
                                         }
                                     )
                                 }
@@ -517,6 +539,87 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        val data = intent.data
+        if ((action == Intent.ACTION_VIEW || action == Intent.ACTION_SEND) && data != null) {
+            incomingAudioUri.value = data
+        } else if (action == Intent.ACTION_SEND) {
+            @Suppress("DEPRECATION")
+            val clipUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                intent.getParcelableExtra(Intent.EXTRA_STREAM)
+            }
+            if (clipUri != null) {
+                incomingAudioUri.value = clipUri
+            }
+        }
+    }
+
+    private fun extractTrackFromUri(uri: Uri): AudioTrack {
+        var displayName = ""
+        var durationMs = 0L
+
+        try {
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIdx != -1) {
+                        displayName = cursor.getString(nameIdx) ?: ""
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        if (displayName.isBlank()) {
+            displayName = uri.lastPathSegment?.substringAfterLast('/') ?: "External Audio"
+        }
+
+        val decodedName = try {
+            Uri.decode(displayName) ?: displayName
+        } catch (_: Exception) {
+            displayName
+        }
+
+        val cleanTitle = if (decodedName.contains('.')) decodedName.substringBeforeLast('.') else decodedName
+
+        try {
+            val mmr = android.media.MediaMetadataRetriever()
+            mmr.setDataSource(this, uri)
+            val durStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+            durationMs = durStr?.toLongOrNull() ?: 0L
+            val artist = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
+            mmr.release()
+            return AudioTrack(
+                id = System.currentTimeMillis(),
+                uri = uri,
+                title = cleanTitle,
+                artist = if (!artist.isNullOrBlank()) artist else "WhatsApp / External",
+                album = "External Shared Audio",
+                durationMs = durationMs,
+                folderName = "WhatsApp / External"
+            )
+        } catch (_: Exception) {}
+
+        return AudioTrack(
+            id = System.currentTimeMillis(),
+            uri = uri,
+            title = cleanTitle,
+            artist = "WhatsApp / External",
+            album = "External Shared Audio",
+            durationMs = durationMs,
+            folderName = "WhatsApp / External"
+        )
+    }
 
     private fun checkAudioPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
