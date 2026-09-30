@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -64,6 +66,7 @@ fun MiniPlayerBar(
     onClick: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
+    onClose: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val track = playbackState.currentTrack ?: return
@@ -110,11 +113,6 @@ fun MiniPlayerBar(
                 scaleY = scale
             }
             .clip(RoundedCornerShape(24.dp))
-            .clickable(
-                interactionSource = interactionSource,
-                indication = androidx.compose.material3.ripple(),
-                onClick = onClick
-            )
             .testTag("mini_player_bar"),
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.95f),
@@ -129,27 +127,40 @@ fun MiniPlayerBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(start = 10.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Artwork thumbnail
-                TrackArtwork(
-                    track = track,
-                    isPlaying = playbackState.isPlaying,
-                    shape = RoundedCornerShape(12.dp),
-                    iconSize = 20.dp,
+                // Artwork & Song Info Row (tappable to open Now Playing screen)
+                Row(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // Title & Subtitle + Repeat Pill
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.Center
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = androidx.compose.material3.ripple(),
+                            onClick = onClick
+                        )
+                        .padding(vertical = 2.dp, horizontal = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Artwork thumbnail
+                    TrackArtwork(
+                        track = track,
+                        isPlaying = playbackState.isPlaying,
+                        shape = RoundedCornerShape(12.dp),
+                        iconSize = 18.dp,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    // Title & Subtitle + Repeat Pill
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.Center
+                    ) {
                     Text(
                         text = track.displayTitle,
                         style = MaterialTheme.typography.bodyMedium,
@@ -237,8 +248,11 @@ fun MiniPlayerBar(
                         }
                     }
                 }
+            }
 
-                // Controls - Sleek animated action buttons
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Controls - Sleek animated action buttons
                 IconButton(
                     onClick = {
                         coroutineScope.launch {
@@ -303,6 +317,34 @@ fun MiniPlayerBar(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Close 'X' Button - Standalone touch target that immediately stops song and removes mini player
+                Surface(
+                    onClick = onClose,
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        0.5.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("mini_player_close")
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Dismiss and remove mini player",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 

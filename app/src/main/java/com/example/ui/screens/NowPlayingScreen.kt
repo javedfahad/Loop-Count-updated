@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.RingVolume
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
@@ -162,6 +163,8 @@ fun NowPlayingScreen(
                 showDualListenSheet = false
                 onNavigateToShareTo?.invoke()
             },
+            onStopMusic = { playerManager.stop() },
+            onPlayPauseMusic = { playerManager.togglePlayPause() },
             onDismiss = { showDualListenSheet = false }
         )
     }
@@ -530,14 +533,14 @@ fun NowPlayingScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 24.dp)
+                        .padding(horizontal = 20.dp)
                         .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                    val artworkSize = (screenHeight * 0.32f).coerceIn(160.dp, 260.dp)
+                    val artworkSize = (screenHeight * 0.19f).coerceIn(110.dp, 155.dp)
                     NowPlayingArtworkCard(
                         track = track,
                         isPlaying = playbackState.isPlaying,
@@ -546,7 +549,7 @@ fun NowPlayingScreen(
                             .testTag("now_playing_artwork")
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -554,46 +557,56 @@ fun NowPlayingScreen(
                     ) {
                         Text(
                             text = track?.displayTitle ?: "No Track Selected",
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center,
-                            maxLines = 2,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = track?.displayArtist ?: "Unknown Artist",
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        // Capsule 1: Ringtone and Shuffle Capsule
-                        RingtoneAndShuffleCapsule(
-                            playbackState = playbackState,
-                            playerManager = playerManager,
-                            onRingtoneClick = { showRingtoneDialog = true }
-                        )
+                        // Compact side-by-side capsules: Ringtone/Shuffle + Playback Speed
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RingtoneAndShuffleCapsule(
+                                playbackState = playbackState,
+                                playerManager = playerManager,
+                                onRingtoneClick = { showRingtoneDialog = true },
+                                modifier = Modifier.weight(1.08f)
+                            )
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Capsule 2: 2x, 3x, 4x Playback Speed Option Capsule
-                        NowPlayingSpeedCapsule(
-                            playbackState = playbackState,
-                            playerManager = playerManager
-                        )
+                            NowPlayingSpeedCapsule(
+                                playbackState = playbackState,
+                                playerManager = playerManager,
+                                modifier = Modifier.weight(0.92f)
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
+                    // Repeat / Magic Remix Card with Active Stop Button
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
                             .widthIn(max = 480.dp)
-                            .clip(RoundedCornerShape(18.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .clickable {
                                 if (playbackState.isMagicRemixActive) {
                                     playerManager.next()
@@ -602,7 +615,7 @@ fun NowPlayingScreen(
                                 }
                             }
                             .testTag("now_playing_repeat_card"),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiaryContainer
                         else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
                         else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f),
@@ -616,14 +629,14 @@ fun NowPlayingScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(30.dp)
                                         .clip(CircleShape)
                                         .background(
                                             if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.tertiary
@@ -638,14 +651,14 @@ fun NowPlayingScreen(
                                         tint = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.onTertiary
                                         else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.onPrimary
                                         else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
                                         text = if (playbackState.isMagicRemixActive) "MAGIC REMIX ACTIVE" else "REPEAT COUNT",
-                                        fontSize = 10.sp,
+                                        fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 1.sp,
                                         color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.onTertiaryContainer
@@ -653,9 +666,9 @@ fun NowPlayingScreen(
                                         else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Text(
-                                        text = if (playbackState.isMagicRemixActive) "Drop #${playbackState.magicTransitionCount} • Non-stop mashup"
+                                        text = if (playbackState.isMagicRemixActive) "Drop #${playbackState.magicTransitionCount} • Mashup"
                                         else playbackState.repeatDisplayLabel,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = MaterialTheme.typography.bodySmall,
                                         fontWeight = FontWeight.Bold,
                                         color = if (playbackState.isMagicRemixActive) MaterialTheme.colorScheme.onTertiaryContainer
                                         else if (playbackState.isRepeatActive) MaterialTheme.colorScheme.primary
@@ -668,105 +681,77 @@ fun NowPlayingScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                if (playbackState.isMagicRemixActive) {
+                                // Stop Button right here so host / user can immediately stop song!
+                                if (playbackState.isPlaying) {
                                     Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.tertiary
+                                        onClick = { playerManager.stop() },
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f),
+                                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).testTag("btn_stop_track")
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Stop,
+                                                contentDescription = "Stop",
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(2.dp))
                                             Text(
-                                                text = "NEXT: ",
+                                                text = "Stop",
                                                 fontSize = 11.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onTertiary.copy(alpha = 0.8f)
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onErrorContainer
                                             )
-                                            Text(
-                                                text = "${playbackState.magicSliceRemainingSeconds}s",
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = MaterialTheme.colorScheme.onTertiary
-                                            )
-                                        }
-                                    }
-                                } else if (playbackState.isRepeatActive) {
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.primary
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            if (playbackState.isInfiniteRepeat) {
-                                                Text(
-                                                    text = "LOOP: ",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-                                                )
-                                                Text(
-                                                    text = "∞",
-                                                    fontSize = 16.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = MaterialTheme.colorScheme.onPrimary
-                                                )
-                                            } else {
-                                                Text(
-                                                    text = "LEFT: ",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-                                                )
-                                                Text(
-                                                    text = "${playbackState.remainingCount}",
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = MaterialTheme.colorScheme.onPrimary
-                                                )
-                                            }
                                         }
                                     }
                                 }
 
-                                if (playbackState.stopAfterFinish && !playbackState.isMagicRemixActive && !playbackState.isInfiniteRepeat) {
+                                if (playbackState.isMagicRemixActive) {
                                     Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.secondaryContainer
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.tertiary
                                     ) {
                                         Text(
-                                            text = "⏹ Stop",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                            text = "${playbackState.magicSliceRemainingSeconds}s",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.onTertiary,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                         )
                                     }
-                                } else if (!playbackState.isRepeatActive && !playbackState.isMagicRemixActive) {
-                                    Text(
-                                        text = "Tap to set repeat",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
+                                } else if (playbackState.isRepeatActive) {
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
                                         color = MaterialTheme.colorScheme.primary
-                                    )
+                                    ) {
+                                        Text(
+                                            text = if (playbackState.isInfiniteRepeat) "∞" else "${playbackState.remainingCount}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // Live Dual Listen Sync Status Banner if connected
+                    // Live Dual Listen Sync Status Banner if connected / advertising
                     if (syncState.connectionState == DualSyncConnectionState.CONNECTED || syncState.connectionState == DualSyncConnectionState.ADVERTISING) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .widthIn(max = 480.dp)
-                                .clip(RoundedCornerShape(16.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .clickable { showDualListenSheet = true }
                                 .testTag("now_playing_sync_status_badge"),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(14.dp),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp,
@@ -776,7 +761,7 @@ fun NowPlayingScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
@@ -786,43 +771,73 @@ fun NowPlayingScreen(
                                         Icons.Default.Groups,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = if (syncState.role == DualSyncRole.HOST)
                                             "Dual Listen Host • ${syncState.connectedDeviceCount} / 6 Friends"
                                         else
-                                            "Dual Listen Party • Synced with Host",
+                                            "Synced with Host",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
                                         text = if (syncState.role == DualSyncRole.HOST)
-                                            "Streaming live audio offline"
+                                            "Streaming live offline"
                                         else
-                                            "Listening to ${syncState.partyName.ifBlank { "Host's Party" }}",
-                                        fontSize = 13.sp,
+                                            "Listening to ${syncState.partyName.ifBlank { "Party" }}",
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
-                                Text(
-                                    text = "Party",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+
+                                if (syncState.role == DualSyncRole.HOST && playbackState.isPlaying) {
+                                    Surface(
+                                        onClick = { playerManager.stop() },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.errorContainer,
+                                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Stop,
+                                                contentDescription = "Stop Stream",
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(2.dp))
+                                            Text(
+                                                text = "Stop",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onErrorContainer
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Text(
+                                        text = "Party",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
+                    // Progress Slider
                     Column(modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp)) {
                         Slider(
                             value = sliderValue,
@@ -851,17 +866,19 @@ fun NowPlayingScreen(
                             Text(
                                 text = AudioTrack.formatDuration(currentPos),
                                 style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = AudioTrack.formatDuration(duration),
                                 style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     if (playbackState.isDualListenStream) {
                         // Listener Mode Indicator - Host is Master Controller
@@ -910,11 +927,11 @@ fun NowPlayingScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .widthIn(max = 480.dp)
-                                .padding(horizontal = 4.dp, vertical = 8.dp)
+                                .padding(horizontal = 4.dp, vertical = 4.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
         }
@@ -998,7 +1015,7 @@ fun InteractivePlaybackControls(
                     playerManager.seekBackward10()
                 },
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(42.dp)
                     .graphicsLayer {
                         rotationZ = rewindAngle
                         scaleX = if (rewindKick) 0.88f else 1f
@@ -1010,7 +1027,7 @@ fun InteractivePlaybackControls(
                     imageVector = Icons.Default.Replay10,
                     contentDescription = "Rewind 10 seconds",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
@@ -1025,7 +1042,7 @@ fun InteractivePlaybackControls(
                     playerManager.previous()
                 },
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(46.dp)
                     .graphicsLayer {
                         translationX = prevOffset
                         scaleX = prevScale
@@ -1037,14 +1054,14 @@ fun InteractivePlaybackControls(
                     imageVector = Icons.Default.SkipPrevious,
                     contentDescription = "Previous track",
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier.size(30.dp)
                 )
             }
         }
 
         // Central Play / Pause button (strictly centered at 50% width)
         Box(
-            modifier = Modifier.padding(horizontal = 8.dp),
+            modifier = Modifier.padding(horizontal = 6.dp),
             contentAlignment = Alignment.Center
         ) {
             FilledIconButton(
@@ -1062,12 +1079,12 @@ fun InteractivePlaybackControls(
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 modifier = Modifier
-                    .size(72.dp)
+                    .size(64.dp)
                     .graphicsLayer {
                         scaleX = playScale
                         scaleY = playScale
                     }
-                    .shadow(12.dp, CircleShape, spotColor = MaterialTheme.colorScheme.primary)
+                    .shadow(10.dp, CircleShape, spotColor = MaterialTheme.colorScheme.primary)
                     .testTag("btn_play_pause")
             ) {
                 AnimatedContent(
@@ -1081,7 +1098,7 @@ fun InteractivePlaybackControls(
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(38.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                 }
             }
@@ -1104,7 +1121,7 @@ fun InteractivePlaybackControls(
                     playerManager.next()
                 },
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(46.dp)
                     .graphicsLayer {
                         translationX = nextOffset
                         scaleX = nextScale
@@ -1116,7 +1133,7 @@ fun InteractivePlaybackControls(
                     imageVector = Icons.Default.SkipNext,
                     contentDescription = "Next track",
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier.size(30.dp)
                 )
             }
 
@@ -1131,7 +1148,7 @@ fun InteractivePlaybackControls(
                     playerManager.seekForward10()
                 },
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(42.dp)
                     .graphicsLayer {
                         rotationZ = forwardAngle
                         scaleX = if (forwardKick) 0.88f else 1f
@@ -1143,7 +1160,7 @@ fun InteractivePlaybackControls(
                     imageVector = Icons.Default.Forward10,
                     contentDescription = "Forward 10 seconds",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
@@ -1201,18 +1218,19 @@ fun RingtoneAndShuffleCapsule(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_set_ringtone),
                         contentDescription = "Set as Ringtone or Notification",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(17.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "Ringtone",
                         style = MaterialTheme.typography.labelMedium,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1224,7 +1242,7 @@ fun RingtoneAndShuffleCapsule(
                 modifier = Modifier
                     .padding(horizontal = 2.dp)
                     .width(1.dp)
-                    .height(20.dp)
+                    .height(18.dp)
                     .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.22f))
             )
 
@@ -1250,7 +1268,7 @@ fun RingtoneAndShuffleCapsule(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Shuffle,
@@ -1261,17 +1279,18 @@ fun RingtoneAndShuffleCapsule(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
                         modifier = Modifier
-                            .size(19.dp)
+                            .size(17.dp)
                             .graphicsLayer {
                                 rotationZ = shuffleRotation
                                 scaleX = shuffleScale
                                 scaleY = shuffleScale
                             }
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (playbackState.isShuffle) "Shuffle On" else "Shuffle",
+                        text = if (playbackState.isShuffle) "On" else "Shuffle",
                         style = MaterialTheme.typography.labelMedium,
+                        fontSize = 11.5.sp,
                         fontWeight = if (playbackState.isShuffle) FontWeight.Bold else FontWeight.Medium,
                         color = if (playbackState.isShuffle) {
                             MaterialTheme.colorScheme.onPrimaryContainer
@@ -1340,11 +1359,12 @@ fun NowPlayingSpeedCapsule(
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = speedLabel,
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontSize = 11.5.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                             color = if (isSelected) {
                                 MaterialTheme.colorScheme.onPrimary

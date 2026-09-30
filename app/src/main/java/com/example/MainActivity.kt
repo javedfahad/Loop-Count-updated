@@ -424,6 +424,7 @@ class MainActivity : ComponentActivity() {
                                         onOpenNowPlaying = { navigateTo(Screen.NowPlaying) },
                                         onPlayPause = { viewModel.playerManager.togglePlayPause() },
                                         onNext = { viewModel.playerManager.next() },
+                                        onCloseMiniPlayer = { viewModel.playerManager.dismissPlayer() },
                                         onBack = { navigateBack() },
                                         onPlayTrack = { track, queue ->
                                             viewModel.playerManager.playTrack(track, queue, startPositionMs = 0L, folderKey = folderKey)

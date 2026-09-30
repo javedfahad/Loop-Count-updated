@@ -812,6 +812,7 @@ fun HomeScreen(
                         onClick = onOpenNowPlaying,
                         onPlayPause = { playerManager.togglePlayPause() },
                         onNext = { playerManager.next() },
+                        onClose = { playerManager.dismissPlayer() },
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
                 }

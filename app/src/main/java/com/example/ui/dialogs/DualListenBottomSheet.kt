@@ -37,10 +37,12 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.Button
@@ -86,6 +88,8 @@ import com.example.ui.components.LiveQrCodeScannerSheet
 fun DualListenBottomSheet(
     syncManager: BluetoothSyncManager,
     onNavigateToShareTo: (() -> Unit)? = null,
+    onStopMusic: (() -> Unit)? = null,
+    onPlayPauseMusic: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     // Intercept Back button to close bottom sheet only, avoiding popping underlying screens
@@ -220,6 +224,8 @@ fun DualListenBottomSheet(
                             onStartMusic = onDismiss,
                             onEndParty = { syncManager.endParty() },
                             onRefreshNetwork = { syncManager.createParty() },
+                            onStopMusic = onStopMusic,
+                            onPlayPauseMusic = onPlayPauseMusic,
                             onOpenHotspotSettings = {
                                 try {
                                     val intent = Intent("android.settings.TETHER_SETTINGS").apply {
@@ -418,6 +424,8 @@ private fun HostPartyView(
     onStartMusic: () -> Unit,
     onEndParty: () -> Unit,
     onRefreshNetwork: () -> Unit,
+    onStopMusic: (() -> Unit)? = null,
+    onPlayPauseMusic: (() -> Unit)? = null,
     onOpenHotspotSettings: () -> Unit
 ) {
     Column(
@@ -462,7 +470,7 @@ private fun HostPartyView(
             )
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Check if Hotspot / Wi-Fi is active
         if (!syncState.isWifiOrHotspotReady) {
@@ -474,7 +482,7 @@ private fun HostPartyView(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(14.dp),
+                    modifier = Modifier.padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -482,7 +490,7 @@ private fun HostPartyView(
                             imageVector = Icons.Default.WifiTethering,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -492,14 +500,14 @@ private fun HostPartyView(
                             color = MaterialTheme.colorScheme.error
                         )
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Turn on your phone's Portable Hotspot or connect to the same Wi-Fi so friends can scan and join.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = onOpenHotspotSettings,
@@ -516,46 +524,126 @@ private fun HostPartyView(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
         }
 
-        // QR Code Card
+        // QR Code Card - Compact & Crisp
         val qrBitmap = syncState.qrCodeBitmap
         if (qrBitmap != null) {
             Surface(
                 modifier = Modifier
-                    .size(240.dp)
-                    .clip(RoundedCornerShape(20.dp))
+                    .size(160.dp)
+                    .clip(RoundedCornerShape(16.dp))
                     .border(
-                        2.dp,
+                        1.5.dp,
                         MaterialTheme.colorScheme.outlineVariant,
-                        RoundedCornerShape(20.dp)
+                        RoundedCornerShape(16.dp)
                     ),
                 color = Color.White
             ) {
                 Box(
-                    modifier = Modifier.padding(14.dp),
+                    modifier = Modifier.padding(10.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
                         bitmap = qrBitmap.asImageBitmap(),
                         contentDescription = "Party QR Code",
-                        modifier = Modifier.size(212.dp)
+                        modifier = Modifier.size(140.dp)
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Scan this QR code to join",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
+        // Live Audio Stream Controls for Host if song is running
+        if (syncState.currentStreamingTitle != null || syncState.isHostMusicPlaying) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GraphicEq,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = syncState.currentStreamingTitle ?: "Live Audio Stream",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = if (syncState.isHostMusicPlaying) "Broadcasting to friends" else "Playback paused",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    if (onPlayPauseMusic != null) {
+                        IconButton(
+                            onClick = onPlayPauseMusic,
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (syncState.isHostMusicPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (syncState.isHostMusicPlaying) "Pause" else "Play",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    if (onStopMusic != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
+                            onClick = onStopMusic,
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = "Stop",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Connected Listener Badges
         if (syncState.connectedListeners.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = "CONNECTED LISTENERS:",
                 style = MaterialTheme.typography.labelSmall,
@@ -563,7 +651,7 @@ private fun HostPartyView(
                 color = MaterialTheme.colorScheme.primary,
                 letterSpacing = 0.8.sp
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -574,16 +662,16 @@ private fun HostPartyView(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Headphones,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(13.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = listener.name,
                                 style = MaterialTheme.typography.labelMedium,
@@ -596,44 +684,44 @@ private fun HostPartyView(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Action Buttons: [ Start Music ] and [ End Party ]
         Button(
             onClick = onStartMusic,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
+                .height(48.dp)
                 .testTag("host_start_music_btn"),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary
             )
         ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.width(8.dp))
+            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = "Start Music",
+                text = if (syncState.isHostMusicPlaying) "View Player" else "Start Music",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedButton(
             onClick = onEndParty,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
+                .height(46.dp)
                 .testTag("host_end_party_btn"),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.error
             )
         ) {
-            Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
+            Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "End Party",
                 style = MaterialTheme.typography.titleSmall,

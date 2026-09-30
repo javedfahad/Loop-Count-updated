@@ -111,6 +111,7 @@ fun FolderDetailScreen(
     onOpenNowPlaying: (() -> Unit)? = null,
     onPlayPause: (() -> Unit)? = null,
     onNext: (() -> Unit)? = null,
+    onCloseMiniPlayer: (() -> Unit)? = null,
     onBack: () -> Unit,
     onPlayTrack: (AudioTrack, List<AudioTrack>) -> Unit,
     onPlayFolder: (List<AudioTrack>, Int, Boolean) -> Unit,
@@ -690,6 +691,7 @@ fun FolderDetailScreen(
                     onClick = onOpenNowPlaying,
                     onPlayPause = onPlayPause,
                     onNext = onNext,
+                    onClose = { onCloseMiniPlayer?.invoke() },
                     modifier = Modifier
                         .navigationBarsPadding()
                         .padding(bottom = 6.dp)

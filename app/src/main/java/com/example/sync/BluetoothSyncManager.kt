@@ -94,7 +94,7 @@ data class DualSyncUiState(
  */
 class BluetoothSyncManager(
     private val context: Context,
-    private val playerManager: AudioPlayerManager
+    val playerManager: AudioPlayerManager
 ) {
     companion object {
         const val TAG = "DualListenManager"

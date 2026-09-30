@@ -628,6 +628,39 @@ class AudioPlayerManager(
         onSyncEvent?.invoke("STOP", 0L, null)
     }
 
+    /**
+     * Completely stops playback, clears the active track and queue from memory and ExoPlayer,
+     * stops the foreground notification service, and removes the mini player from the screen.
+     */
+    fun dismissPlayer() {
+        saveCurrentTrackPosition()
+        exoPlayer?.pause()
+        exoPlayer?.stop()
+        exoPlayer?.clearMediaItems()
+        exoPlayer?.volume = 1.0f
+        releaseWakeLock()
+        positionUpdateJob?.cancel()
+        _state.update {
+            it.copy(
+                currentTrack = null,
+                queue = emptyList(),
+                queueIndex = -1,
+                isPlaying = false,
+                currentPositionMs = 0L,
+                durationMs = 0L,
+                isFolderTimerActive = false,
+                folderTimerExpired = false,
+                isMagicRemixActive = false,
+                isDualListenStream = false
+            )
+        }
+        onSyncEvent?.invoke("STOP", 0L, null)
+        try {
+            val serviceIntent = Intent(context, MediaPlaybackService::class.java)
+            context.stopService(serviceIntent)
+        } catch (_: Exception) {}
+    }
+
     fun seekTo(positionMs: Long) {
         exoPlayer?.seekTo(positionMs.coerceAtLeast(0L))
         _state.update { it.copy(currentPositionMs = positionMs) }
