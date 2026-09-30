@@ -95,6 +95,7 @@ import com.example.model.UserFolder
 import com.example.playback.PlaybackState
 import com.example.ui.components.FancySelectionBottomBar
 import com.example.ui.components.MiniPlayerBar
+import com.example.ui.components.MultiSelectLogo
 import com.example.ui.components.TrackArtwork
 import com.example.ui.dialogs.FolderTimerDialog
 import com.example.ui.dialogs.TrackOptionsDialog
@@ -514,7 +515,24 @@ fun FolderDetailScreen(
                         }
                     },
                     actions = {
-                        // Clean: Actions are hosted in the fancy bottom dock
+                        TextButton(
+                            onClick = {
+                                if (selectedTracks.size == localTracks.size) {
+                                    selectedTracks.clear()
+                                } else {
+                                    selectedTracks.clear()
+                                    selectedTracks.addAll(localTracks)
+                                }
+                            },
+                            modifier = Modifier.testTag("folder_detail_select_all_toggle")
+                        ) {
+                            Text(
+                                text = if (selectedTracks.isNotEmpty() && selectedTracks.size == localTracks.size) "Deselect All" else "Select All",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -551,6 +569,16 @@ fun FolderDetailScreen(
                         }
                     },
                     actions = {
+                        IconButton(
+                            onClick = {
+                                isMultiSelectMode = true
+                                selectedTracks.clear()
+                            },
+                            modifier = Modifier.testTag("folder_detail_multi_select")
+                        ) {
+                            MultiSelectLogo(size = 22.dp)
+                        }
+
                         IconButton(
                             onClick = { showTimerDialog = true },
                             modifier = Modifier.testTag("folder_detail_timer")
@@ -683,6 +711,10 @@ fun FolderDetailScreen(
                         if (selectedTracks.isNotEmpty()) {
                             showBatchDeleteConfirmDialog = true
                         }
+                    },
+                    onDismiss = {
+                        isMultiSelectMode = false
+                        selectedTracks.clear()
                     }
                 )
             } else if (playbackState?.currentTrack != null && onOpenNowPlaying != null && onPlayPause != null && onNext != null) {

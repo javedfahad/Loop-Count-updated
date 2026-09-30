@@ -123,6 +123,7 @@ import com.example.ui.components.FancySelectionBottomBar
 import com.example.ui.components.FolderItemCard
 import com.example.ui.components.LoopifyLogo
 import com.example.ui.components.MiniPlayerBar
+import com.example.ui.components.MultiSelectLogo
 import com.example.ui.components.TrackItemCard
 import com.example.ui.dialogs.FolderOptionsDialog
 import com.example.ui.dialogs.RepeatCountDialog
@@ -161,7 +162,8 @@ fun HomeScreen(
     onAddMultipleTracksToFolder: ((Long, List<AudioTrack>) -> Unit)? = null,
     onCreateFolderWithTrack: (String, AudioTrack) -> Unit = { _, _ -> },
     onCreateFolderWithMultipleTracks: ((String, List<AudioTrack>) -> Unit)? = null,
-    onOpenDualListen: (() -> Unit)? = null
+    onOpenDualListen: (() -> Unit)? = null,
+    onShareTo: ((List<AudioTrack>) -> Unit)? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = selectedTab.coerceIn(0, 1), pageCount = { 2 })
@@ -579,6 +581,15 @@ fun HomeScreen(
             },
             onCreateFolderWithTrack = { folderName ->
                 onCreateFolderWithTrack(folderName, track)
+            },
+            onShareTo = {
+                onShareTo?.invoke(listOf(track))
+            },
+            onSelectMultiple = {
+                isMultiSelectMode = true
+                if (!selectedTracks.any { it.uri == track.uri }) {
+                    selectedTracks.add(track)
+                }
             }
         )
     }
@@ -672,7 +683,24 @@ fun HomeScreen(
                             )
                         },
                         actions = {
-                            // Intentionally clean - actions are hosted in the fancy bottom dock
+                            TextButton(
+                                onClick = {
+                                    if (selectedTracks.size == filteredTracks.size) {
+                                        selectedTracks.clear()
+                                    } else {
+                                        selectedTracks.clear()
+                                        selectedTracks.addAll(filteredTracks)
+                                    }
+                                },
+                                modifier = Modifier.testTag("home_top_select_all_toggle")
+                            ) {
+                                Text(
+                                    text = if (selectedTracks.isNotEmpty() && selectedTracks.size == filteredTracks.size) "Deselect All" else "Select All",
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -706,7 +734,34 @@ fun HomeScreen(
                                 )
                             }
                         },
-                        actions = {},
+                        actions = {
+                            // Prominent Multi-Select button with good logo
+                            Surface(
+                                onClick = {
+                                    isMultiSelectMode = true
+                                    selectedTracks.clear()
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier
+                                    .padding(end = 12.dp)
+                                    .testTag("action_enter_multi_select")
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    MultiSelectLogo(size = 20.dp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Select",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background
                         )
@@ -793,7 +848,6 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .imePadding()
-                    .navigationBarsPadding()
             ) {
                 // When music plays, the mini player smoothly slides up ABOVE the bottom dock with comfortable clearance
                 AnimatedVisibility(
@@ -817,7 +871,7 @@ fun HomeScreen(
                     )
                 }
 
-                // Permanent Bottom Dock when normal, OR Fancy 3-Action Selection Dock during multi-select
+                // Permanent Bottom Dock when normal, OR Fancy 4-Action Selection Dock during multi-select
                 if (!isMultiSelectMode) {
                     BottomOneHandedDock(
                         searchQuery = searchQuery,
@@ -829,7 +883,12 @@ fun HomeScreen(
                         isLoading = isLoading,
                         onRefresh = onRefreshTracks,
                         selectedTabIndex = selectedTabIndex,
-                        onCreateFolderClick = { showCreateFolderDialog = true }
+                        onCreateFolderClick = { showCreateFolderDialog = true },
+                        onEnterMultiSelect = {
+                            isMultiSelectMode = true
+                            selectedTracks.clear()
+                        },
+                        modifier = Modifier.navigationBarsPadding()
                     )
                 } else {
                     FancySelectionBottomBar(
@@ -853,6 +912,17 @@ fun HomeScreen(
                             if (selectedTracks.isNotEmpty()) {
                                 showBatchDeleteConfirmDialog = true
                             }
+                        },
+                        onShareTo = {
+                            if (selectedTracks.isNotEmpty()) {
+                                onShareTo?.invoke(selectedTracks.toList())
+                                isMultiSelectMode = false
+                                selectedTracks.clear()
+                            }
+                        },
+                        onDismiss = {
+                            isMultiSelectMode = false
+                            selectedTracks.clear()
                         }
                     )
                 }
@@ -1374,7 +1444,9 @@ fun BottomOneHandedDock(
     isLoading: Boolean,
     onRefresh: () -> Unit,
     selectedTabIndex: Int,
-    onCreateFolderClick: () -> Unit
+    onCreateFolderClick: () -> Unit,
+    onEnterMultiSelect: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
@@ -1397,7 +1469,7 @@ fun BottomOneHandedDock(
             1.dp,
             MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
         ),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
@@ -1612,6 +1684,23 @@ fun BottomOneHandedDock(
                         isLoading = isLoading,
                         onClick = onRefresh
                     )
+
+                    if (selectedTabIndex == 0 && onEnterMultiSelect != null) {
+                        IconButton(
+                            onClick = onEnterMultiSelect,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = CircleShape
+                                )
+                                .testTag("dock_multi_select_button")
+                        ) {
+                            MultiSelectLogo(
+                                size = 22.dp
+                            )
+                        }
+                    }
 
                     if (selectedTabIndex == 1) {
                         IconButton(

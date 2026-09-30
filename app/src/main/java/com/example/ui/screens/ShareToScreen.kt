@@ -1,9 +1,8 @@
 package com.example.ui.screens
 
+import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -13,18 +12,19 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,65 +36,46 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.material.icons.filled.WifiTethering
-import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -103,17 +84,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -121,25 +97,28 @@ import androidx.compose.ui.unit.sp
 import com.example.model.AudioTrack
 import com.example.model.DeviceFolder
 import com.example.model.UserFolder
-import com.example.transfer.DiscoveredDevice
-import com.example.transfer.NetworkUtils
-import com.example.transfer.ReceiverState
+import com.example.transfer.ShareToPayload
 import com.example.transfer.TransferItem
-import com.example.transfer.TransferProgress
 import com.example.transfer.WifiTransferManager
-import com.example.ui.components.LiveQrCodeScannerSheet
+import com.example.ui.components.ShareToScannerView
+import com.example.ui.components.TrackArtwork
+import com.example.util.ShareToQrHelper
 import kotlinx.coroutines.launch
 
-enum class ShareMode {
-    SEND,
-    RECEIVE
+enum class ShareToScreenMode {
+    OVERVIEW,
+    HOST_QR,
+    LISTENER_SCAN,
+    RECEIVING,
+    SELECT_SONG
 }
 
-enum class SelectionTab {
-    SONGS,
-    FOLDERS
-}
-
+/**
+ * Redesigned, clean, minimal Share To screen.
+ * Flow: Select song -> Share To -> Create Share -> QR -> Connected.
+ * No technical networking jargon (IPs, ports, sockets) exposed to the user.
+ * Generates local QR codes using ZXing Core and scans them offline using Google ML Kit + CameraX.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShareToScreen(
@@ -148,2286 +127,985 @@ fun ShareToScreen(
     deviceFolders: List<DeviceFolder>,
     transferManager: WifiTransferManager,
     onBack: () -> Unit,
-    onOpenLibrary: () -> Unit
+    onOpenLibrary: () -> Unit,
+    initialSelectedTracks: List<AudioTrack> = emptyList()
 ) {
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
-    val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
 
-    var shareMode by remember { mutableStateOf(ShareMode.SEND) }
-    val receiverState by transferManager.receiverState.collectAsState()
-    val senderProgress by transferManager.senderProgress.collectAsState()
+    // Host and receiver states from transferManager
+    val hostState by transferManager.hostShareState.collectAsState()
 
-    // Sender state
-    var receiverIpInput by remember {
-        mutableStateOf(NetworkUtils.getLocalIpAddress(context))
+    var screenMode by remember {
+        mutableStateOf(
+            if (initialSelectedTracks.isNotEmpty()) ShareToScreenMode.HOST_QR else ShareToScreenMode.OVERVIEW
+        )
     }
-    var selectionTab by remember { mutableStateOf(SelectionTab.SONGS) }
-    var searchQuery by remember { mutableStateOf("") }
 
-    // Selection tracking
-    val selectedTrackIds = remember { mutableStateListOf<Long>() }
-    // Folder keys: "user_${id}" or "device_${name}"
-    val selectedFolderKeys = remember { mutableStateListOf<String>() }
-    var expandedFolderKey by remember { mutableStateOf<String?>(null) }
-
-    // Live Transfer Active Dialog & Radar Sheet
-    var showSendProgressDialog by remember { mutableStateOf(false) }
-    var showDeviceRadarSheet by remember { mutableStateOf(false) }
-    var showLiveQrScanner by remember { mutableStateOf(false) }
-    var showHotspotConnectDialog by remember { mutableStateOf(false) }
-    var showMaxFolderDialog by remember { mutableStateOf(false) }
-
-    val discoveredDevices by transferManager.discoveredDevices.collectAsState()
-    val isSearchingDevices by transferManager.isSearchingDevices.collectAsState()
-
-    // Start/stop receiver server when entering/leaving RECEIVE mode, or start discovery in SEND mode
-    DisposableEffect(shareMode) {
-        if (shareMode == ShareMode.RECEIVE) {
-            transferManager.stopDiscovery()
-            transferManager.startReceiver()
-        } else {
-            transferManager.stopReceiver()
-            transferManager.startDiscovery()
-        }
-        onDispose {
-            if (shareMode == ShareMode.RECEIVE) {
-                transferManager.stopReceiver()
-            } else {
-                transferManager.stopDiscovery()
-            }
+    // Active selected tracks for Host
+    val selectedTracks = remember {
+        mutableStateListOf<AudioTrack>().apply {
+            addAll(initialSelectedTracks)
         }
     }
 
-    // Auto open transfer progress dialog when sending begins
-    LaunchedEffect(senderProgress) {
-        if (senderProgress != null && !showSendProgressDialog) {
-            showSendProgressDialog = true
-        }
-    }
+    // Prepared items for transfer
+    var preparedTransferItems by remember { mutableStateOf<List<TransferItem>>(emptyList()) }
+    var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
-    // Collect all tracks for selected folders (unpacked songs)
-    val folderTracksMap = remember(userFolders, deviceFolders) {
-        val map = mutableMapOf<String, Pair<String, List<AudioTrack>>>()
-        userFolders.forEach { uf ->
-            map["user_${uf.id}"] = Pair(uf.name, uf.tracks)
-        }
-        deviceFolders.forEach { df ->
-            map["device_${df.name}"] = Pair(df.name, df.tracks)
-        }
-        map
-    }
+    // Listener receiving state
+    var isReceivingConnection by remember { mutableStateOf(false) }
+    var receivingProgress by remember { mutableFloatStateOf(0f) }
+    var receivingStatusMessage by remember { mutableStateOf("Connecting to host...") }
+    var receivingErrorMessage by remember { mutableStateOf<String?>(null) }
+    var receivedSongNames by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isReceiveCompleted by remember { mutableStateOf(false) }
 
-    // Calculate total songs to send based on current tab selection
-    val tracksToSend: List<AudioTrack> = remember(
-        selectionTab,
-        selectedTrackIds.toList(),
-        selectedFolderKeys.toList(),
-        allTracks,
-        folderTracksMap
-    ) {
-        if (selectionTab == SelectionTab.SONGS) {
-            allTracks.filter { it.id in selectedTrackIds }
-        } else {
-            // Unpack songs from the selected folders (max 2)
-            val gathered = mutableListOf<AudioTrack>()
-            val seenIds = mutableSetOf<Long>()
-            selectedFolderKeys.forEach { key ->
-                folderTracksMap[key]?.second?.forEach { track ->
-                    if (track.id !in seenIds) {
-                        seenIds.add(track.id)
-                        gathered.add(track)
-                    }
-                }
-            }
-            gathered
-        }
-    }
-
-    val totalBytesToSend = remember(tracksToSend) {
-        tracksToSend.sumOf { (it.durationMs * 16L).coerceAtLeast(1024L * 1024L) }
-    }
-
-    // Direct helper to send to any target IP (supports raw IP, ip:port, or loopify/http URL)
-    val startSendingToIp: (String) -> Unit = { rawTarget ->
-        showDeviceRadarSheet = false
-        focusManager.clearFocus()
-        val parsedIp = NetworkUtils.parseIpFromPayload(rawTarget) ?: rawTarget.trim()
-        val port = if (rawTarget.contains(":")) {
-            val portStr = rawTarget.substringAfterLast(":").filter { it.isDigit() }
-            portStr.toIntOrNull() ?: WifiTransferManager.DEFAULT_PORT
-        } else {
-            WifiTransferManager.DEFAULT_PORT
-        }
+    // Start Host Session and generate QR code
+    fun startHostSessionForTracks(tracks: List<AudioTrack>) {
+        if (tracks.isEmpty()) return
         scope.launch {
-            val items = transferManager.prepareTransferItems(tracksToSend)
-            showSendProgressDialog = true
-            transferManager.sendItems(
-                receiverIp = parsedIp,
-                receiverPort = port,
-                items = items,
-                onSuccess = {
-                    Toast.makeText(context, "All songs sent successfully!", Toast.LENGTH_LONG).show()
-                },
-                onError = { err ->
-                    Toast.makeText(context, "Transfer error: $err", Toast.LENGTH_LONG).show()
-                }
+            val items = transferManager.prepareTransferItems(tracks)
+            preparedTransferItems = items
+            val session = transferManager.startHostSharingSession(items)
+
+            val firstTrack = tracks.firstOrNull()
+            val payload = ShareToPayload(
+                hostIp = session.hostIp,
+                port = session.port,
+                sessionId = session.sessionId,
+                songTitle = firstTrack?.displayTitle ?: "Shared Track",
+                artistName = firstTrack?.displayArtist ?: "",
+                trackCount = tracks.size
             )
+
+            val bmp = ShareToQrHelper.generateShareToQrBitmap(payload, size = 650)
+            qrBitmap = bmp
+            screenMode = ShareToScreenMode.HOST_QR
         }
     }
 
-    // Direct step-by-step back handling to ensure user does not get kicked out to Home
-    val handleBackStep: () -> Unit = {
-        when {
-            showSendProgressDialog && (senderProgress?.isCompleted == true || senderProgress?.errorMessage != null) -> {
-                showSendProgressDialog = false
-            }
-            showLiveQrScanner -> {
-                showLiveQrScanner = false
-            }
-            showDeviceRadarSheet -> {
-                showDeviceRadarSheet = false
-            }
-            showHotspotConnectDialog -> {
-                showHotspotConnectDialog = false
-            }
-            showMaxFolderDialog -> {
-                showMaxFolderDialog = false
-            }
-            shareMode == ShareMode.RECEIVE -> {
-                shareMode = ShareMode.SEND
-            }
-            selectedTrackIds.isNotEmpty() || selectedFolderKeys.isNotEmpty() -> {
-                selectedTrackIds.clear()
-                selectedFolderKeys.clear()
-            }
-            else -> {
-                onBack()
-            }
+    // Automatically initialize Host if opened with pre-selected songs
+    LaunchedEffect(Unit) {
+        if (initialSelectedTracks.isNotEmpty()) {
+            startHostSessionForTracks(initialSelectedTracks)
         }
     }
 
-    BackHandler(onBack = handleBackStep)
+    // Clean up host on dispose
+    DisposableEffect(Unit) {
+        onDispose {
+            transferManager.stopHostSharingSession()
+        }
+    }
+
+    // Handle Back Press
+    BackHandler {
+        when (screenMode) {
+            ShareToScreenMode.OVERVIEW -> onBack()
+            ShareToScreenMode.HOST_QR -> {
+                transferManager.stopHostSharingSession()
+                qrBitmap = null
+                if (initialSelectedTracks.isNotEmpty()) {
+                    onBack()
+                } else {
+                    screenMode = ShareToScreenMode.OVERVIEW
+                }
+            }
+            ShareToScreenMode.LISTENER_SCAN -> {
+                screenMode = ShareToScreenMode.OVERVIEW
+            }
+            ShareToScreenMode.RECEIVING -> {
+                if (isReceiveCompleted || receivingErrorMessage != null) {
+                    screenMode = ShareToScreenMode.OVERVIEW
+                } else {
+                    screenMode = ShareToScreenMode.OVERVIEW
+                }
+            }
+            ShareToScreenMode.SELECT_SONG -> {
+                screenMode = ShareToScreenMode.OVERVIEW
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "Share to",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            text = "Share To",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = when (screenMode) {
+                                ShareToScreenMode.HOST_QR -> "Host Mode • Ready to Connect"
+                                ShareToScreenMode.LISTENER_SCAN -> "Scan Host's Code"
+                                ShareToScreenMode.RECEIVING -> "Connecting & Streaming"
+                                ShareToScreenMode.SELECT_SONG -> "Choose Songs to Share"
+                                ShareToScreenMode.OVERVIEW -> "Share & Listen Locally"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = handleBackStep,
+                        onClick = {
+                            when (screenMode) {
+                                ShareToScreenMode.OVERVIEW -> onBack()
+                                ShareToScreenMode.HOST_QR -> {
+                                    transferManager.stopHostSharingSession()
+                                    qrBitmap = null
+                                    if (initialSelectedTracks.isNotEmpty()) onBack() else screenMode = ShareToScreenMode.OVERVIEW
+                                }
+                                ShareToScreenMode.LISTENER_SCAN -> screenMode = ShareToScreenMode.OVERVIEW
+                                ShareToScreenMode.RECEIVING -> screenMode = ShareToScreenMode.OVERVIEW
+                                ShareToScreenMode.SELECT_SONG -> screenMode = ShareToScreenMode.OVERVIEW
+                            }
+                        },
                         modifier = Modifier.testTag("share_to_back_button")
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Go Back"
                         )
                     }
                 },
+                actions = {
+                    if (screenMode == ShareToScreenMode.HOST_QR) {
+                        IconButton(
+                            onClick = {
+                                transferManager.stopHostSharingSession()
+                                qrBitmap = null
+                                screenMode = ShareToScreenMode.OVERVIEW
+                            },
+                            modifier = Modifier.testTag("stop_sharing_icon_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Stop Sharing",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
-        bottomBar = {
-            if (shareMode == ShareMode.SEND && tracksToSend.isNotEmpty()) {
-                Surface(
-                    shadowElevation = 8.dp,
-                    tonalElevation = 2.dp,
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = if (selectionTab == SelectionTab.SONGS) {
-                                        "Songs"
-                                    } else {
-                                        "Folders"
-                                    },
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "~${NetworkUtils.formatFileSize(totalBytesToSend)} total audio data",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    if (tracksToSend.isEmpty()) {
-                                        Toast.makeText(context, "Please select at least one song or folder to send", Toast.LENGTH_SHORT).show()
-                                        return@Button
-                                    }
-                                    showDeviceRadarSheet = true
-                                },
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary
-                                ),
-                                modifier = Modifier.testTag("send_selected_songs_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Send to Phone",
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
-        Column(
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(padding)
         ) {
-            // ShareIt Style Mode Toggle: Send vs Receive
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp)
-                ) {
-                    // Send Tab
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable { shareMode = ShareMode.SEND },
-                        color = if (shareMode == ShareMode.SEND) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(vertical = 12.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = null,
-                                tint = if (shareMode == ShareMode.SEND) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Send",
-                                fontWeight = FontWeight.Bold,
-                                color = if (shareMode == ShareMode.SEND) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    // Receive Tab
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable { shareMode = ShareMode.RECEIVE },
-                        color = if (shareMode == ShareMode.RECEIVE) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(vertical = 12.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = null,
-                                tint = if (shareMode == ShareMode.RECEIVE) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Receive",
-                                fontWeight = FontWeight.Bold,
-                                color = if (shareMode == ShareMode.RECEIVE) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Mode Content
-            when (shareMode) {
-                ShareMode.RECEIVE -> {
-                    ReceiveModeContent(
-                        receiverState = receiverState,
-                        onCopyIp = { ip ->
-                            clipboardManager.setText(AnnotatedString(ip))
-                            Toast.makeText(context, "Copied IP: $ip", Toast.LENGTH_SHORT).show()
-                        },
-                        onOpenLibrary = onOpenLibrary,
-                        onRestartReceiver = {
-                            transferManager.startReceiver()
-                        }
-                    )
-                }
-
-                ShareMode.SEND -> {
-                    SendModeContent(
-                        discoveredDevices = discoveredDevices,
-                        selectionTab = selectionTab,
-                        onSelectionTabChanged = { selectionTab = it },
-                        searchQuery = searchQuery,
-                        onSearchQueryChanged = { searchQuery = it },
-                        allTracks = allTracks,
-                        selectedTrackIds = selectedTrackIds,
-                        onToggleTrackSelection = { trackId ->
-                            if (trackId in selectedTrackIds) {
-                                selectedTrackIds.remove(trackId)
+            when (screenMode) {
+                // ==========================================
+                // 1. OVERVIEW SCREEN (Clean 2-card entry)
+                // ==========================================
+                ShareToScreenMode.OVERVIEW -> {
+                    ShareToOverviewContent(
+                        onStartShare = {
+                            if (allTracks.isNotEmpty()) {
+                                screenMode = ShareToScreenMode.SELECT_SONG
                             } else {
-                                selectedTrackIds.add(trackId)
+                                Toast.makeText(context, "No songs in library to share", Toast.LENGTH_SHORT).show()
                             }
                         },
-                        onSelectAllTracks = {
-                            selectedTrackIds.clear()
-                            selectedTrackIds.addAll(allTracks.map { it.id })
-                        },
-                        onClearTrackSelection = {
-                            selectedTrackIds.clear()
-                        },
-                        userFolders = userFolders,
-                        deviceFolders = deviceFolders,
-                        folderTracksMap = folderTracksMap,
-                        selectedFolderKeys = selectedFolderKeys,
-                        onToggleFolderSelection = { folderKey ->
-                            if (folderKey in selectedFolderKeys) {
-                                selectedFolderKeys.remove(folderKey)
-                            } else {
-                                // Enforce user constraint: maximum 2 folders!
-                                if (selectedFolderKeys.size >= 2) {
-                                    showMaxFolderDialog = true
-                                    Toast.makeText(
-                                        context,
-                                        "Maximum 2 folders allowed. Please uncheck one folder first.",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                } else {
-                                    selectedFolderKeys.add(folderKey)
-                                }
-                            }
-                        },
-                        expandedFolderKey = expandedFolderKey,
-                        onToggleExpandFolder = { key ->
-                            expandedFolderKey = if (expandedFolderKey == key) null else key
+                        onStartScan = {
+                            screenMode = ShareToScreenMode.LISTENER_SCAN
                         }
                     )
                 }
-            }
-        }
-    }
 
-    // Bottom sheet alert message when user attempts to select more than 2 folders
-    if (showMaxFolderDialog) {
-        ModalBottomSheet(
-            onDismissRequest = { showMaxFolderDialog = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            dragHandle = { BottomSheetDefaults.DragHandle() }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
+                // ==========================================
+                // 2. HOST QR SCREEN (Large, clean, focused)
+                // ==========================================
+                ShareToScreenMode.HOST_QR -> {
+                    HostQrScreenContent(
+                        tracks = selectedTracks,
+                        qrBitmap = qrBitmap,
+                        listenersCount = hostState.connectedListenersCount,
+                        isTransmitting = hostState.isTransmitting,
+                        onStopSharing = {
+                            transferManager.stopHostSharingSession()
+                            qrBitmap = null
+                            if (initialSelectedTracks.isNotEmpty()) onBack() else screenMode = ShareToScreenMode.OVERVIEW
+                        }
                     )
                 }
-                Spacer(modifier = Modifier.height(14.dp))
-                Text(
-                    text = "Maximum 2 Folders",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "You can select a maximum of 2 folders to send at a time. To choose a different folder, please deselect one of your currently selected folders first.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 20.sp,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Button(
-                        onClick = { showMaxFolderDialog = false },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("OK", fontWeight = FontWeight.Bold)
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
-    }
 
-    // Nearby Device Radar Bottom Sheet
-    if (showDeviceRadarSheet) {
-        NearbyDeviceRadarSheet(
-            discoveredDevices = discoveredDevices,
-            isSearching = isSearchingDevices,
-            onSendToDevice = { ip ->
-                startSendingToIp(ip)
-            },
-            onScanQr = {
-                showDeviceRadarSheet = false
-                showLiveQrScanner = true
-            },
-            onSendViaHotspot = {
-                showDeviceRadarSheet = false
-                showHotspotConnectDialog = true
-            },
-            manualIp = receiverIpInput,
-            onManualIpChanged = { receiverIpInput = it },
-            onDismiss = { showDeviceRadarSheet = false }
-        )
-    }
+                // ==========================================
+                // 3. SCANNER SCREEN (CameraX + ML Kit)
+                // ==========================================
+                ShareToScreenMode.LISTENER_SCAN -> {
+                    ShareToScannerView(
+                        isConnecting = isReceivingConnection,
+                        connectingMessage = receivingStatusMessage,
+                        onPayloadDetected = { payload ->
+                            isReceivingConnection = true
+                            receivingStatusMessage = "Connecting to host..."
+                            receivingErrorMessage = null
+                            isReceiveCompleted = false
+                            screenMode = ShareToScreenMode.RECEIVING
 
-    // Live In-App Camera QR Code Scanner Sheet
-    if (showLiveQrScanner) {
-        LiveQrCodeScannerSheet(
-            initialManualIp = receiverIpInput,
-            onQrCodeDetected = { rawQrPayload ->
-                val ip = NetworkUtils.parseIpFromPayload(rawQrPayload)
-                if (!ip.isNullOrBlank()) {
-                    showLiveQrScanner = false
-                    receiverIpInput = ip
-                    if (tracksToSend.isEmpty()) {
-                        Toast.makeText(context, "QR scanned: connected to receiver ($ip). Select tracks to send.", Toast.LENGTH_LONG).show()
-                    } else {
-                        Toast.makeText(context, "QR scanned: sending ${tracksToSend.size} tracks to receiver ($ip)...", Toast.LENGTH_SHORT).show()
-                        startSendingToIp(ip)
-                    }
-                } else {
-                    Toast.makeText(context, "Scanned: $rawQrPayload (Unknown receiver)", Toast.LENGTH_SHORT).show()
-                }
-            },
-            onManualConnect = { manualIp ->
-                showLiveQrScanner = false
-                receiverIpInput = manualIp
-                if (tracksToSend.isEmpty()) {
-                    Toast.makeText(context, "Connected to receiver ($manualIp). Select tracks to send.", Toast.LENGTH_LONG).show()
-                } else {
-                    Toast.makeText(context, "Connecting and sending ${tracksToSend.size} tracks to $manualIp...", Toast.LENGTH_SHORT).show()
-                    startSendingToIp(manualIp)
-                }
-            },
-            onDismiss = { showLiveQrScanner = false }
-        )
-    }
-
-    // Hotspot Mode Connect Dialog
-    if (showHotspotConnectDialog) {
-        HotspotConnectDialog(
-            transferManager = transferManager,
-            onConnectToIp = { ip ->
-                showHotspotConnectDialog = false
-                startSendingToIp(ip)
-            },
-            onDismiss = { showHotspotConnectDialog = false }
-        )
-    }
-
-    // Active Live Transfer Modal Panel (Sending)
-    if (showSendProgressDialog && senderProgress != null) {
-        val progress = senderProgress!!
-        ModalBottomSheet(
-            onDismissRequest = {
-                if (progress.isCompleted || progress.errorMessage != null) {
-                    showSendProgressDialog = false
-                    transferManager.resetSenderState()
-                }
-            },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            dragHandle = { BottomSheetDefaults.DragHandle() }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                    // Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (progress.isCompleted) "Transfer Complete!" else "Sending Audio Data...",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (progress.isCompleted) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = Color(0xFF4CAF50),
-                                modifier = Modifier.size(24.dp)
-                            )
-                        } else {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer
-                            ) {
-                                Text(
-                                    text = "⚡ ${NetworkUtils.formatSpeed(progress.speedBytesPerSec)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Progress Overview
-                    if (!progress.isCompleted && progress.errorMessage == null) {
-                        // Current song card
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "Currently Sending:",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = progress.currentTitle.ifBlank { "Preparing file..." },
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (progress.currentFolder.isNotBlank()) {
-                                    Text(
-                                        text = "Target Folder: ${progress.currentFolder}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                LinearProgressIndicator(
-                                    progress = { progress.currentFileProgress },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp)
-                                        .clip(RoundedCornerShape(3.dp))
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "${NetworkUtils.formatFileSize(progress.currentFileBytes)} / ${NetworkUtils.formatFileSize(progress.currentFileTotalBytes)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = "${(progress.currentFileProgress * 100).toInt()}%",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Batch Progress
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Total Batch Progress (${progress.currentIndex}/${progress.totalCount} songs)",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "${(progress.overallProgress * 100).toInt()}%",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            LinearProgressIndicator(
-                                progress = { progress.overallProgress },
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(8.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "${NetworkUtils.formatFileSize(progress.overallBytesTransferred)} of ${NetworkUtils.formatFileSize(progress.overallBytesTotal)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Cancel button
-                        OutlinedButton(
-                            onClick = {
-                                transferManager.cancelSending()
-                                showSendProgressDialog = false
-                            },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Cancel Transfer")
-                        }
-                    } else if (progress.errorMessage != null) {
-                        Text(
-                            text = "Transfer Error: ${progress.errorMessage}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = {
-                                showSendProgressDialog = false
-                                transferManager.resetSenderState()
-                            },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Close")
-                        }
-                    } else {
-                        // Success state
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(vertical = 12.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = Color(0xFF4CAF50),
-                                modifier = Modifier.size(56.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "All ${progress.totalCount} songs transferred!",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Every audio file was streamed and saved on the receiver device.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = {
-                                    showSendProgressDialog = false
-                                    transferManager.resetSenderState()
+                            // Automatically connect to the host IP and port
+                            transferManager.connectToHostAndReceive(
+                                hostIp = payload.hostIp,
+                                hostPort = payload.port,
+                                onProgress = { progress, msg ->
+                                    receivingProgress = progress
+                                    receivingStatusMessage = msg
                                 },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Done")
-                            }
+                                onComplete = { files ->
+                                    isReceivingConnection = false
+                                    isReceiveCompleted = true
+                                    receivedSongNames = files
+                                    receivingStatusMessage = "Connected! Music ready to play."
+                                },
+                                onError = { error ->
+                                    isReceivingConnection = false
+                                    receivingErrorMessage = error
+                                }
+                            )
+                        },
+                        onClose = {
+                            screenMode = ShareToScreenMode.OVERVIEW
                         }
-                    }
+                    )
+                }
+
+                // ==========================================
+                // 4. RECEIVING SCREEN (Progress & Confirmation)
+                // ==========================================
+                ShareToScreenMode.RECEIVING -> {
+                    ListenerReceivingContent(
+                        isCompleted = isReceiveCompleted,
+                        progress = receivingProgress,
+                        statusMessage = receivingStatusMessage,
+                        errorMessage = receivingErrorMessage,
+                        receivedSongs = receivedSongNames,
+                        onRetry = {
+                            screenMode = ShareToScreenMode.LISTENER_SCAN
+                        },
+                        onDone = {
+                            screenMode = ShareToScreenMode.OVERVIEW
+                        }
+                    )
+                }
+
+                // ==========================================
+                // 5. SELECT SONG MODAL (When opened standalone)
+                // ==========================================
+                ShareToScreenMode.SELECT_SONG -> {
+                    SongPickerContent(
+                        tracks = allTracks,
+                        onTrackSelected = { track ->
+                            selectedTracks.clear()
+                            selectedTracks.add(track)
+                            startHostSessionForTracks(listOf(track))
+                        },
+                        onCancel = {
+                            screenMode = ShareToScreenMode.OVERVIEW
+                        }
+                    )
+                }
             }
         }
     }
 }
 
 /**
- * UI for Receive Mode with Radar Animation, QR Code, and Incoming File Progress.
+ * Clean Overview Screen presenting Host or Scan options without technical jargon.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ReceiveModeContent(
-    receiverState: ReceiverState,
-    onCopyIp: (String) -> Unit,
-    onOpenLibrary: () -> Unit,
-    onRestartReceiver: () -> Unit
+private fun ShareToOverviewContent(
+    onStartShare: () -> Unit,
+    onStartScan: () -> Unit
 ) {
-    var showManualIpAddress by remember { mutableStateOf(false) }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "radar_pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "radar_scale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "radar_alpha"
-    )
-
-    val qrBitmap = remember(receiverState.localIp, receiverState.port) {
-        if (receiverState.localIp.isNotBlank()) {
-            try {
-                NetworkUtils.generateQrCodeBitmap("loopify-share://${receiverState.localIp}:${receiverState.port}", 400)
-            } catch (e: Exception) {
-                null
-            }
-        } else null
-    }
-
-    LazyColumn(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        contentPadding = PaddingValues(vertical = 12.dp)
+        verticalArrangement = Arrangement.Center
     ) {
-        // Radar / Status Hero
-        item {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                ),
-                modifier = Modifier.fillMaxWidth()
+        // Hero Icon with soft ambient aura
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.size(80.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = "Share Music Locally",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Connect with nearby friends using high-speed local offline Wi-Fi. No internet or mobile data needed.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(36.dp))
+
+        // Action Card 1: Share Songs (Host)
+        Card(
+            onClick = onStartShare,
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("share_to_card_host")
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(52.dp)
                 ) {
-                    // Pulsing Radar Circle
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(110.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(95.dp)
-                                .scale(pulseScale)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha))
-                        )
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(68.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Wifi,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(36.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = if (receiverState.isReceiving) "Receiving Songs..." else "Ready to Receive",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = receiverState.statusMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Friendly Device Status Card with double-tap secret/manual reveal
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (showManualIpAddress) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .combinedClickable(
-                                onClick = { /* Single tap feedback */ },
-                                onDoubleClick = {
-                                    showManualIpAddress = !showManualIpAddress
-                                }
-                            )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(38.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primaryContainer),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PhoneAndroid,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = "Receiver Device Name",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text(
-                                            text = receiverState.deviceName.ifBlank { "Tuny Receiver" },
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                    modifier = Modifier.clip(RoundedCornerShape(10.dp)).combinedClickable(
-                                        onClick = { /* Tap */ },
-                                        onDoubleClick = { showManualIpAddress = !showManualIpAddress }
-                                    )
-                                ) {
-                                    Text(
-                                        text = "READY",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-
-                            // If double-tapped, reveal IP address and port to put manually into sender
-                            AnimatedVisibility(visible = showManualIpAddress) {
-                                Column(modifier = Modifier.padding(top = 10.dp)) {
-                                    HorizontalDivider(
-                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                                        modifier = Modifier.padding(vertical = 6.dp)
-                                    )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column {
-                                            Text(
-                                                text = "Manual Connection IP Address",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                text = if (receiverState.localIp.isNotBlank())
-                                                    "${receiverState.localIp}:${receiverState.port}"
-                                                else "Connecting to network...",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                        }
-
-                                        if (receiverState.localIp.isNotBlank()) {
-                                            IconButton(
-                                                onClick = { onCopyIp(receiverState.localIp) },
-                                                modifier = Modifier.size(36.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.ContentCopy,
-                                                    contentDescription = "Copy IP",
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                    Text(
-                                        text = "Enter this IP manually on the sender phone if QR code or auto-detect is not working.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 11.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Live Incoming Transfer Card (if active)
-        if (receiverState.isReceiving) {
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Receiving File (${receiverState.receivedItemsCount + 1}/${receiverState.totalItemsCount})",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "⚡ ${NetworkUtils.formatSpeed(receiverState.speedBytesPerSec)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = receiverState.currentTitle.ifBlank { "Incoming track..." },
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (receiverState.currentFolder.isNotBlank()) {
-                            Text(
-                                text = "Saving into folder: ${receiverState.currentFolder}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LinearProgressIndicator(
-                            progress = { receiverState.currentFileProgress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-                        // Overall batch
-                        LinearProgressIndicator(
-                            progress = { receiverState.overallProgress },
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "${NetworkUtils.formatFileSize(receiverState.totalBytesReceived)} of ${NetworkUtils.formatFileSize(receiverState.totalBytesExpected)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
-
-        // Transfer Complete Banner
-        if (receiverState.isComplete) {
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF4CAF50).copy(alpha = 0.15f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Default.CheckCircle,
+                            imageVector = Icons.Default.QrCode,
                             contentDescription = null,
-                            tint = Color(0xFF4CAF50),
-                            modifier = Modifier.size(42.dp)
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(28.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Transfer Complete!",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF2E7D32)
-                        )
-                        Text(
-                            text = "${receiverState.receivedFiles.size} songs received and indexed into your library.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = onOpenLibrary,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF2E7D32)
-                            )
-                        ) {
-                            Icon(imageVector = Icons.Default.MusicNote, contentDescription = null)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Open in Library")
-                        }
                     }
                 }
-            }
-        }
 
-        // QR Code Box for Sender Phone
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Sender Connection QR",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        text = "Share Songs",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
-                        text = "Sender can tap your device name or scan this QR code",
+                        text = "Create a QR code for nearby friends to connect and listen",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (qrBitmap != null) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = Color.White,
-                            shadowElevation = 4.dp,
-                            border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
-                            modifier = Modifier
-                                .size(200.dp)
-                                .padding(4.dp)
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(10.dp)
-                            ) {
-                                Image(
-                                    bitmap = qrBitmap.asImageBitmap(),
-                                    contentDescription = "Receiver QR Code",
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                        }
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(16.dp)
-                            ) {
-                                Text(
-                                    text = "Connect to Wi-Fi or turn on Hotspot to display connection QR code",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    val context = LocalContext.current
-
-                    // Portable Hotspot Section (Interactive)
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.WifiTethering,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "Portable Hotspot (Offline Sharing)",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "No Wi-Fi router? Turn on Hotspot here. The sender connects to your phone's Wi-Fi and transfers songs at top speed offline.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = {
-                                        NetworkUtils.openHotspotSettings(context)
-                                    },
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary
-                                    ),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.WifiTethering, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Turn on Hotspot", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                OutlinedButton(
-                                    onClick = onRestartReceiver,
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Refresh IP", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Action Card 2: Scan & Connect (Listener)
+        Card(
+            onClick = onStartScan,
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("share_to_card_listener")
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.QrCodeScanner,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Scan to Connect",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = "Scan the host's QR code with your camera to join",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }
 
 /**
- * UI for Send Mode with automatic receiver detection, Tabs (Songs vs Folders with 2-folder cap), and preview.
+ * Modern Host QR Screen.
+ * Displays artwork, song title & artist, "Ready to share" badge, large centered QR code,
+ * and connected listener count.
  */
 @Composable
-fun SendModeContent(
-    discoveredDevices: List<DiscoveredDevice>,
-    selectionTab: SelectionTab,
-    onSelectionTabChanged: (SelectionTab) -> Unit,
-    searchQuery: String,
-    onSearchQueryChanged: (String) -> Unit,
-    allTracks: List<AudioTrack>,
-    selectedTrackIds: List<Long>,
-    onToggleTrackSelection: (Long) -> Unit,
-    onSelectAllTracks: () -> Unit,
-    onClearTrackSelection: () -> Unit,
-    userFolders: List<UserFolder>,
-    deviceFolders: List<DeviceFolder>,
-    folderTracksMap: Map<String, Pair<String, List<AudioTrack>>>,
-    selectedFolderKeys: List<String>,
-    onToggleFolderSelection: (String) -> Unit,
-    expandedFolderKey: String?,
-    onToggleExpandFolder: (String) -> Unit
+private fun HostQrScreenContent(
+    tracks: List<AudioTrack>,
+    qrBitmap: Bitmap?,
+    listenersCount: Int,
+    isTransmitting: Boolean,
+    onStopSharing: () -> Unit
 ) {
-    val context = LocalContext.current
-    val focusManager = LocalFocusManager.current
+    val firstTrack = tracks.firstOrNull()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 24.dp)
+            .navigationBarsPadding(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Selection Tabs: "Songs" vs "Folders"
-        TabRow(
-            selectedTabIndex = selectionTab.ordinal,
-            containerColor = Color.Transparent,
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectionTab.ordinal]),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            },
-            divider = { HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Tab(
-                selected = selectionTab == SelectionTab.SONGS,
-                onClick = { onSelectionTabChanged(SelectionTab.SONGS) },
-                text = {
-                    Text(
-                        text = "Songs",
-                        fontWeight = if (selectionTab == SelectionTab.SONGS) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selectionTab == SelectionTab.SONGS) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            )
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Tab(
-                selected = selectionTab == SelectionTab.FOLDERS,
-                onClick = { onSelectionTabChanged(SelectionTab.FOLDERS) },
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Folders",
-                            fontWeight = if (selectionTab == SelectionTab.FOLDERS) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectionTab == SelectionTab.FOLDERS) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        when (selectionTab) {
-            SelectionTab.SONGS -> {
-                // Search & Quick Select bar
+            // Selected Song Card
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChanged,
-                        placeholder = { Text("Search songs...") },
-                        singleLine = true,
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { onSearchQueryChanged("") }) {
-                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Clear")
-                                }
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    if (selectedTrackIds.size == allTracks.size && allTracks.isNotEmpty()) {
-                        OutlinedButton(
-                            onClick = onClearTrackSelection,
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Clear")
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = onSelectAllTracks,
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("All (${allTracks.size})")
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val filteredTracks = remember(allTracks, searchQuery) {
-                    if (searchQuery.isBlank()) allTracks else {
-                        allTracks.filter {
-                            it.title.contains(searchQuery, ignoreCase = true) ||
-                                it.artist.contains(searchQuery, ignoreCase = true)
-                        }
-                    }
-                }
-
-                // Track List
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
-                    contentPadding = PaddingValues(bottom = 80.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(filteredTracks, key = { it.id }) { track ->
-                        val isSelected = track.id in selectedTrackIds
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                    if (firstTrack != null) {
+                        TrackArtwork(
+                            track = firstTrack,
+                            isPlaying = false,
+                            shape = RoundedCornerShape(12.dp),
+                            iconSize = 22.dp,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable { onToggleTrackSelection(track.id) }
+                                .size(50.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(50.dp)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = isSelected,
-                                    onCheckedChange = { onToggleTrackSelection(track.id) }
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                    modifier = Modifier.size(40.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.MusicNote,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = track.displayTitle,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = "${track.displayArtist} • ${track.formattedDuration}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
                             }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (tracks.size > 1) {
+                                "${firstTrack?.displayTitle ?: "Selected Song"} (+${tracks.size - 1} more)"
+                            } else {
+                                firstTrack?.displayTitle ?: "Sharing Song"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = firstTrack?.displayArtist ?: "Local Audio",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    // "Ready to share" badge
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.padding(start = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Ready",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
                     }
                 }
             }
 
-            SelectionTab.FOLDERS -> {
-                // Folders Mode
-                Card(
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
-                    ),
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Main Large QR Code Card
+            Surface(
+                shape = RoundedCornerShape(26.dp),
+                color = Color.White,
+                shadowElevation = 8.dp,
+                border = BorderStroke(2.dp, Color.White),
+                modifier = Modifier
+                    .size(270.dp)
+                    .aspectRatio(1f)
+                    .testTag("host_qr_code_display")
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(14.dp)
+                ) {
+                    if (qrBitmap != null) {
+                        Image(
+                            bitmap = qrBitmap.asImageBitmap(),
+                            contentDescription = "Share To Connection QR Code",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Short User Instruction
+            Text(
+                text = "Scan this QR code to connect",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Open Share To on your friend's device and scan this code",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Connected Listeners Status Pill
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isTransmitting) Icons.Default.Radio else Icons.Default.Wifi,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (listenersCount > 0) {
+                            if (isTransmitting) "$listenersCount listener connected • Sending song..." else "$listenersCount listener connected"
+                        } else {
+                            "Waiting for listeners to scan..."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+
+        // Bottom Stop Action
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp)
+        ) {
+            Button(
+                onClick = onStopSharing,
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .testTag("btn_stop_sharing")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Stop,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Stop Sharing", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+/**
+ * Clean listener connection feedback screen with progress bar.
+ */
+@Composable
+private fun ListenerReceivingContent(
+    isCompleted: Boolean,
+    progress: Float,
+    statusMessage: String,
+    errorMessage: String?,
+    receivedSongs: List<String>,
+    onRetry: () -> Unit,
+    onDone: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        if (errorMessage != null) {
+            // Error State
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.size(72.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Text(
+                text = "Connection Failed",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Button(
+                onClick = onRetry,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Scan Again", fontWeight = FontWeight.Bold)
+            }
+        } else if (isCompleted) {
+            // Success State
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(72.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(38.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = "Connected Successfully!",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = if (receivedSongs.isNotEmpty()) {
+                    "Ready to play \"${receivedSongs.first()}\""
+                } else {
+                    "Audio stream ready to listen"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Button(
+                onClick = onDone,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text("Done", fontWeight = FontWeight.Bold)
+            }
+        } else {
+            // Receiving / Connecting Progress State
+            CircularProgressIndicator(
+                progress = { progress },
+                strokeWidth = 4.dp,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(68.dp)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Connecting to Host",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = statusMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            LinearProgressIndicator(
+                progress = { progress },
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth(0.75f)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+            )
+        }
+    }
+}
+
+/**
+ * Clean, fast picker to choose a track to share if the user opened Share To without selecting first.
+ */
+@Composable
+private fun SongPickerContent(
+    tracks: List<AudioTrack>,
+    onTrackSelected: (AudioTrack) -> Unit,
+    onCancel: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredTracks = remember(tracks, searchQuery) {
+        if (searchQuery.isBlank()) tracks
+        else tracks.filter {
+            it.title.contains(searchQuery, ignoreCase = true) ||
+            it.artist.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp)
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Search songs to share...") },
+            leadingIcon = {
+                Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(filteredTracks, key = { it.id }) { track ->
+                Surface(
+                    onClick = { onTrackSelected(track) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        TrackArtwork(
+                            track = track,
+                            isPlaying = false,
+                            shape = RoundedCornerShape(10.dp),
+                            iconSize = 18.dp,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                        )
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Folder Selection",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
+                                text = track.displayTitle,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Every song inside selected folders will be sent as actual audio files.",
+                                text = "${track.displayArtist} • ${track.formattedDuration}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (selectedFolderKeys.size >= 2) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.padding(start = 8.dp)
-                        ) {
-                            Text(
-                                text = if (selectedFolderKeys.size >= 2) "Max Folders Selected" else "Selected Folders",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (selectedFolderKeys.size >= 2) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // List of folders
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
-                    contentPadding = PaddingValues(bottom = 80.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Combine user folders and device folders
-                    val allFoldersList = mutableListOf<Pair<String, Pair<String, List<AudioTrack>>>>()
-                    userFolders.forEach { uf ->
-                        allFoldersList.add("user_${uf.id}" to Pair(uf.name, uf.tracks))
-                    }
-                    deviceFolders.forEach { df ->
-                        allFoldersList.add("device_${df.name}" to Pair(df.name, df.tracks))
-                    }
-
-                    items(allFoldersList, key = { it.first }) { (folderKey, folderData) ->
-                        val (folderName, folderTracks) = folderData
-                        val isSelected = folderKey in selectedFolderKeys
-                        val isExpanded = expandedFolderKey == folderKey
-                        val totalEstimatedSize = folderTracks.sumOf { (it.durationMs * 16L).coerceAtLeast(1024L * 1024L) }
-
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .clickable { onToggleFolderSelection(folderKey) }
-                                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Checkbox(
-                                        checked = isSelected,
-                                        onCheckedChange = { onToggleFolderSelection(folderKey) }
-                                    )
-
-                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                    Surface(
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = if (folderKey.startsWith("user_")) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                                        modifier = Modifier.size(44.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Default.Folder,
-                                                contentDescription = null,
-                                                tint = if (folderKey.startsWith("user_")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                                                modifier = Modifier.size(24.dp)
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.width(12.dp))
-
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = folderName,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = "${folderTracks.size} songs • ~${NetworkUtils.formatFileSize(totalEstimatedSize)}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-
-                                    // Expand / Collapse songs preview button
-                                    IconButton(
-                                        onClick = { onToggleExpandFolder(folderKey) },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                            contentDescription = "Preview Songs",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                // Expandable Songs List Preview inside this Folder
-                                AnimatedVisibility(visible = isExpanded) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                                            .background(
-                                                MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                                                RoundedCornerShape(12.dp)
-                                            )
-                                            .padding(12.dp)
-                                    ) {
-                                        Text(
-                                            text = "Songs in '$folderName' (${folderTracks.size}):",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        if (folderTracks.isEmpty()) {
-                                            Text(
-                                                text = "No songs in this folder",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        } else {
-                                            folderTracks.take(15).forEachIndexed { idx, trk ->
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(vertical = 3.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(
-                                                        text = "${idx + 1}. ",
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                    Text(
-                                                        text = trk.displayTitle,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        modifier = Modifier.weight(1f)
-                                                    )
-                                                    Text(
-                                                        text = trk.formattedDuration,
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            }
-                                            if (folderTracks.size > 15) {
-                                                Text(
-                                                    text = "+ ${folderTracks.size - 15} more songs...",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(top = 4.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Modern Nearby Devices Radar Bottom Sheet for 1-tap music transfer.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun NearbyDeviceRadarSheet(
-    discoveredDevices: List<DiscoveredDevice>,
-    isSearching: Boolean,
-    onSendToDevice: (String) -> Unit,
-    onScanQr: () -> Unit,
-    onSendViaHotspot: () -> Unit,
-    manualIp: String,
-    onManualIpChanged: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var showManualIp by remember { mutableStateOf(false) }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "sheet_radar_pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "sheet_scale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 0.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "sheet_alpha"
-    )
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Send to Nearby Phone",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Fast local Wi-Fi transfer • Zero mobile data used",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Radar Animation
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(100.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(90.dp)
-                        .scale(pulseScale)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha))
-                )
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Default.Wifi,
-                            contentDescription = null,
+                            imageVector = Icons.Default.QrCode,
+                            contentDescription = "Share",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Discovered Devices Section
-            if (discoveredDevices.isNotEmpty()) {
-                Text(
-                    text = "Nearby Receivers Found (${discoveredDevices.size}):",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.align(Alignment.Start)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    discoveredDevices.forEach { dev ->
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onSendToDevice(dev.ip) }
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Default.PhoneAndroid,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onPrimary,
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = dev.name,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "Ready to receive • Tap to send",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = Color(0xFF2E7D32),
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-
-                                Button(
-                                    onClick = { onSendToDevice(dev.ip) },
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Text("Send", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                Text(
-                    text = "Searching for receiver on your Wi-Fi...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Make sure the other phone has 'Receive' open in Tuny Music",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Instant 1-Tap Connect Options
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Hotspot 1-tap connect
-                Button(
-                    onClick = onSendViaHotspot,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(imageVector = Icons.Default.WifiTethering, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Hotspot Mode", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                }
-
-                // Scan QR code
-                Button(
-                    onClick = onScanQr,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(imageVector = Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Scan QR", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Manual IP fallback accordion
-            TextButton(
-                onClick = { showManualIp = !showManualIp }
-            ) {
-                Text(
-                    text = if (showManualIp) "Hide manual IP" else "Enter IP manually",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-
-            if (showManualIp) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = manualIp,
-                        onValueChange = onManualIpChanged,
-                        label = { Text("Receiver IP") },
-                        placeholder = { Text("192.168.43.1 or 192.168.43.1:8888") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Text,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                if (manualIp.isNotBlank()) {
-                                    onSendToDevice(manualIp.trim())
-                                }
-                            }
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            if (manualIp.isNotBlank()) {
-                                onSendToDevice(manualIp.trim())
-                            }
-                        },
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Text("Send")
-                    }
-                }
-            }
         }
-    }
-}
 
-/**
- * Dedicated dialog for establishing Hotspot-mode transfer with active auto-probing,
- * direct settings shortcuts, and step-by-step guidance.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HotspotConnectDialog(
-    transferManager: WifiTransferManager,
-    onConnectToIp: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    // Intercept back button to dismiss dialog smoothly
-    BackHandler {
-        onDismiss()
-    }
+        Spacer(modifier = Modifier.height(12.dp))
 
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var isProbing by remember { mutableStateOf(true) }
-    var detectedIp by remember { mutableStateOf<String?>(null) }
-    var isConnectingDirectly by remember { mutableStateOf(false) }
-    var connectionError by remember { mutableStateOf<String?>(null) }
-    val gatewayIp = remember { NetworkUtils.getGatewayIpAddress(context) }
-
-    fun runProbe() {
-        isProbing = true
-        connectionError = null
-        scope.launch {
-            val ip = transferManager.findActiveReceiverIp()
-            if (ip != null) {
-                detectedIp = ip
-            }
-            isProbing = false
-        }
-    }
-
-    // Auto-probe repeatedly every 2 seconds while dialog is open
-    LaunchedEffect(Unit) {
-        while (isActive) {
-            val ip = transferManager.findActiveReceiverIp()
-            if (ip != null) {
-                detectedIp = ip
-                isProbing = false
-                break
-            }
-            isProbing = false
-            delay(2000)
-        }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        dragHandle = { BottomSheetDefaults.DragHandle() }
-    ) {
-        Column(
+        Button(
+            onClick = onCancel,
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface
+            ),
             modifier = Modifier
                 .fillMaxWidth()
+                .height(48.dp)
                 .navigationBarsPadding()
-                .padding(horizontal = 22.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-                // Header icon
-                Box(
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.WifiTethering,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Hotspot Transfer Mode",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Direct offline sharing without Wi-Fi router",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Detection status card
-                if (detectedIp != null) {
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Receiver Found on Hotspot!",
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Ready to transmit directly",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
-                                onClick = { onConnectToIp(detectedIp!!) },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Send Songs Now", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(14.dp))
-                } else if (isProbing) {
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                strokeWidth = 2.5.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = "Scanning for Hotspot receiver...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(14.dp))
-                }
-
-                // Error alert card if direct send could not reach receiver
-                if (connectionError != null) {
-                    Card(
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = connectionError!!,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                // Step-by-step instructions card
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "How to connect via Hotspot:",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "1. On Receiver phone: Open 'Receive' tab and turn on Hotspot.\n2. On this phone: Connect to that Hotspot Wi-Fi network.\n3. Tap below to send directly.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 18.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Action buttons: Open Wi-Fi Settings, Direct Connect, Rescan
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            NetworkUtils.openWifiSettings(context)
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Wi-Fi Settings", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    Button(
-                        onClick = {
-                            if (isConnectingDirectly) return@Button
-                            isConnectingDirectly = true
-                            connectionError = null
-                            scope.launch {
-                                val target = detectedIp?.takeIf { transferManager.isPortReachable(it) }
-                                    ?: transferManager.findActiveReceiverIp()
-                                    ?: listOfNotNull(gatewayIp, "192.168.43.1").firstOrNull { transferManager.isPortReachable(it) }
-
-                                isConnectingDirectly = false
-                                if (target != null) {
-                                    onConnectToIp(target)
-                                } else {
-                                    connectionError = "Receiver phone not detected yet.\nMake sure the other phone has 'Receive' mode open in Tuny Music."
-                                }
-                            }
-                        },
-                        enabled = !isConnectingDirectly,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (isConnectingDirectly) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Connecting...", fontSize = 11.sp)
-                        } else {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Send Directly", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(
-                        onClick = { runProbe() },
-                        enabled = !isProbing
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Scan Again", fontSize = 12.sp)
-                    }
-
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel", fontSize = 12.sp)
-                    }
-                }
-            }
+            Text("Cancel")
+        }
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }

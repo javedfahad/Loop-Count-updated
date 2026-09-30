@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.RingVolume
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.BottomSheetDefaults
@@ -78,6 +79,7 @@ fun TrackOptionsDialog(
     onDelete: () -> Unit,
     onAddToFolder: ((Long) -> Unit)? = null,
     onCreateFolderWithTrack: ((String) -> Unit)? = null,
+    onShareTo: (() -> Unit)? = null,
     onSelectMultiple: (() -> Unit)? = null
 ) {
     var isRenaming by remember { mutableStateOf(false) }
@@ -458,6 +460,32 @@ fun TrackOptionsDialog(
                     },
                     testTag = "option_repeat_settings"
                 )
+
+                if (onShareTo != null) {
+                    OptionMenuItem(
+                        icon = Icons.Default.Share,
+                        title = "Share To...",
+                        subtitle = "Share with a nearby listener via QR code",
+                        onClick = {
+                            onDismiss()
+                            onShareTo()
+                        },
+                        testTag = "option_share_to"
+                    )
+                }
+
+                if (onSelectMultiple != null) {
+                    OptionMenuItem(
+                        icon = Icons.Default.Checklist,
+                        title = "Select Multiple Songs",
+                        subtitle = "Select multiple songs to batch share, folder, or delete",
+                        onClick = {
+                            onDismiss()
+                            onSelectMultiple()
+                        },
+                        testTag = "option_select_multiple"
+                    )
+                }
 
                 OptionMenuItem(
                     icon = Icons.Default.CreateNewFolder,

@@ -6,6 +6,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Checkbox
@@ -118,46 +120,77 @@ fun TrackItemCard(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Modern circular selection indicator with smooth bouncy animation
             if (isSelectionMode) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = onSelectionToggle,
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = MaterialTheme.colorScheme.primary
+                val checkScale by animateFloatAsState(
+                    targetValue = if (isSelected) 1f else 0.82f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
                     ),
-                    modifier = Modifier.padding(end = 6.dp)
+                    label = "check_scale"
                 )
-            } else {
-                // Artwork thumbnail with active indicator
-                Box(contentAlignment = Alignment.Center) {
-                    TrackArtwork(
-                        track = track,
-                        isPlaying = isCurrentTrack && isPlaying,
-                        shape = RoundedCornerShape(14.dp),
-                        iconSize = 22.dp,
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer {
+                            scaleX = checkScale
+                            scaleY = checkScale
+                        }
+                        .clip(CircleShape)
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent
+                        )
+                        .border(
+                            width = if (isSelected) 0.dp else 2.dp,
+                            color = if (isSelected) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+                            shape = CircleShape
+                        )
+                        .testTag("track_selection_indicator_${track.id}")
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Selected",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+
+            // Artwork thumbnail with active indicator
+            Box(contentAlignment = Alignment.Center) {
+                TrackArtwork(
+                    track = track,
+                    isPlaying = isCurrentTrack && isPlaying,
+                    shape = RoundedCornerShape(14.dp),
+                    iconSize = 22.dp,
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                )
+                if (isCurrentTrack && isPlaying) {
+                    Box(
                         modifier = Modifier
                             .size(50.dp)
                             .clip(RoundedCornerShape(14.dp))
-                    )
-                    if (isCurrentTrack && isPlaying) {
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Equalizer,
-                                contentDescription = "Now playing",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Equalizer,
+                            contentDescription = "Now playing",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                 }
-                Spacer(modifier = Modifier.width(14.dp))
             }
+            Spacer(modifier = Modifier.width(14.dp))
 
             // Track details
             Column(

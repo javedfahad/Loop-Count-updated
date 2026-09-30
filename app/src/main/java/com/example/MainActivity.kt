@@ -75,7 +75,7 @@ sealed class Screen {
     object Appearance : Screen()
     object About : Screen()
     object Support : Screen()
-    object ShareTo : Screen()
+    data class ShareTo(val initialTracks: List<AudioTrack> = emptyList()) : Screen()
 }
 
 class MainActivity : ComponentActivity() {
@@ -222,7 +222,7 @@ class MainActivity : ComponentActivity() {
                         syncManager = viewModel.bluetoothSyncManager,
                         onNavigateToShareTo = {
                             showDualListenSheet = false
-                            navigateTo(Screen.ShareTo)
+                            navigateTo(Screen.ShareTo())
                         },
                         onDismiss = { showDualListenSheet = false }
                     )
@@ -234,7 +234,7 @@ class MainActivity : ComponentActivity() {
                     drawerContent = {
                         NavigationDrawerContent(
                             onNavigateToShareTo = {
-                                navigateTo(Screen.ShareTo)
+                                navigateTo(Screen.ShareTo())
                             },
                             onNavigateToSupport = {
                                 navigateTo(Screen.Support)
@@ -396,6 +396,9 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onCreateFolderWithMultipleTracks = { folderName, initialTracks ->
                                             viewModel.createUserFolderWithTracks(folderName, initialTracks)
+                                        },
+                                        onShareTo = { tracks ->
+                                            navigateTo(Screen.ShareTo(tracks))
                                         }
                                     )
                                 }
@@ -491,7 +494,14 @@ class MainActivity : ComponentActivity() {
                                         playbackState = playbackState,
                                         playerManager = viewModel.playerManager,
                                         syncManager = viewModel.bluetoothSyncManager,
-                                        onNavigateToShareTo = { navigateTo(Screen.ShareTo) },
+                                        onNavigateToShareTo = {
+                                            val current = playbackState.currentTrack
+                                            if (current != null) {
+                                                navigateTo(Screen.ShareTo(listOf(current)))
+                                            } else {
+                                                navigateTo(Screen.ShareTo())
+                                            }
+                                        },
                                         onBack = { navigateBack() }
                                     )
                                 }
@@ -529,7 +539,8 @@ class MainActivity : ComponentActivity() {
                                         onOpenLibrary = {
                                             viewModel.onTransferCompleteRefresh()
                                             navigateTo(Screen.Home)
-                                        }
+                                        },
+                                        initialSelectedTracks = (screen as? Screen.ShareTo)?.initialTracks ?: emptyList()
                                     )
                                 }
                             }

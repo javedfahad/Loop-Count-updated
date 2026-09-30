@@ -56,6 +56,11 @@ class WifiTransferManager(private val context: Context) {
     private val _isSearchingDevices = MutableStateFlow(false)
     val isSearchingDevices: StateFlow<Boolean> = _isSearchingDevices.asStateFlow()
 
+    private val _hostShareState = MutableStateFlow(HostShareSessionState())
+    val hostShareState: StateFlow<HostShareSessionState> = _hostShareState.asStateFlow()
+    private var hostServerJob: Job? = null
+    private var hostServerSocket: ServerSocket? = null
+
     companion object {
         const val DEFAULT_PORT = 8888
         const val DISCOVERY_PORT = 8889
@@ -408,6 +413,15 @@ class WifiTransferManager(private val context: Context) {
         }
 
         return candidate
+    }
+
+    private fun resolveShareToCacheFile(fileName: String): File {
+        val cleanFile = NetworkUtils.sanitizeFileName(fileName.ifBlank { "shared_audio.mp3" })
+        val cacheDir = File(context.cacheDir, "share_to_playback")
+        if (!cacheDir.exists()) {
+            cacheDir.mkdirs()
+        }
+        return File(cacheDir, cleanFile)
     }
 
     /**
@@ -806,5 +820,315 @@ class WifiTransferManager(private val context: Context) {
 
     fun resetSenderState() {
         cancelSending()
+    }
+
+    /**
+     * Starts the Host Share Server for the new Share To flow.
+     * Listens for connecting listeners who scan the Host's QR code.
+     */
+    fun startHostSharingSession(items: List<TransferItem>, port: Int = DEFAULT_PORT): HostShareSessionState {
+        stopHostSharingSession()
+        val localIp = NetworkUtils.getLocalIpAddress(context)
+        val sessionId = "st_" + (System.currentTimeMillis() % 100000).toString(36)
+
+        val initialState = HostShareSessionState(
+            isHosting = true,
+            hostIp = localIp,
+            port = port,
+            sessionId = sessionId,
+            sharedTracks = items,
+            connectedListenersCount = 0,
+            statusMessage = "Ready to share",
+            isTransmitting = false
+        )
+        _hostShareState.value = initialState
+
+        hostServerJob = scope.launch {
+            try {
+                hostServerSocket = ServerSocket().apply {
+                    reuseAddress = true
+                    bind(InetSocketAddress(port))
+                }
+
+                while (isActive) {
+                    val clientSocket = try {
+                        hostServerSocket?.accept() ?: break
+                    } catch (e: Exception) {
+                        break
+                    }
+
+                    // Handle listener connection concurrently
+                    launch {
+                        handleHostServingToListener(clientSocket, items)
+                    }
+                }
+            } catch (e: Exception) {
+                if (isActive) {
+                    _hostShareState.update {
+                        it.copy(
+                            isHosting = false,
+                            lastError = "Could not start local share server: ${e.localizedMessage}"
+                        )
+                    }
+                }
+            }
+        }
+
+        return initialState
+    }
+
+    private suspend fun handleHostServingToListener(socket: Socket, items: List<TransferItem>) = withContext(Dispatchers.IO) {
+        socket.soTimeout = 45000
+        socket.tcpNoDelay = true
+
+        var dataOut: DataOutputStream? = null
+        var dataIn: DataInputStream? = null
+
+        _hostShareState.update {
+            it.copy(
+                connectedListenersCount = it.connectedListenersCount + 1,
+                isTransmitting = true,
+                statusMessage = "Sharing music with listener..."
+            )
+        }
+
+        try {
+            dataOut = DataOutputStream(BufferedOutputStream(socket.getOutputStream()))
+            dataIn = DataInputStream(BufferedInputStream(socket.getInputStream()))
+
+            // 1. Handshake
+            dataOut.writeUTF(PROTOCOL_HEADER)
+            dataOut.writeUTF(NetworkUtils.getDeviceModelName())
+            dataOut.flush()
+
+            val ack = dataIn.readUTF()
+            if (!ack.startsWith(PROTOCOL_OK)) {
+                socket.close()
+                return@withContext
+            }
+
+            // 2. Metadata header
+            val totalBytes = items.sumOf { it.sizeBytes }
+            dataOut.writeInt(items.size)
+            dataOut.writeLong(totalBytes)
+            dataOut.flush()
+
+            val ready = dataIn.readUTF()
+            if (ready != PROTOCOL_READY) {
+                socket.close()
+                return@withContext
+            }
+
+            val buffer = ByteArray(64 * 1024)
+
+            // 3. Send items
+            for (item in items) {
+                if (!isActive) break
+
+                dataOut.writeUTF(item.title)
+                dataOut.writeUTF(item.artist)
+                dataOut.writeLong(item.durationMs)
+                dataOut.writeUTF(item.folderName)
+                dataOut.writeUTF(item.fileName)
+                dataOut.writeLong(item.sizeBytes)
+                dataOut.flush()
+
+                var inputStream: InputStream? = null
+                try {
+                    inputStream = context.contentResolver.openInputStream(Uri.parse(item.uri))
+                } catch (_: Exception) {
+                    try {
+                        inputStream = File(item.uri).inputStream()
+                    } catch (_: Exception) {}
+                }
+
+                if (inputStream != null) {
+                    var fileBytesSent = 0L
+                    BufferedInputStream(inputStream).use { bis ->
+                        while (isActive && fileBytesSent < item.sizeBytes) {
+                            val toRead = (item.sizeBytes - fileBytesSent).coerceAtMost(buffer.size.toLong()).toInt()
+                            val read = bis.read(buffer, 0, toRead)
+                            if (read == -1) break
+                            dataOut.write(buffer, 0, read)
+                            fileBytesSent += read
+                        }
+                    }
+                    dataOut.flush()
+                }
+
+                val itemOk = dataIn.readUTF()
+                if (itemOk != PROTOCOL_ITEM_OK) {
+                    break
+                }
+            }
+
+            dataOut.writeUTF(PROTOCOL_BATCH_COMPLETE)
+            dataOut.flush()
+
+            val allDone = dataIn.readUTF()
+
+            _hostShareState.update {
+                it.copy(
+                    isTransmitting = false,
+                    statusMessage = "Shared successfully with listener"
+                )
+            }
+        } catch (e: Exception) {
+            _hostShareState.update {
+                it.copy(
+                    isTransmitting = false,
+                    statusMessage = "Ready to share"
+                )
+            }
+        } finally {
+            try {
+                dataOut?.close()
+                dataIn?.close()
+                socket.close()
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun stopHostSharingSession() {
+        try {
+            hostServerSocket?.close()
+        } catch (_: Exception) {}
+        hostServerJob?.cancel()
+        hostServerJob = null
+        hostServerSocket = null
+        _hostShareState.value = HostShareSessionState()
+    }
+
+    /**
+     * Connects to a Host's Share To session and receives the shared song(s).
+     */
+    fun connectToHostAndReceive(
+        hostIp: String,
+        hostPort: Int = DEFAULT_PORT,
+        onProgress: (Float, String) -> Unit,
+        onComplete: (List<String>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        scope.launch {
+            var socket: Socket? = null
+            var dataIn: DataInputStream? = null
+            var dataOut: DataOutputStream? = null
+
+            try {
+                onProgress(0.05f, "Connecting to host...")
+                socket = Socket()
+                socket.connect(InetSocketAddress(hostIp, hostPort), 12000)
+                socket.soTimeout = 45000
+                socket.tcpNoDelay = true
+
+                dataIn = DataInputStream(BufferedInputStream(socket.getInputStream()))
+                dataOut = DataOutputStream(BufferedOutputStream(socket.getOutputStream()))
+
+                // 1. Handshake
+                val header = dataIn.readUTF()
+                if (header != PROTOCOL_HEADER) {
+                    throw IllegalStateException("Invalid host response")
+                }
+                val hostDevice = dataIn.readUTF()
+
+                dataOut.writeUTF("$PROTOCOL_OK ${NetworkUtils.getDeviceModelName()}")
+                dataOut.flush()
+
+                // 2. Read metadata
+                val itemCount = dataIn.readInt()
+                val totalBytes = dataIn.readLong()
+
+                dataOut.writeUTF(PROTOCOL_READY)
+                dataOut.flush()
+
+                val receivedList = mutableListOf<String>()
+                val buffer = ByteArray(64 * 1024)
+                var overallReceived = 0L
+
+                for (i in 0 until itemCount) {
+                    if (!isActive) break
+
+                    val title = dataIn.readUTF()
+                    val artist = dataIn.readUTF()
+                    val durationMs = dataIn.readLong()
+                    val folderName = dataIn.readUTF()
+                    val rawFileName = dataIn.readUTF()
+                    val fileSize = dataIn.readLong()
+
+                    onProgress(
+                        if (totalBytes > 0) (overallReceived.toFloat() / totalBytes.toFloat()).coerceIn(0.1f, 0.95f) else 0.5f,
+                        "Receiving: $title"
+                    )
+
+                    val destFile = resolveShareToCacheFile(rawFileName)
+                    val fileOut = FileOutputStream(destFile)
+                    var fileBytesRead = 0L
+
+                    try {
+                        while (fileBytesRead < fileSize) {
+                            val toRead = (fileSize - fileBytesRead).coerceAtMost(buffer.size.toLong()).toInt()
+                            val read = dataIn.read(buffer, 0, toRead)
+                            if (read == -1) break
+                            fileOut.write(buffer, 0, read)
+                            fileBytesRead += read
+                            overallReceived += read
+
+                            val p = if (totalBytes > 0) (overallReceived.toFloat() / totalBytes.toFloat()).coerceIn(0.1f, 0.98f) else 0.5f
+                            onProgress(p, "Receiving: $title")
+                        }
+                    } finally {
+                        fileOut.flush()
+                        fileOut.close()
+                    }
+
+                    // Temporary share playback file only — do NOT scan into Android media library
+                    receivedList.add(destFile.name)
+
+                    dataOut.writeUTF(PROTOCOL_ITEM_OK)
+                    dataOut.flush()
+                }
+
+                val batchDone = dataIn.readUTF()
+                if (batchDone == PROTOCOL_BATCH_COMPLETE) {
+                    dataOut.writeUTF(PROTOCOL_ALL_DONE)
+                    dataOut.flush()
+                }
+
+                onProgress(1f, "Connected! Song received.")
+                withContext(Dispatchers.Main) {
+                    onComplete(receivedList)
+                }
+            } catch (e: java.net.SocketTimeoutException) {
+                withContext(Dispatchers.Main) {
+                    onError("Connection timed out. Please ensure the host has the Share To QR code open.")
+                }
+            } catch (e: java.net.ConnectException) {
+                withContext(Dispatchers.Main) {
+                    onError("Could not reach host. Make sure both devices are on the same local Wi-Fi or hotspot.")
+                }
+            } catch (e: java.net.UnknownHostException) {
+                withContext(Dispatchers.Main) {
+                    onError("Host address could not be reached on the local network.")
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    val msg = when {
+                        e.message?.contains("ECONNREFUSED", ignoreCase = true) == true ->
+                            "The host has ended this Share session. Please ask the host to show the QR code again."
+                        e.message?.contains("ENETUNREACH", ignoreCase = true) == true ||
+                        e.message?.contains("No route to host", ignoreCase = true) == true ->
+                            "Network unavailable. Please connect to the host's Wi-Fi network or hotspot."
+                        else -> "Could not connect to host. Make sure both devices are on the same Wi-Fi or hotspot."
+                    }
+                    onError(msg)
+                }
+            } finally {
+                try {
+                    dataIn?.close()
+                    dataOut?.close()
+                    socket?.close()
+                } catch (_: Exception) {}
+            }
+        }
     }
 }
