@@ -221,7 +221,12 @@ fun FancySelectionBottomBar(
                         // Button 3: Share To
                         if (onShareTo != null) {
                             FancyDockButton(
-                                icon = Icons.Default.Share,
+                                customIcon = {
+                                    MultiSelectLogo(
+                                        size = 22.dp,
+                                        badgeBackground = Color.Transparent
+                                    )
+                                },
                                 label = "Share To",
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -254,13 +259,14 @@ fun FancySelectionBottomBar(
 
 @Composable
 private fun FancyDockButton(
-    icon: ImageVector,
     label: String,
     containerColor: Color,
     contentColor: Color,
     enabled: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    customIcon: (@Composable () -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -301,12 +307,16 @@ private fun FancyDockButton(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = actualContentColor,
-                modifier = Modifier.size(22.dp)
-            )
+            if (customIcon != null) {
+                customIcon()
+            } else if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = actualContentColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
             Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = label,

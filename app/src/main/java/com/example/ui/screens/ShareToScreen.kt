@@ -38,7 +38,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.MusicNote
@@ -100,6 +102,7 @@ import com.example.model.UserFolder
 import com.example.transfer.ShareToPayload
 import com.example.transfer.TransferItem
 import com.example.transfer.WifiTransferManager
+import com.example.ui.components.MultiSelectLogo
 import com.example.ui.components.ShareToScannerView
 import com.example.ui.components.TrackArtwork
 import com.example.util.ShareToQrHelper
@@ -291,6 +294,34 @@ fun ShareToScreen(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    } else if (screenMode == ShareToScreenMode.OVERVIEW || screenMode == ShareToScreenMode.SELECT_SONG) {
+                        // Prominent Select button with MultiSelectLogo as requested
+                        Surface(
+                            onClick = {
+                                if (allTracks.isNotEmpty()) {
+                                    screenMode = ShareToScreenMode.SELECT_SONG
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier
+                                .padding(end = 12.dp)
+                                .testTag("share_to_top_select_button")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                MultiSelectLogo(size = 20.dp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Select",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -406,10 +437,10 @@ fun ShareToScreen(
                 ShareToScreenMode.SELECT_SONG -> {
                     SongPickerContent(
                         tracks = allTracks,
-                        onTrackSelected = { track ->
+                        onTracksSelected = { chosenTracks ->
                             selectedTracks.clear()
-                            selectedTracks.add(track)
-                            startHostSessionForTracks(listOf(track))
+                            selectedTracks.addAll(chosenTracks)
+                            startHostSessionForTracks(chosenTracks)
                         },
                         onCancel = {
                             screenMode = ShareToScreenMode.OVERVIEW
@@ -443,11 +474,9 @@ private fun ShareToOverviewContent(
             modifier = Modifier.size(80.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(40.dp)
+                MultiSelectLogo(
+                    size = 44.dp,
+                    animated = true
                 )
             }
         }
@@ -493,15 +522,12 @@ private fun ShareToOverviewContent(
             ) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.size(52.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.QrCode,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(28.dp)
+                        MultiSelectLogo(
+                            size = 32.dp
                         )
                     }
                 }
@@ -987,15 +1013,18 @@ private fun ListenerReceivingContent(
 }
 
 /**
- * Clean, fast picker to choose a track to share if the user opened Share To without selecting first.
+ * Clean, fast multi-select picker to choose tracks to share.
+ * Features MultiSelectLogo branding, multi-track selection, and direct sending.
  */
 @Composable
 private fun SongPickerContent(
     tracks: List<AudioTrack>,
-    onTrackSelected: (AudioTrack) -> Unit,
+    onTracksSelected: (List<AudioTrack>) -> Unit,
     onCancel: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    val selectedPickerTracks = remember { mutableStateListOf<AudioTrack>() }
+
     val filteredTracks = remember(tracks, searchQuery) {
         if (searchQuery.isBlank()) tracks
         else tracks.filter {
@@ -1004,6 +1033,8 @@ private fun SongPickerContent(
         }
     }
 
+    val isAllSelected = filteredTracks.isNotEmpty() && selectedPickerTracks.size == filteredTracks.size
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1011,6 +1042,7 @@ private fun SongPickerContent(
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
+        // Search Bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -1027,7 +1059,48 @@ private fun SongPickerContent(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Status Header with MultiSelectLogo + Select All / Deselect All Action
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MultiSelectLogo(size = 22.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (selectedPickerTracks.isEmpty()) "Tap songs to select" else "${selectedPickerTracks.size} of ${filteredTracks.size} selected",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (selectedPickerTracks.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            TextButton(
+                onClick = {
+                    if (isAllSelected) {
+                        selectedPickerTracks.clear()
+                    } else {
+                        selectedPickerTracks.clear()
+                        selectedPickerTracks.addAll(filteredTracks)
+                    }
+                },
+                modifier = Modifier.testTag("share_picker_select_all_btn")
+            ) {
+                Text(
+                    text = if (isAllSelected) "Deselect All" else "Select All",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
 
         LazyColumn(
             modifier = Modifier
@@ -1036,11 +1109,25 @@ private fun SongPickerContent(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(filteredTracks, key = { it.id }) { track ->
+                val isSelected = selectedPickerTracks.any { it.uri == track.uri }
+
                 Surface(
-                    onClick = { onTrackSelected(track) },
+                    onClick = {
+                        if (isSelected) {
+                            selectedPickerTracks.removeAll { it.uri == track.uri }
+                        } else {
+                            selectedPickerTracks.add(track)
+                        }
+                    },
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.fillMaxWidth()
+                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(
+                        width = if (isSelected) 1.5.dp else 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("picker_track_${track.id}")
                 ) {
                     Row(
                         modifier = Modifier
@@ -1048,6 +1135,33 @@ private fun SongPickerContent(
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Circular Selection Indicator
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+                                )
+                                .border(
+                                    width = if (isSelected) 0.dp else 2.dp,
+                                    color = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+                                    shape = CircleShape
+                                )
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
                         TrackArtwork(
                             track = track,
                             isPlaying = false,
@@ -1064,8 +1178,8 @@ private fun SongPickerContent(
                             Text(
                                 text = track.displayTitle,
                                 style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1079,33 +1193,66 @@ private fun SongPickerContent(
                             )
                         }
 
-                        Icon(
-                            imageVector = Icons.Default.QrCode,
-                            contentDescription = "Share",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
+                        // Logo emblem on each item
+                        MultiSelectLogo(
+                            size = 22.dp,
+                            badgeBackground = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        Button(
-            onClick = onCancel,
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                contentColor = MaterialTheme.colorScheme.onSurface
-            ),
+        // Action Buttons: Send Songs Button + Cancel
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
-                .navigationBarsPadding()
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Cancel")
+            Button(
+                onClick = {
+                    if (selectedPickerTracks.isNotEmpty()) {
+                        onTracksSelected(selectedPickerTracks.toList())
+                    }
+                },
+                enabled = selectedPickerTracks.isNotEmpty(),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .testTag("btn_share_selected_tracks")
+            ) {
+                MultiSelectLogo(
+                    size = 20.dp,
+                    badgeBackground = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (selectedPickerTracks.size > 1) "Send ${selectedPickerTracks.size} Songs" else if (selectedPickerTracks.size == 1) "Send 1 Song" else "Select Songs to Send",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+            }
+
+            OutlinedButton(
+                onClick = onCancel,
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+            ) {
+                Text("Cancel")
+            }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+
+        Spacer(modifier = Modifier.height(10.dp))
     }
 }
