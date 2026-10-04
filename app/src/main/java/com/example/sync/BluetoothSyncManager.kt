@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import com.example.model.AudioTrack
@@ -14,6 +15,8 @@ import com.example.transfer.NetworkUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,11 +28,13 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 enum class DualSyncRole {
     NONE,
@@ -139,11 +144,15 @@ class BluetoothSyncManager(
     private var hostServerSocket: ServerSocket? = null
     private val connectedClients = CopyOnWriteArrayList<HostClientSession>()
     private var heartbeatJob: Job? = null
+    private var hostIpMonitorJob: Job? = null
 
     // Listener (Client) Uplink
     private var clientSocket: Socket? = null
     private var clientWriter: PrintWriter? = null
     private var clientReaderJob: Job? = null
+
+    @Volatile
+    private var connectedHostIp: String = ""
 
     @Volatile
     private var isPartyActive = false
@@ -277,6 +286,58 @@ class BluetoothSyncManager(
 
         // 3. Start Periodic Sync Heartbeat (keeps listeners tightly synchronized)
         startHostSyncHeartbeat()
+
+        // 4. Start Host IP Monitor (auto-updates QR code if Hotspot is turned on after party creation)
+        startHostIpMonitor()
+    }
+
+    private fun startHostIpMonitor() {
+        hostIpMonitorJob?.cancel()
+        hostIpMonitorJob = scope.launch {
+            while (isPartyActive && isActive) {
+                delay(2500)
+                if (_uiState.value.role == DualSyncRole.HOST &&
+                    _uiState.value.connectionState == DualSyncConnectionState.ADVERTISING
+                ) {
+                    val currentIp = NetworkUtils.getLocalIpAddress(context)
+                    if (currentIp.isNotBlank() && currentIp != "127.0.0.1" && currentIp != "0.0.0.0" && currentIp != _uiState.value.hostIp) {
+                        refreshHostPartyPayload(currentIp)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun refreshHostPartyPayload(newIp: String) {
+        val sessionId = _uiState.value.sessionId
+        val sessionToken = _uiState.value.sessionToken
+        val partyName = _uiState.value.partyName
+        val qrPayloadJson = JSONObject().apply {
+            put("app", "TunyMusicDual")
+            put("v", 2)
+            put("ip", newIp)
+            put("port", TCP_CONTROL_PORT)
+            put("httpPort", HTTP_STREAM_PORT)
+            put("session", sessionId)
+            put("token", sessionToken)
+            put("name", partyName)
+        }.toString()
+
+        val qrBitmap = try {
+            NetworkUtils.generateQrCodeBitmap(qrPayloadJson, 600)
+        } catch (_: Exception) {
+            null
+        }
+
+        _uiState.update {
+            it.copy(
+                hostIp = newIp,
+                isWifiOrHotspotReady = true,
+                qrPayload = qrPayloadJson,
+                qrCodeBitmap = qrBitmap,
+                statusMessage = "Party Ready • Scan QR to join"
+            )
+        }
     }
 
     private fun handleIncomingListenerConnection(
@@ -308,8 +369,10 @@ class BluetoothSyncManager(
                 val reqToken = handshakeJson.optString("token")
                 val clientDeviceName = handshakeJson.optString("name", "Friend's Phone")
 
-                // Security & Session Validation
-                if (reqSession != activeSessionId || reqToken != activeToken) {
+                // Security & Session Validation (allows exact session/token OR direct manual IP connection)
+                val isAuthorized = (reqSession == activeSessionId && reqToken == activeToken) ||
+                        (reqSession == "default" || reqSession == "direct_connect")
+                if (!isAuthorized) {
                     val reject = JSONObject().apply {
                         put("action", CMD_REJECT)
                         put("reason", "EXPIRED")
@@ -349,8 +412,10 @@ class BluetoothSyncManager(
                 val currentPlayback = playerManager.state.value
                 val curTrack = currentPlayback.currentTrack
                 val trackObj = if (curTrack != null) {
-                    val hostIp = _uiState.value.hostIp
-                    val streamUrl = "http://$hostIp:$HTTP_STREAM_PORT/audio?session=$activeSessionId&token=$activeToken"
+                    val hostIpForClient = socket.localAddress?.hostAddress?.takeIf {
+                        it.isNotBlank() && it != "0.0.0.0" && it != "127.0.0.1"
+                    } ?: _uiState.value.hostIp
+                    val streamUrl = "http://$hostIpForClient:$HTTP_STREAM_PORT/audio?session=$activeSessionId&token=$activeToken"
                     JSONObject().apply {
                         put("title", curTrack.displayTitle)
                         put("artist", curTrack.displayArtist)
@@ -468,11 +533,145 @@ class BluetoothSyncManager(
     }
 
     // =========================================================================
-    // LISTENER FLOW: JOIN PARTY & RECEIVE STREAM
+    // LISTENER FLOW: JOIN PARTY & RECEIVE STREAM (ULTRA-FAST PARALLEL PROBE)
     // =========================================================================
 
+    private data class FastConnectResult(
+        val socket: Socket,
+        val reader: BufferedReader,
+        val writer: PrintWriter,
+        val hostIp: String,
+        val responseJson: JSONObject
+    )
+
+    private fun getCandidateHostIps(primaryIp: String): List<String> {
+        val candidates = linkedSetOf<String>()
+
+        // 1. Primary IP from QR code (if valid)
+        if (primaryIp.isNotBlank() && primaryIp != "127.0.0.1" && primaryIp != "0.0.0.0") {
+            candidates.add(primaryIp)
+        }
+
+        // 2. Gateway of current Wi-Fi connection (In Hotspot mode, Host is always the gateway!)
+        val gateway = NetworkUtils.getGatewayIpAddress(context)
+        if (!gateway.isNullOrBlank() && NetworkUtils.isPrivateOrLocalIp(gateway)) {
+            candidates.add(gateway)
+        }
+
+        // 3. Android default Hotspot gateway
+        candidates.add("192.168.43.1")
+
+        // 4. Hotspot candidate list (includes Wi-Fi Direct, subnet .1, etc.)
+        for (candidate in NetworkUtils.getHotspotCandidateIps(context)) {
+            if (candidate.isNotBlank() && NetworkUtils.isPrivateOrLocalIp(candidate)) {
+                candidates.add(candidate)
+            }
+        }
+
+        // Remove our own device's local IP (don't connect to ourselves)
+        val selfIp = NetworkUtils.getLocalIpAddress(context)
+        candidates.remove(selfIp)
+
+        return candidates.toList()
+    }
+
+    private suspend fun connectToPartyHostFast(
+        candidateIps: List<String>,
+        hostPort: Int,
+        sessionId: String,
+        token: String,
+        clientDeviceName: String
+    ): FastConnectResult? = coroutineScope {
+        if (candidateIps.isEmpty()) return@coroutineScope null
+
+        val channel = Channel<FastConnectResult>(capacity = 1)
+        val activeJobs = mutableListOf<Job>()
+        val failureCount = AtomicInteger(0)
+        val total = candidateIps.size
+
+        for (candidateIp in candidateIps) {
+            val job = launch(Dispatchers.IO) {
+                var sock: Socket? = null
+                try {
+                    val socket = Socket()
+                    sock = socket
+                    socket.tcpNoDelay = true
+                    // Ultra fast LAN connect timeout (1800ms) - LAN SYN-ACK is typically < 10ms
+                    socket.connect(InetSocketAddress(candidateIp, hostPort), 1800)
+                    socket.soTimeout = 3000
+
+                    val writer = PrintWriter(socket.getOutputStream(), true)
+                    val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+
+                    val joinRequest = JSONObject().apply {
+                        put("action", CMD_JOIN)
+                        put("session", sessionId)
+                        put("token", token)
+                        put("name", clientDeviceName)
+                    }
+                    writer.println(joinRequest.toString())
+
+                    val responseLine = reader.readLine()
+                    if (!responseLine.isNullOrBlank()) {
+                        val responseJson = JSONObject(responseLine)
+                        val action = responseJson.optString("action")
+                        if (action == CMD_JOIN_OK || action == CMD_REJECT) {
+                            val resolvedIp = socket.inetAddress?.hostAddress ?: candidateIp
+                            val result = FastConnectResult(
+                                socket = socket,
+                                reader = reader,
+                                writer = writer,
+                                hostIp = resolvedIp,
+                                responseJson = responseJson
+                            )
+                            if (channel.trySend(result).isSuccess) {
+                                return@launch // Don't close winning socket
+                            }
+                        }
+                    }
+                    socket.close()
+                } catch (_: Exception) {
+                    try { sock?.close() } catch (_: Exception) {}
+                } finally {
+                    if (failureCount.incrementAndGet() >= total) {
+                        channel.close()
+                    }
+                }
+            }
+            activeJobs.add(job)
+        }
+
+        val winner = try {
+            channel.receiveCatching().getOrNull()
+        } catch (_: Exception) {
+            null
+        }
+
+        // Cancel all pending candidate connection attempts
+        for (j in activeJobs) {
+            j.cancel()
+        }
+
+        winner
+    }
+
+    private fun sanitizeStreamUrl(originalUrl: String, hostIp: String, fallbackHttpPort: Int): String {
+        if (originalUrl.isBlank() || hostIp.isBlank()) return originalUrl
+        return try {
+            val uri = Uri.parse(originalUrl)
+            val port = if (uri.port != -1) uri.port else fallbackHttpPort
+            val query = uri.encodedQuery
+            val path = uri.encodedPath ?: "/audio"
+            val queryPart = if (!query.isNullOrBlank()) "?$query" else ""
+            "http://$hostIp:$port$path$queryPart"
+        } catch (_: Exception) {
+            originalUrl
+        }
+    }
+
     /**
-     * Joins an active Host party using decoded QR code content.
+     * Joins an active Host party using decoded QR code content or IP address.
+     * Uses parallel multi-candidate probing for near-instant (sub-100ms) connection.
      */
     fun joinPartyFromQr(qrContent: String) {
         disconnect()
@@ -482,7 +681,7 @@ class BluetoothSyncManager(
             _uiState.update {
                 it.copy(
                     connectionState = DualSyncConnectionState.ERROR,
-                    errorMessage = "Invalid QR Code. Please scan the QR code from Host's Dual Listen screen."
+                    errorMessage = "Invalid QR Code or IP address. Please scan the QR code from Host's screen."
                 )
             }
             return
@@ -501,7 +700,7 @@ class BluetoothSyncManager(
                 sessionId = sessionId,
                 sessionToken = token,
                 errorMessage = null,
-                statusMessage = "Connecting to $hostPartyName..."
+                statusMessage = "Fast connecting to $hostPartyName..."
             )
         }
 
@@ -509,34 +708,41 @@ class BluetoothSyncManager(
 
         scope.launch {
             try {
-                val socket = Socket(hostIp, hostPort).apply {
-                    tcpNoDelay = true
-                    soTimeout = 8_000 // 8s handshake timeout
+                val clientDeviceName = getUserDeviceName()
+                val candidateIps = getCandidateHostIps(hostIp)
+                Log.d(TAG, "Attempting fast party connect to candidate IPs: $candidateIps on port $hostPort")
+
+                // Round 1: Fast concurrent probe to all candidate IPs
+                var fastResult = connectToPartyHostFast(candidateIps, hostPort, sessionId, token, clientDeviceName)
+
+                // Round 2: If Wi-Fi was still finishing DHCP lease, brief 400ms delay & retry
+                if (fastResult == null && isPartyActive) {
+                    _uiState.update { it.copy(statusMessage = "Connecting to Host Wi-Fi...") }
+                    delay(400)
+                    val freshCandidates = getCandidateHostIps(hostIp)
+                    fastResult = connectToPartyHostFast(freshCandidates, hostPort, sessionId, token, clientDeviceName)
                 }
+
+                if (fastResult == null) {
+                    _uiState.update {
+                        it.copy(
+                            connectionState = DualSyncConnectionState.ERROR,
+                            role = DualSyncRole.NONE,
+                            errorMessage = "Could not reach Host phone. Ensure you are connected to the Host's Wi-Fi Hotspot or Wi-Fi network.",
+                            statusMessage = "Could not connect to party"
+                        )
+                    }
+                    disconnect()
+                    return@launch
+                }
+
+                val (socket, reader, writer, resolvedHostIp, responseJson) = fastResult
                 clientSocket = socket
-
-                val writer = PrintWriter(socket.getOutputStream(), true)
                 clientWriter = writer
-                val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+                connectedHostIp = resolvedHostIp
+                socket.soTimeout = 0 // Persistent connection
 
-                // Send JOIN handshake
-                val joinRequest = JSONObject().apply {
-                    put("action", CMD_JOIN)
-                    put("session", sessionId)
-                    put("token", token)
-                    put("name", getUserDeviceName())
-                }
-                writer.println(joinRequest.toString())
-
-                // Wait for Host response
-                val responseLine = reader.readLine()
-                if (responseLine.isNullOrBlank()) {
-                    throw Exception("Host did not respond to join request.")
-                }
-
-                val responseJson = JSONObject(responseLine)
                 val action = responseJson.optString("action")
-
                 if (action == CMD_REJECT) {
                     val message = responseJson.optString("message", "Connection was rejected by Host.")
                     _uiState.update {
@@ -548,6 +754,7 @@ class BluetoothSyncManager(
                         )
                     }
                     socket.close()
+                    disconnect()
                     return@launch
                 }
 
@@ -556,7 +763,6 @@ class BluetoothSyncManager(
                 }
 
                 // Successful connection!
-                socket.soTimeout = 0 // Persistent connection
                 val partyTitle = responseJson.optString("partyName", hostPartyName)
                 val count = responseJson.optInt("listenerCount", 1)
                 val max = responseJson.optInt("maxListeners", MAX_LISTENERS)
@@ -566,6 +772,7 @@ class BluetoothSyncManager(
                         connectionState = DualSyncConnectionState.CONNECTED,
                         role = DualSyncRole.CLIENT,
                         partyName = partyTitle,
+                        hostIp = resolvedHostIp,
                         connectedDeviceName = partyTitle,
                         connectedDeviceCount = count,
                         maxDevices = max,
@@ -589,10 +796,7 @@ class BluetoothSyncManager(
                     it.copy(
                         connectionState = DualSyncConnectionState.ERROR,
                         role = DualSyncRole.NONE,
-                        errorMessage = if (e is SocketTimeoutException)
-                            "Could not reach Host. Ensure you are connected to Host's Wi-Fi Hotspot."
-                        else
-                            "Connection failed: ${e.localizedMessage ?: "Unknown error"}",
+                        errorMessage = "Connection error: ${e.localizedMessage ?: "Unknown error"}",
                         statusMessage = "Could not connect to party"
                     )
                 }
@@ -745,7 +949,9 @@ class BluetoothSyncManager(
         val title = trackJson.optString("title", "Live Party Stream")
         val artist = trackJson.optString("artist", "Host Stream")
         val duration = trackJson.optLong("duration", 0L)
-        val streamUrl = trackJson.optString("streamUrl", "")
+        val rawStreamUrl = trackJson.optString("streamUrl", "")
+        val activeHost = connectedHostIp.ifBlank { _uiState.value.hostIp }
+        val streamUrl = sanitizeStreamUrl(rawStreamUrl, activeHost, HTTP_STREAM_PORT)
         val pos = trackJson.optLong("pos", 0L)
         val isPlaying = trackJson.optBoolean("isPlaying", true)
         val ts = trackJson.optLong("ts", System.currentTimeMillis())
@@ -791,42 +997,53 @@ class BluetoothSyncManager(
     )
 
     private fun parseQrPayload(raw: String): ParsedQr? {
-        val clean = raw.trim()
-        try {
-            if (clean.startsWith("{") && clean.endsWith("}")) {
-                val json = JSONObject(clean)
+        val clean = raw.trim().trim('\"', '\'')
+
+        // 1. Try JSON block { ... } anywhere in raw string
+        val jsonStart = clean.indexOf('{')
+        val jsonEnd = clean.lastIndexOf('}')
+        if (jsonStart != -1 && jsonEnd > jsonStart) {
+            try {
+                val jsonStr = clean.substring(jsonStart, jsonEnd + 1)
+                val json = JSONObject(jsonStr)
                 val ip = json.optString("ip")
                 val port = json.optInt("port", TCP_CONTROL_PORT)
                 val httpPort = json.optInt("httpPort", HTTP_STREAM_PORT)
                 val session = json.optString("session")
                 val token = json.optString("token")
                 val name = json.optString("name", "Host's Party")
-                if (ip.isNotBlank() && session.isNotBlank() && token.isNotBlank()) {
-                    return ParsedQr(ip, port, httpPort, session, token, name)
+                if (ip.isNotBlank()) {
+                    return ParsedQr(ip, port, httpPort, session.ifBlank { "default" }, token.ifBlank { "default" }, name)
                 }
-            }
-        } catch (_: Exception) {}
+            } catch (_: Exception) {}
+        }
 
-        // Fallback: URI Scheme tunymusic-dual://join?ip=...&port=...
+        // 2. URI Scheme tunymusic-dual://join?ip=...&port=...
         try {
-            if (clean.startsWith("tunymusic-dual://", ignoreCase = true)) {
-                val uri = android.net.Uri.parse(clean)
+            if (clean.contains("tunymusic-dual://", ignoreCase = true)) {
+                val uriStr = clean.substring(clean.indexOf("tunymusic-dual://", ignoreCase = true))
+                val uri = Uri.parse(uriStr)
                 val ip = uri.getQueryParameter("ip") ?: ""
                 val port = uri.getQueryParameter("port")?.toIntOrNull() ?: TCP_CONTROL_PORT
                 val httpPort = uri.getQueryParameter("httpPort")?.toIntOrNull() ?: HTTP_STREAM_PORT
-                val session = uri.getQueryParameter("session") ?: ""
-                val token = uri.getQueryParameter("token") ?: ""
+                val session = uri.getQueryParameter("session") ?: "default"
+                val token = uri.getQueryParameter("token") ?: "default"
                 val name = uri.getQueryParameter("name") ?: "Host's Party"
-                if (ip.isNotBlank() && session.isNotBlank()) {
+                if (ip.isNotBlank()) {
                     return ParsedQr(ip, port, httpPort, session, token, name)
                 }
             }
         } catch (_: Exception) {}
 
-        // Fallback: Raw IP format (e.g. 192.168.43.1:8890)
+        // 3. Raw IP format (e.g. 192.168.43.1 or 192.168.43.1:8890)
         val extractedIp = NetworkUtils.parseIpFromPayload(clean)
         if (extractedIp != null) {
-            return ParsedQr(extractedIp, TCP_CONTROL_PORT, HTTP_STREAM_PORT, "default", "default", "Host's Party")
+            var port = TCP_CONTROL_PORT
+            if (clean.contains(":")) {
+                val p = clean.substringAfterLast(":").trim().toIntOrNull()
+                if (p != null && p in 1024..65535) port = p
+            }
+            return ParsedQr(extractedIp, port, HTTP_STREAM_PORT, "default", "default", "Host's Party")
         }
 
         return null
@@ -941,8 +1158,11 @@ class BluetoothSyncManager(
         isPartyActive = false
         heartbeatJob?.cancel()
         heartbeatJob = null
+        hostIpMonitorJob?.cancel()
+        hostIpMonitorJob = null
         clientReaderJob?.cancel()
         clientReaderJob = null
+        connectedHostIp = ""
 
         // Stop Audio Server
         audioStreamServer.stop()

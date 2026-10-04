@@ -17,11 +17,69 @@ import java.util.Locale
 object NetworkUtils {
 
     /**
+     * Checks if an IP is a valid private LAN address (RFC 1918) suitable for Wi-Fi or Hotspot.
+     * Strictly rejects Carrier-Grade NAT (100.64.0.0/10) used by mobile cellular data (LTE/5G).
+     */
+    fun isPrivateOrLocalIp(ip: String?): Boolean {
+        if (ip.isNullOrBlank() || ip == "0.0.0.0" || ip.startsWith("127.")) return false
+        // Exclude CGNAT (RFC 6598: 100.64.0.0/10, i.e. 100.64.0.0 - 100.127.255.255)
+        if (ip.startsWith("100.")) {
+            val parts = ip.split(".")
+            val secondOctet = parts.getOrNull(1)?.toIntOrNull() ?: 0
+            if (secondOctet in 64..127) return false
+        }
+        // Exclude link-local (169.254.0.0/16) and test networks
+        if (ip.startsWith("169.254.") || ip.startsWith("192.0.2.") || ip.startsWith("198.51.100.")) return false
+
+        // Standard RFC 1918 private IPv4 ranges:
+        if (ip.startsWith("192.168.")) return true
+        if (ip.startsWith("10.")) return true
+        if (ip.startsWith("172.")) {
+            val parts = ip.split(".")
+            val secondOctet = parts.getOrNull(1)?.toIntOrNull() ?: 0
+            if (secondOctet in 16..31) return true
+        }
+        return false
+    }
+
+    /**
      * Gets the primary local IPv4 address of the device (Wi-Fi or Hotspot).
+     * Strictly avoids cellular (4G/5G/CGNAT) IPs so local network audio sync always works.
      */
     fun getLocalIpAddress(context: Context? = null): String {
         try {
-            // First check Wi-Fi manager if context available
+            // Exclude cellular interfaces (Qualcomm rmnet, MediaTek ccmni, Samsung pdp, generic wwan, tun/vpn)
+            val excludedInterfaces = listOf("rmnet", "ccmni", "pdp", "wwan", "cellular", "dummy", "sit", "ip6tnl", "tun")
+
+            // Prioritize Wi-Fi and Hotspot interfaces (ap, softap, swlan, wlan, p2p, rndis, eth)
+            val priorityInterfaces = listOf("ap", "softap", "swlan", "wlan", "p2p", "rndis", "eth")
+
+            val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
+
+            // Filter out down/loopback or strictly cellular interfaces
+            val candidateInterfaces = interfaces.filter { ni ->
+                ni.isUp && !ni.isLoopback && excludedInterfaces.none { ni.name.contains(it, ignoreCase = true) }
+            }.sortedBy { ni ->
+                val index = priorityInterfaces.indexOfFirst { ni.name.contains(it, ignoreCase = true) }
+                if (index != -1) index else 99
+            }
+
+            // Phase 1: Check active Hotspot AP interfaces (ap, softap, swlan) or 192.168.43.1 first
+            for (ni in candidateInterfaces) {
+                val isHotspotInterface = ni.name.startsWith("ap", ignoreCase = true) ||
+                        ni.name.startsWith("softap", ignoreCase = true) ||
+                        ni.name.startsWith("swlan", ignoreCase = true)
+                for (address in Collections.list(ni.inetAddresses)) {
+                    if (!address.isLoopbackAddress && address is Inet4Address) {
+                        val hostAddress = address.hostAddress ?: continue
+                        if (hostAddress == "192.168.43.1" || (isHotspotInterface && isPrivateOrLocalIp(hostAddress))) {
+                            return hostAddress
+                        }
+                    }
+                }
+            }
+
+            // Phase 2: Check Wi-Fi manager if connected to an external Wi-Fi network
             if (context != null) {
                 val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
                 val ipInt = wifiManager?.connectionInfo?.ipAddress ?: 0
@@ -34,36 +92,33 @@ object NetworkUtils {
                         ipInt shr 16 and 0xff,
                         ipInt shr 24 and 0xff
                     )
-                    if (ip != "0.0.0.0") return ip
+                    if (isPrivateOrLocalIp(ip)) return ip
                 }
             }
 
-            // Iterate through network interfaces (handles portable hotspot & modern Wi-Fi)
-            val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
-            // Priority order: wlan0 (Wi-Fi), ap0/softap (Hotspot), p2p (Wi-Fi Direct), eth0
-            val priorityInterfaces = listOf("wlan", "ap", "rndis", "p2p", "eth", "tun")
-
-            val sortedInterfaces = interfaces.sortedBy { ni ->
-                val index = priorityInterfaces.indexOfFirst { ni.name.contains(it, ignoreCase = true) }
-                if (index != -1) index else 99
-            }
-
-            for (ni in sortedInterfaces) {
-                if (!ni.isUp || ni.isLoopback) continue
-                val addresses = Collections.list(ni.inetAddresses)
-                for (address in addresses) {
+            // Phase 3: Look for any valid private LAN IPv4 address (192.168.*, 10.*, 172.16-31.*)
+            for (ni in candidateInterfaces) {
+                for (address in Collections.list(ni.inetAddresses)) {
                     if (!address.isLoopbackAddress && address is Inet4Address) {
                         val hostAddress = address.hostAddress ?: continue
-                        if (!hostAddress.startsWith("127.") && hostAddress != "0.0.0.0") {
+                        if (isPrivateOrLocalIp(hostAddress)) {
                             return hostAddress
                         }
                     }
                 }
             }
+
+            // Phase 4: Check Wi-Fi gateway if available
+            val gatewayIp = getGatewayIpAddress(context)
+            if (gatewayIp != null && isPrivateOrLocalIp(gatewayIp)) {
+                return gatewayIp
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        return "192.168.43.1" // Common Android hotspot default
+
+        // Safe fallback: 192.168.43.1 is the universal default IP for Android Hotspots
+        return "192.168.43.1"
     }
 
     /**

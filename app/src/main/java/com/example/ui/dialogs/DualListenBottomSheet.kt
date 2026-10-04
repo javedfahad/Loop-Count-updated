@@ -106,9 +106,14 @@ fun DualListenBottomSheet(
     // Live QR Scanner Sheet
     if (showScannerSheet) {
         LiveQrCodeScannerSheet(
+            initialManualIp = syncState.hostIp.ifBlank { "192.168.43.1" },
             onQrCodeDetected = { qrString ->
                 showScannerSheet = false
                 syncManager.joinPartyFromQr(qrString)
+            },
+            onManualConnect = { manualInput ->
+                showScannerSheet = false
+                syncManager.joinPartyFromQr(manualInput)
             },
             onDismiss = { showScannerSheet = false }
         )
@@ -259,6 +264,7 @@ fun DualListenBottomSheet(
                     // ---------------------------------------------------------
                     ListenerConnectingView(
                         partyName = syncState.partyName,
+                        statusMessage = syncState.statusMessage,
                         onCancel = { syncManager.disconnect() }
                     )
                 }
@@ -926,20 +932,32 @@ private fun ListenerConnectedView(
 @Composable
 private fun ListenerConnectingView(
     partyName: String,
+    statusMessage: String = "Connecting to Party...",
     onCancel: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 30.dp),
+            .padding(vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(48.dp),
-            color = MaterialTheme.colorScheme.primary,
-            strokeWidth = 3.5.dp
-        )
-        Spacer(modifier = Modifier.height(20.dp))
+        Box(
+            modifier = Modifier.size(56.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 3.5.dp
+            )
+            Icon(
+                imageVector = Icons.Default.WifiTethering,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(18.dp))
         Text(
             text = "Connecting to Party...",
             style = MaterialTheme.typography.titleMedium,
@@ -951,19 +969,29 @@ private fun ListenerConnectingView(
             Text(
                 text = partyName,
                 style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary
             )
         }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = statusMessage.ifBlank { "Fast syncing offline party session..." },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "Negotiating offline streaming session...",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "Tip: Make sure you are connected to the Host's Wi-Fi Hotspot",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+            textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(22.dp))
         OutlinedButton(
             onClick = onCancel,
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.testTag("listener_cancel_connecting_btn")
         ) {
             Text("Cancel")
         }
