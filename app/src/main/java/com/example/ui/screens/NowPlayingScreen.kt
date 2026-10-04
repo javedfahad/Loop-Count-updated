@@ -21,6 +21,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BluetoothConnected
@@ -176,6 +179,13 @@ fun NowPlayingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures { _, dragAmount ->
+                            if (dragAmount > 15f) {
+                                onBack()
+                            }
+                        }
+                    }
             ) {
                 Row(
                     modifier = Modifier
@@ -183,7 +193,7 @@ fun NowPlayingScreen(
                         .padding(start = 12.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Collapse / Down-arrow Navigation Button
+                    // Collapse / Down-arrow Navigation Button (Minimizes to Mini Player)
                     IconButton(
                         onClick = onBack,
                         modifier = Modifier
@@ -192,7 +202,7 @@ fun NowPlayingScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Collapse",
+                            contentDescription = "Minimize to Mini Player",
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -224,8 +234,24 @@ fun NowPlayingScreen(
                         )
                     }
 
-                    // Top Bar Spacer to balance collapse arrow
-                    Spacer(modifier = Modifier.size(44.dp))
+                    // Top Bar Action: Share To (Fast Wi-Fi Transfer UI)
+                    IconButton(
+                        onClick = {
+                            if (track != null) {
+                                onNavigateToShareTo?.invoke()
+                            }
+                        },
+                        modifier = Modifier
+                            .size(44.dp)
+                            .testTag("now_playing_share_to_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share To nearby devices",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
         },

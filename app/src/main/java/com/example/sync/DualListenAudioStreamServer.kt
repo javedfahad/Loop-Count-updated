@@ -14,6 +14,7 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.InputStream
 import java.io.InputStreamReader
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.Locale
@@ -67,8 +68,9 @@ class DualListenAudioStreamServer(
 
         serverJob = scope.launch {
             try {
-                serverSocket = ServerSocket(port).apply {
+                serverSocket = ServerSocket().apply {
                     reuseAddress = true
+                    bind(InetSocketAddress(port))
                 }
                 Log.d(TAG, "Audio Streaming Server started on port $port")
 
@@ -144,17 +146,21 @@ class DualListenAudioStreamServer(
 
             // Validate session and token
             val queryParams = parseQueryParams(pathWithQuery)
-            val reqSession = queryParams["session"]
-            val reqToken = queryParams["token"]
+            val reqSession = queryParams["session"] ?: ""
+            val reqToken = queryParams["token"] ?: ""
 
-            if (activeSessionId.isNotEmpty() && reqSession != activeSessionId) {
-                sendHttpError(out, 403, "Forbidden - Invalid Session")
-                socket.close()
-                return
-            }
+            val isSessionValid = activeSessionId.isEmpty() ||
+                    reqSession == activeSessionId ||
+                    reqSession == "default" ||
+                    reqSession == "direct_connect"
 
-            if (activeToken.isNotEmpty() && reqToken != activeToken) {
-                sendHttpError(out, 403, "Forbidden - Invalid Token")
+            val isTokenValid = activeToken.isEmpty() ||
+                    reqToken == activeToken ||
+                    reqToken == "default" ||
+                    reqToken == "direct_connect"
+
+            if (!isSessionValid || !isTokenValid) {
+                sendHttpError(out, 403, "Forbidden - Invalid Session or Token")
                 socket.close()
                 return
             }

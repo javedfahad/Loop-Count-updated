@@ -48,8 +48,35 @@ object NetworkUtils {
      */
     fun getLocalIpAddress(context: Context? = null): String {
         try {
+            // Step 1: Active Network LinkProperties via ConnectivityManager (modern, fastest, and most accurate)
+            if (context != null) {
+                val cm = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val activeNet = cm?.activeNetwork
+                    if (activeNet != null) {
+                        val caps = cm.getNetworkCapabilities(activeNet)
+                        val isLocalTransport = caps != null && (
+                                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
+                                caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
+                        )
+                        if (isLocalTransport) {
+                            val linkProps = cm.getLinkProperties(activeNet)
+                            for (la in linkProps?.linkAddresses ?: emptyList()) {
+                                val addr = la.address
+                                if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                                    val hostAddr = addr.hostAddress
+                                    if (!hostAddr.isNullOrBlank() && isPrivateOrLocalIp(hostAddr)) {
+                                        return hostAddr
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Exclude cellular interfaces (Qualcomm rmnet, MediaTek ccmni, Samsung pdp, generic wwan, tun/vpn)
-            val excludedInterfaces = listOf("rmnet", "ccmni", "pdp", "wwan", "cellular", "dummy", "sit", "ip6tnl", "tun")
+            val excludedInterfaces = listOf("rmnet", "ccmni", "pdp", "wwan", "cellular", "dummy", "sit", "ip6tnl", "tun", "v4-rmnet")
 
             // Prioritize Wi-Fi and Hotspot interfaces (ap, softap, swlan, wlan, p2p, rndis, eth)
             val priorityInterfaces = listOf("ap", "softap", "swlan", "wlan", "p2p", "rndis", "eth")
@@ -64,7 +91,7 @@ object NetworkUtils {
                 if (index != -1) index else 99
             }
 
-            // Phase 1: Check active Hotspot AP interfaces (ap, softap, swlan) or 192.168.43.1 first
+            // Phase 2: Check active Hotspot AP interfaces (ap, softap, swlan) or 192.168.43.1 first
             for (ni in candidateInterfaces) {
                 val isHotspotInterface = ni.name.startsWith("ap", ignoreCase = true) ||
                         ni.name.startsWith("softap", ignoreCase = true) ||
@@ -79,24 +106,22 @@ object NetworkUtils {
                 }
             }
 
-            // Phase 2: Check Wi-Fi manager if connected to an external Wi-Fi network
-            if (context != null) {
-                val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-                val ipInt = wifiManager?.connectionInfo?.ipAddress ?: 0
-                if (ipInt != 0) {
-                    val ip = String.format(
-                        Locale.US,
-                        "%d.%d.%d.%d",
-                        ipInt and 0xff,
-                        ipInt shr 8 and 0xff,
-                        ipInt shr 16 and 0xff,
-                        ipInt shr 24 and 0xff
-                    )
-                    if (isPrivateOrLocalIp(ip)) return ip
+            // Phase 3: Look for Wi-Fi interface (wlan, eth) IPv4
+            for (ni in candidateInterfaces) {
+                val isWifi = ni.name.startsWith("wlan", ignoreCase = true) || ni.name.startsWith("eth", ignoreCase = true)
+                if (isWifi) {
+                    for (address in Collections.list(ni.inetAddresses)) {
+                        if (!address.isLoopbackAddress && address is Inet4Address) {
+                            val hostAddress = address.hostAddress ?: continue
+                            if (isPrivateOrLocalIp(hostAddress)) {
+                                return hostAddress
+                            }
+                        }
+                    }
                 }
             }
 
-            // Phase 3: Look for any valid private LAN IPv4 address (192.168.*, 10.*, 172.16-31.*)
+            // Phase 4: Look for any valid private LAN IPv4 address (192.168.*, 10.*, 172.16-31.*)
             for (ni in candidateInterfaces) {
                 for (address in Collections.list(ni.inetAddresses)) {
                     if (!address.isLoopbackAddress && address is Inet4Address) {
@@ -108,7 +133,7 @@ object NetworkUtils {
                 }
             }
 
-            // Phase 4: Check Wi-Fi gateway if available
+            // Phase 5: Check Wi-Fi gateway if available
             val gatewayIp = getGatewayIpAddress(context)
             if (gatewayIp != null && isPrivateOrLocalIp(gatewayIp)) {
                 return gatewayIp
@@ -291,10 +316,10 @@ object NetworkUtils {
     /**
      * Generates a clean QR code bitmap for receiver IP pairing.
      */
-    fun generateQrCodeBitmap(content: String, size: Int = 512): Bitmap {
+    fun generateQrCodeBitmap(content: String, size: Int = 600): Bitmap {
         val hints = mapOf(
             EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
-            EncodeHintType.MARGIN to 1
+            EncodeHintType.MARGIN to 2
         )
         val bitMatrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, hints)
         val width = bitMatrix.width

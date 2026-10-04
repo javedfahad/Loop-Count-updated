@@ -334,26 +334,36 @@ private fun InitialDualListenView(
         if (!errorMessage.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(14.dp))
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.padding(14.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ErrorOutline,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Connection Notice",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = errorMessage,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
-                        fontWeight = FontWeight.Medium
+                        lineHeight = 18.sp
                     )
                 }
             }
@@ -533,38 +543,62 @@ private fun HostPartyView(
             Spacer(modifier = Modifier.height(10.dp))
         }
 
-        // QR Code Card - Compact & Crisp
+        // QR Code Card - Enhanced High-Contrast & Larger Scanning Area
         val qrBitmap = syncState.qrCodeBitmap
         if (qrBitmap != null) {
             Surface(
                 modifier = Modifier
-                    .size(160.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .size(200.dp)
+                    .clip(RoundedCornerShape(20.dp))
                     .border(
-                        1.5.dp,
-                        MaterialTheme.colorScheme.outlineVariant,
-                        RoundedCornerShape(16.dp)
+                        2.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        RoundedCornerShape(20.dp)
                     ),
                 color = Color.White
             ) {
                 Box(
-                    modifier = Modifier.padding(10.dp),
+                    modifier = Modifier.padding(12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
                         bitmap = qrBitmap.asImageBitmap(),
                         contentDescription = "Party QR Code",
-                        modifier = Modifier.size(140.dp)
+                        modifier = Modifier.size(176.dp)
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Scan this QR code to join",
+                text = "Scan this QR code with listener phones",
                 style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Wifi,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(13.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Host IP: ${syncState.hostIp.ifBlank { "192.168.43.1" }} : ${syncState.hostPort}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
 
         // Live Audio Stream Controls for Host if song is running

@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -735,6 +736,35 @@ fun HomeScreen(
                             }
                         },
                         actions = {
+                            // Prominent Share To Button (Fast Wi-Fi Transfer UI)
+                            Surface(
+                                onClick = { onShareTo?.invoke(emptyList()) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier
+                                    .padding(end = 8.dp)
+                                    .testTag("action_top_open_share_to")
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Share To",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = "Share To",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                            }
+
                             // Prominent Multi-Select button with good logo
                             Surface(
                                 onClick = {
@@ -1048,8 +1078,11 @@ fun HomeScreen(
                                                 selectedTracks.add(track)
                                             }
                                         } else {
-                                            playerManager.playTrack(track, filteredTracks)
-                                            onOpenNowPlaying()
+                                            if (isCurrent) {
+                                                onOpenNowPlaying()
+                                            } else {
+                                                playerManager.playTrack(track, filteredTracks)
+                                            }
                                         }
                                     },
                                     onLongClick = {

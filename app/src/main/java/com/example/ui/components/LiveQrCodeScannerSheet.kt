@@ -158,7 +158,7 @@ fun LiveQrCodeScannerSheet(
                     }
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(10.dp))
                     Text(
-                        text = "Scan Receiver QR Code",
+                        text = "Scan Party QR Code",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -289,7 +289,7 @@ fun LiveQrCodeScannerSheet(
 
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "Point camera directly at the QR code on the receiver's phone",
+                    text = "Point camera directly at the QR code on the Host phone",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -369,7 +369,7 @@ fun LiveQrCodeScannerSheet(
                     if (showManualInput) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Enter the Receiver IP address shown on the receiver screen (e.g. 192.168.43.1):",
+                            text = "Enter the Host IP address shown on the Host screen (e.g. 192.168.43.1 or 192.168.1.15):",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -383,7 +383,7 @@ fun LiveQrCodeScannerSheet(
                             OutlinedTextField(
                                 value = manualIpText,
                                 onValueChange = { manualIpText = it.trim() },
-                                placeholder = { Text("192.168.43.1 or 192.168.43.1:8888", fontSize = 13.sp) },
+                                placeholder = { Text("192.168.43.1 or 192.168.1.15:8890", fontSize = 13.sp) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Text,

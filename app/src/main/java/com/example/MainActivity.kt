@@ -485,6 +485,9 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onCreateFolderWithMultipleTracks = { folderName, tracksToAdd ->
                                             viewModel.createUserFolderWithTracks(folderName, tracksToAdd)
+                                        },
+                                        onShareTo = { tracks ->
+                                            navigateTo(Screen.ShareTo(tracks))
                                         }
                                     )
                                 }

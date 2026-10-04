@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -268,8 +269,9 @@ class BluetoothSyncManager(
         // 2. Start TCP Control Server to handle listener handshakes & commands
         scope.launch {
             try {
-                hostServerSocket = ServerSocket(TCP_CONTROL_PORT).apply {
+                hostServerSocket = ServerSocket().apply {
                     reuseAddress = true
+                    bind(InetSocketAddress(TCP_CONTROL_PORT))
                 }
                 Log.d(TAG, "Host TCP Control Server started on port $TCP_CONTROL_PORT")
 
@@ -533,7 +535,7 @@ class BluetoothSyncManager(
     }
 
     // =========================================================================
-    // LISTENER FLOW: JOIN PARTY & RECEIVE STREAM (ULTRA-FAST PARALLEL PROBE)
+    // LISTENER FLOW: JOIN PARTY & RECEIVE STREAM (DIRECT FAST CONNECT & FALLBACKS)
     // =========================================================================
 
     private data class FastConnectResult(
@@ -544,115 +546,59 @@ class BluetoothSyncManager(
         val responseJson: JSONObject
     )
 
-    private fun getCandidateHostIps(primaryIp: String): List<String> {
-        val candidates = linkedSetOf<String>()
-
-        // 1. Primary IP from QR code (if valid)
-        if (primaryIp.isNotBlank() && primaryIp != "127.0.0.1" && primaryIp != "0.0.0.0") {
-            candidates.add(primaryIp)
-        }
-
-        // 2. Gateway of current Wi-Fi connection (In Hotspot mode, Host is always the gateway!)
-        val gateway = NetworkUtils.getGatewayIpAddress(context)
-        if (!gateway.isNullOrBlank() && NetworkUtils.isPrivateOrLocalIp(gateway)) {
-            candidates.add(gateway)
-        }
-
-        // 3. Android default Hotspot gateway
-        candidates.add("192.168.43.1")
-
-        // 4. Hotspot candidate list (includes Wi-Fi Direct, subnet .1, etc.)
-        for (candidate in NetworkUtils.getHotspotCandidateIps(context)) {
-            if (candidate.isNotBlank() && NetworkUtils.isPrivateOrLocalIp(candidate)) {
-                candidates.add(candidate)
-            }
-        }
-
-        // Remove our own device's local IP (don't connect to ourselves)
-        val selfIp = NetworkUtils.getLocalIpAddress(context)
-        candidates.remove(selfIp)
-
-        return candidates.toList()
-    }
-
-    private suspend fun connectToPartyHostFast(
-        candidateIps: List<String>,
-        hostPort: Int,
+    private fun tryConnectToHost(
+        targetIp: String,
+        targetPort: Int,
         sessionId: String,
         token: String,
-        clientDeviceName: String
-    ): FastConnectResult? = coroutineScope {
-        if (candidateIps.isEmpty()) return@coroutineScope null
+        clientDeviceName: String,
+        timeoutMs: Int = 2200
+    ): FastConnectResult? {
+        if (targetIp.isBlank() || targetIp == "127.0.0.1" || targetIp == "0.0.0.0") return null
+        var sock: Socket? = null
+        return try {
+            val socket = Socket()
+            sock = socket
+            socket.tcpNoDelay = true
+            socket.connect(InetSocketAddress(targetIp, targetPort), timeoutMs)
+            socket.soTimeout = 4000
 
-        val channel = Channel<FastConnectResult>(capacity = 1)
-        val activeJobs = mutableListOf<Job>()
-        val failureCount = AtomicInteger(0)
-        val total = candidateIps.size
+            val writer = PrintWriter(socket.getOutputStream(), true)
+            val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
 
-        for (candidateIp in candidateIps) {
-            val job = launch(Dispatchers.IO) {
-                var sock: Socket? = null
-                try {
-                    val socket = Socket()
-                    sock = socket
-                    socket.tcpNoDelay = true
-                    // Ultra fast LAN connect timeout (1800ms) - LAN SYN-ACK is typically < 10ms
-                    socket.connect(InetSocketAddress(candidateIp, hostPort), 1800)
-                    socket.soTimeout = 3000
-
-                    val writer = PrintWriter(socket.getOutputStream(), true)
-                    val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-
-                    val joinRequest = JSONObject().apply {
-                        put("action", CMD_JOIN)
-                        put("session", sessionId)
-                        put("token", token)
-                        put("name", clientDeviceName)
-                    }
-                    writer.println(joinRequest.toString())
-
-                    val responseLine = reader.readLine()
-                    if (!responseLine.isNullOrBlank()) {
-                        val responseJson = JSONObject(responseLine)
-                        val action = responseJson.optString("action")
-                        if (action == CMD_JOIN_OK || action == CMD_REJECT) {
-                            val resolvedIp = socket.inetAddress?.hostAddress ?: candidateIp
-                            val result = FastConnectResult(
-                                socket = socket,
-                                reader = reader,
-                                writer = writer,
-                                hostIp = resolvedIp,
-                                responseJson = responseJson
-                            )
-                            if (channel.trySend(result).isSuccess) {
-                                return@launch // Don't close winning socket
-                            }
-                        }
-                    }
-                    socket.close()
-                } catch (_: Exception) {
-                    try { sock?.close() } catch (_: Exception) {}
-                } finally {
-                    if (failureCount.incrementAndGet() >= total) {
-                        channel.close()
-                    }
-                }
+            val joinRequest = JSONObject().apply {
+                put("action", CMD_JOIN)
+                put("session", sessionId)
+                put("token", token)
+                put("name", clientDeviceName)
             }
-            activeJobs.add(job)
-        }
+            writer.println(joinRequest.toString())
 
-        val winner = try {
-            channel.receiveCatching().getOrNull()
+            val responseLine = reader.readLine()
+            if (!responseLine.isNullOrBlank()) {
+                val responseJson = JSONObject(responseLine)
+                val action = responseJson.optString("action")
+                if (action == CMD_JOIN_OK || action == CMD_REJECT) {
+                    val resolvedIp = socket.inetAddress?.hostAddress ?: targetIp
+                    FastConnectResult(
+                        socket = socket,
+                        reader = reader,
+                        writer = writer,
+                        hostIp = resolvedIp,
+                        responseJson = responseJson
+                    )
+                } else {
+                    try { socket.close() } catch (_: Exception) {}
+                    null
+                }
+            } else {
+                try { socket.close() } catch (_: Exception) {}
+                null
+            }
         } catch (_: Exception) {
+            try { sock?.close() } catch (_: Exception) {}
             null
         }
-
-        // Cancel all pending candidate connection attempts
-        for (j in activeJobs) {
-            j.cancel()
-        }
-
-        winner
     }
 
     private fun sanitizeStreamUrl(originalUrl: String, hostIp: String, fallbackHttpPort: Int): String {
@@ -669,9 +615,19 @@ class BluetoothSyncManager(
         }
     }
 
+    private fun cleanupClientSockets() {
+        clientReaderJob?.cancel()
+        clientReaderJob = null
+        try { clientWriter?.close() } catch (_: Exception) {}
+        clientWriter = null
+        try { clientSocket?.close() } catch (_: Exception) {}
+        clientSocket = null
+        connectedHostIp = ""
+    }
+
     /**
      * Joins an active Host party using decoded QR code content or IP address.
-     * Uses parallel multi-candidate probing for near-instant (sub-100ms) connection.
+     * Tries the QR code's Host IP first directly (<30ms), then falls back to Wi-Fi Gateway and Hotspot IP.
      */
     fun joinPartyFromQr(qrContent: String) {
         disconnect()
@@ -709,30 +665,51 @@ class BluetoothSyncManager(
         scope.launch {
             try {
                 val clientDeviceName = getUserDeviceName()
-                val candidateIps = getCandidateHostIps(hostIp)
-                Log.d(TAG, "Attempting fast party connect to candidate IPs: $candidateIps on port $hostPort")
 
-                // Round 1: Fast concurrent probe to all candidate IPs
-                var fastResult = connectToPartyHostFast(candidateIps, hostPort, sessionId, token, clientDeviceName)
+                // Step 1: Direct fast connect to the Host IP from QR code (sub-50ms when on same Wi-Fi/Hotspot)
+                var fastResult = withContext(Dispatchers.IO) {
+                    tryConnectToHost(hostIp, hostPort, sessionId, token, clientDeviceName, timeoutMs = 2500)
+                }
 
-                // Round 2: If Wi-Fi was still finishing DHCP lease, brief 400ms delay & retry
+                // Step 2: Fallback candidates if primary IP was unreachable (e.g. Host turned on Hotspot after party creation)
                 if (fastResult == null && isPartyActive) {
-                    _uiState.update { it.copy(statusMessage = "Connecting to Host Wi-Fi...") }
-                    delay(400)
-                    val freshCandidates = getCandidateHostIps(hostIp)
-                    fastResult = connectToPartyHostFast(freshCandidates, hostPort, sessionId, token, clientDeviceName)
+                    val fallbacks = linkedSetOf<String>()
+                    val gateway = NetworkUtils.getGatewayIpAddress(context)
+                    if (!gateway.isNullOrBlank() && gateway != hostIp && NetworkUtils.isPrivateOrLocalIp(gateway)) {
+                        fallbacks.add(gateway)
+                    }
+                    if (hostIp != "192.168.43.1") {
+                        fallbacks.add("192.168.43.1")
+                    }
+                    for (cand in NetworkUtils.getHotspotCandidateIps(context)) {
+                        if (cand != hostIp && NetworkUtils.isPrivateOrLocalIp(cand)) {
+                            fallbacks.add(cand)
+                        }
+                    }
+                    val selfIp = NetworkUtils.getLocalIpAddress(context)
+                    fallbacks.remove(selfIp)
+
+                    for (fallbackIp in fallbacks) {
+                        if (!isPartyActive) break
+                        _uiState.update { it.copy(statusMessage = "Connecting to Host at $fallbackIp...") }
+                        fastResult = withContext(Dispatchers.IO) {
+                            tryConnectToHost(fallbackIp, hostPort, sessionId, token, clientDeviceName, timeoutMs = 1500)
+                        }
+                        if (fastResult != null) break
+                    }
                 }
 
                 if (fastResult == null) {
+                    cleanupClientSockets()
+                    isPartyActive = false
                     _uiState.update {
                         it.copy(
                             connectionState = DualSyncConnectionState.ERROR,
                             role = DualSyncRole.NONE,
-                            errorMessage = "Could not reach Host phone. Ensure you are connected to the Host's Wi-Fi Hotspot or Wi-Fi network.",
-                            statusMessage = "Could not connect to party"
+                            errorMessage = "Could not reach Host phone.\n• If outside: Connect your phone's Wi-Fi to Host's Hotspot.\n• If indoors: Ensure both phones are on the same Wi-Fi network.",
+                            statusMessage = "Connection failed"
                         )
                     }
-                    disconnect()
                     return@launch
                 }
 
@@ -745,6 +722,8 @@ class BluetoothSyncManager(
                 val action = responseJson.optString("action")
                 if (action == CMD_REJECT) {
                     val message = responseJson.optString("message", "Connection was rejected by Host.")
+                    cleanupClientSockets()
+                    isPartyActive = false
                     _uiState.update {
                         it.copy(
                             connectionState = DualSyncConnectionState.ERROR,
@@ -753,8 +732,6 @@ class BluetoothSyncManager(
                             statusMessage = message
                         )
                     }
-                    socket.close()
-                    disconnect()
                     return@launch
                 }
 
@@ -792,15 +769,16 @@ class BluetoothSyncManager(
                 startListenerMessageLoop(reader)
             } catch (e: Exception) {
                 Log.e(TAG, "Client join error: ${e.message}")
+                cleanupClientSockets()
+                isPartyActive = false
                 _uiState.update {
                     it.copy(
                         connectionState = DualSyncConnectionState.ERROR,
                         role = DualSyncRole.NONE,
-                        errorMessage = "Connection error: ${e.localizedMessage ?: "Unknown error"}",
+                        errorMessage = "Connection error: ${e.localizedMessage ?: "Network unreachable"}",
                         statusMessage = "Could not connect to party"
                     )
                 }
-                disconnect()
             }
         }
     }
@@ -816,6 +794,7 @@ class BluetoothSyncManager(
             } catch (_: Exception) {
                 // Disconnected from Host
             } finally {
+                cleanupClientSockets()
                 if (isPartyActive && _uiState.value.role == DualSyncRole.CLIENT) {
                     _uiState.update {
                         it.copy(
@@ -829,7 +808,6 @@ class BluetoothSyncManager(
                         playerManager.stop()
                     }
                 }
-                disconnect()
             }
         }
     }
