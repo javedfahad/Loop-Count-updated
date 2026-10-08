@@ -128,8 +128,7 @@ fun FolderDetailScreen(
     onRenameFolder: ((Long, String) -> Unit)? = null,
     userFolders: List<UserFolder> = emptyList(),
     onAddMultipleTracksToFolder: ((Long, List<AudioTrack>) -> Unit)? = null,
-    onCreateFolderWithMultipleTracks: ((String, List<AudioTrack>) -> Unit)? = null,
-    onShareTo: ((List<AudioTrack>) -> Unit)? = null
+    onCreateFolderWithMultipleTracks: ((String, List<AudioTrack>) -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     var showAddTracksDialog by remember { mutableStateOf(false) }
@@ -643,18 +642,6 @@ fun FolderDetailScreen(
                                     onResumeFolder?.invoke(localTracks)
                                 }
                             )
-                            if (localTracks.isNotEmpty() && onShareTo != null) {
-                                DropdownMenuItem(
-                                    text = { Text("Share Folder via Wi-Fi") },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        onShareTo.invoke(localTracks)
-                                    }
-                                )
-                            }
                             if (folder.id > 0) {
                                 DropdownMenuItem(
                                     text = { Text("Rename Folder") },

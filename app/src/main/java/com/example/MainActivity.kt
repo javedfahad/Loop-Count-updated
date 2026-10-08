@@ -6,647 +6,92 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.unit.dp
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
-import android.content.Intent
-import android.net.Uri
-import android.provider.OpenableColumns
-import com.example.model.AudioTrack
-import com.example.model.UserFolder
-import kotlinx.coroutines.flow.MutableStateFlow
-import com.example.ui.components.NavigationDrawerContent
-import com.example.ui.dialogs.DualListenBottomSheet
-import com.example.ui.screens.AboutScreen
-import com.example.ui.screens.AppearanceScreen
-import com.example.ui.screens.FolderDetailScreen
-import com.example.ui.screens.HomeScreen
-import com.example.ui.screens.NowPlayingScreen
-import com.example.ui.screens.ShareToScreen
-import com.example.ui.screens.SupportLoopifyScreen
-import com.example.ui.splash.SplashScreen
-import com.example.ui.theme.LoopCountTheme
+import com.example.ui.MainApp
+import com.example.ui.theme.TunyMusicTheme
 import com.example.viewmodel.MainViewModel
-import kotlinx.coroutines.launch
-
-sealed class Screen {
-    object Splash : Screen()
-    object Home : Screen()
-    data class FolderDetail(val folder: UserFolder) : Screen()
-    object NowPlaying : Screen()
-    object Appearance : Screen()
-    object About : Screen()
-    object Support : Screen()
-    data class ShareTo(val initialTracks: List<AudioTrack> = emptyList()) : Screen()
-}
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels()
-    private val incomingAudioUri = MutableStateFlow<Uri?>(null)
+    private lateinit var viewModel: MainViewModel
+
+    private val deleteConsentLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.refreshTracks()
+        }
+    }
+
+    private val requestPermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val audioGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions[Manifest.permission.READ_MEDIA_AUDIO] == true
+        } else {
+            permissions[Manifest.permission.READ_EXTERNAL_STORAGE] == true
+        }
+        if (audioGranted) {
+            viewModel.setPermissionGranted(true)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Automatically unlock device's highest refresh rate (e.g. 90Hz, 120Hz, 144Hz) for ultra-smooth UI
-        com.example.util.DisplayRefreshRateHelper.enableMaxRefreshRate(this)
+        viewModel = ViewModelProvider(this)[MainViewModel::class.java]
 
-        // Handle opening audio directly from WhatsApp, Telegram, Files, Chrome, etc.
-        handleIncomingIntent(intent)
+        checkAndRequestPermissions()
 
         setContent {
             val uiState by viewModel.uiState.collectAsState()
-            val playbackState by viewModel.playbackState.collectAsState()
-            val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-            val scope = rememberCoroutineScope()
-            val snackbarHostState = remember { SnackbarHostState() }
-
-            val pendingIncomingUri by incomingAudioUri.collectAsState()
-
-            var screenStack by remember { mutableStateOf<List<Screen>>(listOf(Screen.Splash)) }
-            val currentScreen = screenStack.lastOrNull() ?: Screen.Home
-
-            fun navigateTo(screen: Screen) {
-                if (screen is Screen.Splash) {
-                    screenStack = listOf(Screen.Splash)
-                } else if (screen is Screen.Home) {
-                    screenStack = listOf(Screen.Home)
-                } else {
-                    if (screenStack.lastOrNull() != screen) {
-                        screenStack = screenStack + screen
-                    }
-                }
-            }
-
-            fun navigateBack() {
-                if (screenStack.size > 1) {
-                    screenStack = screenStack.dropLast(1)
-                } else if (screenStack.lastOrNull() !is Screen.Home) {
-                    screenStack = listOf(Screen.Home)
-                }
-            }
-
-            // Check permissions
-            val hasAudioPermission = remember(uiState.permissionGranted) {
-                checkAudioPermission()
-            }
-
-            val permissionLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.RequestMultiplePermissions()
-            ) { results ->
-                val hasAudio = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    results[Manifest.permission.READ_MEDIA_AUDIO] == true
-                } else {
-                    results[Manifest.permission.READ_EXTERNAL_STORAGE] == true || results[Manifest.permission.WRITE_EXTERNAL_STORAGE] == true
-                }
-                viewModel.setPermissionGranted(hasAudio || checkAudioPermission())
-            }
-
-            val notificationPermissionLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.RequestPermission()
-            ) { /* Notification permission response */ }
-
-            var pendingDeleteTrack by remember { mutableStateOf<AudioTrack?>(null) }
-
-            val deleteIntentLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.StartIntentSenderForResult()
-            ) { result ->
-                if (result.resultCode == Activity.RESULT_OK) {
-                    pendingDeleteTrack?.let { track ->
-                        viewModel.onTrackConsentDeleted(track)
-                    }
-                }
-                pendingDeleteTrack = null
-            }
-
-            // Sync initial permission and request notification permission on Android 13+
-            LaunchedEffect(Unit) {
-                val granted = checkAudioPermission()
-                viewModel.setPermissionGranted(granted)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
-            }
-
-            // Immediately launch and play audio shared or opened from WhatsApp, Telegram, Files, etc.
-            LaunchedEffect(pendingIncomingUri) {
-                pendingIncomingUri?.let { uri ->
-                    val externalTrack = extractTrackFromUri(uri)
-                    viewModel.playerManager.playTrack(externalTrack, listOf(externalTrack))
-                    screenStack = listOf(Screen.Home, Screen.NowPlaying)
-                    incomingAudioUri.value = null
-                }
-            }
-
-            // Handle messages
-            LaunchedEffect(uiState.message) {
-                uiState.message?.let { msg ->
-                    snackbarHostState.showSnackbar(msg)
-                    viewModel.clearMessage()
-                }
-            }
-
-            val requestPermissions = {
-                val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    arrayOf(
-                        Manifest.permission.READ_MEDIA_AUDIO,
-                        Manifest.permission.POST_NOTIFICATIONS
-                    )
-                } else {
-                    arrayOf(
-                        Manifest.permission.READ_EXTERNAL_STORAGE,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE
-                    )
-                }
-                permissionLauncher.launch(permissions)
-            }
-
-            LoopCountTheme(
+            TunyMusicTheme(
                 themeMode = uiState.themeMode,
-                accent = uiState.accentColor
+                accentColor = uiState.accentColor
             ) {
-                var showDualListenSheet by remember { mutableStateOf(false) }
-
-                // System Back gesture / button handling:
-                // If drawer is open, close it. If on a sub-screen, pop to the previous screen (e.g. NowPlaying -> FolderDetail -> Home).
-                BackHandler(enabled = drawerState.isOpen) {
-                    scope.launch { drawerState.close() }
-                }
-                BackHandler(enabled = screenStack.size > 1 && !drawerState.isOpen && currentScreen !is Screen.Splash && !showDualListenSheet) {
-                    navigateBack()
-                }
-
-                if (showDualListenSheet) {
-                    DualListenBottomSheet(
-                        syncManager = viewModel.bluetoothSyncManager,
-                        onNavigateToShareTo = {
-                            showDualListenSheet = false
-                            navigateTo(Screen.ShareTo())
-                        },
-                        onDismiss = { showDualListenSheet = false }
-                    )
-                }
-
-                ModalNavigationDrawer(
-                    drawerState = drawerState,
-                    gesturesEnabled = currentScreen is Screen.Home,
-                    drawerContent = {
-                        NavigationDrawerContent(
-                            onNavigateToShareTo = {
-                                navigateTo(Screen.ShareTo())
-                            },
-                            onNavigateToSupport = {
-                                navigateTo(Screen.Support)
-                            },
-                            onNavigateToAppearance = {
-                                navigateTo(Screen.Appearance)
-                            },
-                            onNavigateToAbout = {
-                                navigateTo(Screen.About)
-                            },
-                            onOpenDualListen = {
-                                showDualListenSheet = true
-                            },
-                            onCloseDrawer = {
-                                scope.launch { drawerState.close() }
-                            }
+                MainApp(
+                    viewModel = viewModel,
+                    onRequestPermissions = { checkAndRequestPermissions() },
+                    onDeleteConsentRequired = { intentSender ->
+                        deleteConsentLauncher.launch(
+                            IntentSenderRequest.Builder(intentSender).build()
                         )
                     }
-                ) {
-                    Scaffold(
-                        snackbarHost = { SnackbarHost(snackbarHostState) },
-                        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                        modifier = Modifier.fillMaxSize()
-                    ) { _ ->
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            AnimatedContent(
-                            targetState = currentScreen,
-                            transitionSpec = {
-                                if (targetState is Screen.NowPlaying) {
-                                    // When tapping an audio track card or mini player, slide up smoothly from bottom!
-                                    (slideInVertically(
-                                        initialOffsetY = { fullHeight -> fullHeight },
-                                        animationSpec = tween(380, easing = FastOutSlowInEasing)
-                                    ) + fadeIn(animationSpec = tween(280)))
-                                        .togetherWith(
-                                            slideOutVertically(
-                                                targetOffsetY = { -it / 6 },
-                                                animationSpec = tween(380, easing = FastOutSlowInEasing)
-                                            ) + fadeOut(animationSpec = tween(200))
-                                        )
-                                } else if (initialState is Screen.NowPlaying) {
-                                    // When collapsing or going back, slide down smoothly to bottom!
-                                    (slideInVertically(
-                                        initialOffsetY = { -it / 6 },
-                                        animationSpec = tween(340, easing = FastOutSlowInEasing)
-                                    ) + fadeIn(animationSpec = tween(240)))
-                                        .togetherWith(
-                                            slideOutVertically(
-                                                targetOffsetY = { fullHeight -> fullHeight },
-                                                animationSpec = tween(340, easing = FastOutSlowInEasing)
-                                            ) + fadeOut(animationSpec = tween(220))
-                                        )
-                                } else if (targetState is Screen.FolderDetail || targetState is Screen.Appearance || targetState is Screen.About || targetState is Screen.ShareTo || targetState is Screen.Support) {
-                                    (slideInHorizontally(
-                                        initialOffsetX = { fullWidth -> fullWidth },
-                                        animationSpec = tween(320, easing = FastOutSlowInEasing)
-                                    ) + fadeIn(animationSpec = tween(240)))
-                                        .togetherWith(
-                                            slideOutHorizontally(
-                                                targetOffsetX = { -it / 3 },
-                                                animationSpec = tween(320, easing = FastOutSlowInEasing)
-                                            ) + fadeOut(animationSpec = tween(180))
-                                        )
-                                } else if (initialState is Screen.FolderDetail || initialState is Screen.Appearance || initialState is Screen.About || initialState is Screen.ShareTo || initialState is Screen.Support) {
-                                    (slideInHorizontally(
-                                        initialOffsetX = { -it / 3 },
-                                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                                    ) + fadeIn(animationSpec = tween(220)))
-                                        .togetherWith(
-                                            slideOutHorizontally(
-                                                targetOffsetX = { fullWidth -> fullWidth },
-                                                animationSpec = tween(300, easing = FastOutSlowInEasing)
-                                            ) + fadeOut(animationSpec = tween(220))
-                                        )
-                                } else {
-                                    fadeIn(animationSpec = tween(260)) togetherWith fadeOut(animationSpec = tween(200))
-                                }
-                            },
-                            label = "screen_transition",
-                            modifier = Modifier.fillMaxSize()
-                        ) { screen ->
-                            when (screen) {
-                                is Screen.Splash -> {
-                                    SplashScreen(
-                                        onSplashFinished = {
-                                            if (screenStack.none { it is Screen.NowPlaying }) {
-                                                navigateTo(Screen.Home)
-                                            }
-                                        }
-                                    )
-                                }
-
-                                is Screen.Home -> {
-                                    HomeScreen(
-                                        tracks = uiState.allTracks,
-                                        userFolders = uiState.userFolders,
-                                        deviceFolders = uiState.deviceFolders.associate { it.name to it.tracks },
-                                        playbackState = playbackState,
-                                        playerManager = viewModel.playerManager,
-                                        selectedTab = uiState.selectedTab,
-                                        onTabSelected = { viewModel.setSelectedTab(it) },
-                                        isLoading = uiState.isLoading,
-                                        hasStoragePermission = hasAudioPermission,
-                                        onRequestPermission = requestPermissions,
-                                        onRefreshTracks = {
-                                            if (!hasAudioPermission) {
-                                                requestPermissions()
-                                            }
-                                            viewModel.refreshTracks(showFeedback = true)
-                                        },
-                                        onOpenDrawer = {
-                                            scope.launch { drawerState.open() }
-                                        },
-                                        onOpenDualListen = {
-                                            showDualListenSheet = true
-                                        },
-                                        onOpenNowPlaying = {
-                                            navigateTo(Screen.NowPlaying)
-                                        },
-                                        onOpenFolderDetail = { folder ->
-                                            viewModel.setSelectedTab(1)
-                                            navigateTo(Screen.FolderDetail(folder))
-                                        },
-                                        onCreateFolder = { name ->
-                                            viewModel.createUserFolder(name)
-                                        },
-                                        onRenameFolder = { id, name ->
-                                            viewModel.renameUserFolder(id, name)
-                                        },
-                                        onDeleteFolder = { id ->
-                                            viewModel.deleteUserFolder(id)
-                                        },
-                                        onRenameTrack = { track, title ->
-                                            viewModel.renameTrack(track, title)
-                                        },
-                                        onDeleteTrack = { track ->
-                                            viewModel.deleteTrack(track) { intentSender ->
-                                                pendingDeleteTrack = track
-                                                val intentSenderRequest =
-                                                    IntentSenderRequest.Builder(intentSender).build()
-                                                deleteIntentLauncher.launch(intentSenderRequest)
-                                            }
-                                        },
-                                        onDeleteMultipleTracks = { tracksToDelete ->
-                                            viewModel.deleteMultipleTracks(tracksToDelete) { intentSender ->
-                                                val intentSenderRequest =
-                                                    IntentSenderRequest.Builder(intentSender).build()
-                                                deleteIntentLauncher.launch(intentSenderRequest)
-                                            }
-                                        },
-                                        onAddTrackToFolder = { folderId, track ->
-                                            viewModel.addTrackToFolder(folderId, track)
-                                        },
-                                        onAddMultipleTracksToFolder = { folderId, addedTracks ->
-                                            viewModel.addTracksToFolder(folderId, addedTracks)
-                                        },
-                                        onCreateFolderWithTrack = { folderName, track ->
-                                            viewModel.createUserFolderWithTrack(folderName, track)
-                                        },
-                                        onCreateFolderWithMultipleTracks = { folderName, initialTracks ->
-                                            viewModel.createUserFolderWithTracks(folderName, initialTracks)
-                                        },
-                                        onShareTo = { tracks ->
-                                            navigateTo(Screen.ShareTo(tracks))
-                                        }
-                                    )
-                                }
-
-                                is Screen.FolderDetail -> {
-                                    // Keep folder synced with user folders or device folders
-                                    val currentFolder = when {
-                                        screen.folder.id > 0 -> {
-                                            uiState.userFolders.find { it.id == screen.folder.id } ?: screen.folder
-                                        }
-                                        else -> {
-                                            uiState.deviceFolders.find { it.name.equals(screen.folder.name, ignoreCase = true) }?.let { deviceFolder ->
-                                                UserFolder(id = -1, name = deviceFolder.name, tracks = deviceFolder.tracks)
-                                            } ?: screen.folder
-                                        }
-                                    }
-
-                                    val folderKey = if (currentFolder.id > 0) "user_${currentFolder.id}" else "device_${currentFolder.name}"
-
-                                    FolderDetailScreen(
-                                        folder = currentFolder,
-                                        allTracks = uiState.allTracks,
-                                        currentTrack = playbackState.currentTrack,
-                                        isPlaying = playbackState.isPlaying,
-                                        playbackState = playbackState,
-                                        onOpenNowPlaying = { navigateTo(Screen.NowPlaying) },
-                                        onPlayPause = { viewModel.playerManager.togglePlayPause() },
-                                        onNext = { viewModel.playerManager.next() },
-                                        onCloseMiniPlayer = { viewModel.playerManager.dismissPlayer() },
-                                        onBack = { navigateBack() },
-                                        onPlayTrack = { track, queue ->
-                                            viewModel.playerManager.playTrack(track, queue, startPositionMs = 0L, folderKey = folderKey)
-                                            navigateTo(Screen.NowPlaying)
-                                        },
-                                        onPlayFolder = { tracks, minutes, shuffle ->
-                                            viewModel.playFolder(folderKey, tracks, minutes, shuffle)
-                                            navigateTo(Screen.NowPlaying)
-                                        },
-                                        onResumeFolder = { tracks ->
-                                            viewModel.resumeFolder(folderKey, tracks)
-                                            navigateTo(Screen.NowPlaying)
-                                        },
-                                        onMagicRemix = { tracks ->
-                                            viewModel.playMagicRemix(currentFolder.name, tracks)
-                                            navigateTo(Screen.NowPlaying)
-                                        },
-                                        onReorder = { reordered ->
-                                            if (currentFolder.id > 0) {
-                                                viewModel.reorderFolderTracks(currentFolder.id, reordered)
-                                            }
-                                        },
-                                        onAddTracks = { added ->
-                                            if (currentFolder.id > 0) {
-                                                viewModel.addTracksToFolder(currentFolder.id, added)
-                                            }
-                                        },
-                                        onRemoveTrack = { trackUri ->
-                                            if (currentFolder.id > 0) {
-                                                viewModel.removeTrackFromFolder(currentFolder.id, trackUri)
-                                            }
-                                        },
-                                        onRemoveMultipleTracks = { uris ->
-                                            if (currentFolder.id > 0) {
-                                                viewModel.removeMultipleTracksFromFolder(currentFolder.id, uris)
-                                            }
-                                        },
-                                        onDeleteTracks = { tracksToDelete ->
-                                            viewModel.deleteMultipleTracks(tracksToDelete) { intentSender ->
-                                                val intentSenderRequest =
-                                                    IntentSenderRequest.Builder(intentSender).build()
-                                                deleteIntentLauncher.launch(intentSenderRequest)
-                                            }
-                                        },
-                                        onDeleteFolder = { folderId ->
-                                            viewModel.deleteUserFolder(folderId)
-                                            navigateBack()
-                                        },
-                                        onRenameFolder = { folderId, newName ->
-                                            viewModel.renameUserFolder(folderId, newName)
-                                        },
-                                        userFolders = uiState.userFolders,
-                                        onAddMultipleTracksToFolder = { folderId, tracksToAdd ->
-                                            viewModel.addTracksToFolder(folderId, tracksToAdd)
-                                        },
-                                        onCreateFolderWithMultipleTracks = { folderName, tracksToAdd ->
-                                            viewModel.createUserFolderWithTracks(folderName, tracksToAdd)
-                                        },
-                                        onShareTo = { tracks ->
-                                            navigateTo(Screen.ShareTo(tracks))
-                                        }
-                                    )
-                                }
-
-                                is Screen.NowPlaying -> {
-                                    NowPlayingScreen(
-                                        playbackState = playbackState,
-                                        playerManager = viewModel.playerManager,
-                                        syncManager = viewModel.bluetoothSyncManager,
-                                        onNavigateToShareTo = {
-                                            val current = playbackState.currentTrack
-                                            if (current != null) {
-                                                navigateTo(Screen.ShareTo(listOf(current)))
-                                            } else {
-                                                navigateTo(Screen.ShareTo())
-                                            }
-                                        },
-                                        onBack = { navigateBack() }
-                                    )
-                                }
-
-                                is Screen.Appearance -> {
-                                    AppearanceScreen(
-                                        currentThemeMode = uiState.themeMode,
-                                        currentAccent = uiState.accentColor,
-                                        onThemeModeSelected = { viewModel.setThemeMode(it) },
-                                        onAccentSelected = { viewModel.setAccentColor(it) },
-                                        onClearCache = { viewModel.clearAppCache() },
-                                        onBack = { navigateBack() }
-                                    )
-                                }
-
-                                is Screen.About -> {
-                                    AboutScreen(
-                                        onBack = { navigateBack() }
-                                    )
-                                }
-
-                                is Screen.Support -> {
-                                    SupportLoopifyScreen(
-                                        onBack = { navigateBack() }
-                                    )
-                                }
-
-                                is Screen.ShareTo -> {
-                                    ShareToScreen(
-                                        allTracks = uiState.allTracks,
-                                        userFolders = uiState.userFolders,
-                                        deviceFolders = uiState.deviceFolders,
-                                        transferManager = viewModel.transferManager,
-                                        onBack = { navigateBack() },
-                                        onOpenLibrary = {
-                                            viewModel.onTransferCompleteRefresh()
-                                            navigateTo(Screen.Home)
-                                        },
-                                        initialSelectedTracks = (screen as? Screen.ShareTo)?.initialTracks ?: emptyList()
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                )
             }
         }
     }
-}
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        handleIncomingIntent(intent)
-    }
+    private fun checkAndRequestPermissions() {
+        val permissions = mutableListOf<String>()
 
-    private fun handleIncomingIntent(intent: Intent?) {
-        if (intent == null) return
-        val action = intent.action
-        val data = intent.data
-        if ((action == Intent.ACTION_VIEW || action == Intent.ACTION_SEND) && data != null) {
-            incomingAudioUri.value = data
-        } else if (action == Intent.ACTION_SEND) {
-            @Suppress("DEPRECATION")
-            val clipUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
             } else {
-                intent.getParcelableExtra(Intent.EXTRA_STREAM)
+                viewModel.setPermissionGranted(true)
             }
-            if (clipUri != null) {
-                incomingAudioUri.value = clipUri
-            }
-        }
-    }
-
-    private fun extractTrackFromUri(uri: Uri): AudioTrack {
-        var displayName = ""
-        var durationMs = 0L
-
-        try {
-            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (nameIdx != -1) {
-                        displayName = cursor.getString(nameIdx) ?: ""
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-
-        if (displayName.isBlank()) {
-            displayName = uri.lastPathSegment?.substringAfterLast('/') ?: "External Audio"
-        }
-
-        val decodedName = try {
-            Uri.decode(displayName) ?: displayName
-        } catch (_: Exception) {
-            displayName
-        }
-
-        val cleanTitle = if (decodedName.contains('.')) decodedName.substringBeforeLast('.') else decodedName
-
-        try {
-            val mmr = android.media.MediaMetadataRetriever()
-            mmr.setDataSource(this, uri)
-            val durStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
-            durationMs = durStr?.toLongOrNull() ?: 0L
-            val artist = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
-            mmr.release()
-            return AudioTrack(
-                id = System.currentTimeMillis(),
-                uri = uri,
-                title = cleanTitle,
-                artist = if (!artist.isNullOrBlank()) artist else "WhatsApp / External",
-                album = "External Shared Audio",
-                durationMs = durationMs,
-                folderName = "WhatsApp / External"
-            )
-        } catch (_: Exception) {}
-
-        return AudioTrack(
-            id = System.currentTimeMillis(),
-            uri = uri,
-            title = cleanTitle,
-            artist = "WhatsApp / External",
-            album = "External Shared Audio",
-            durationMs = durationMs,
-            folderName = "WhatsApp / External"
-        )
-    }
-
-    private fun checkAudioPermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_MEDIA_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
         } else {
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            } else {
+                viewModel.setPermissionGranted(true)
+            }
+        }
+
+        if (permissions.isNotEmpty()) {
+            requestPermissionsLauncher.launch(permissions.toTypedArray())
         }
     }
 }

@@ -11,7 +11,7 @@ import android.os.Build
 import android.util.Log
 import com.example.model.AudioTrack
 import com.example.playback.AudioPlayerManager
-import com.example.transfer.NetworkUtils
+import com.example.util.NetworkUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

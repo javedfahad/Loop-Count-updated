@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Headphones
@@ -38,7 +37,6 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun NavigationDrawerContent(
-    onNavigateToShareTo: () -> Unit,
     onNavigateToSupport: () -> Unit,
     onNavigateToAppearance: () -> Unit,
     onNavigateToAbout: () -> Unit,
@@ -102,21 +100,6 @@ fun NavigationDrawerContent(
                     onOpenDualListen()
                 },
                 testTag = "drawer_item_dual_listen"
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Navigation Items - Share to (ShareIt style Wi-Fi transfer)
-            DrawerNavItem(
-                icon = Icons.AutoMirrored.Filled.Send,
-                title = "Share to",
-                subtitle = "Fast Wi-Fi Song & Folder Transfer",
-                iconTint = MaterialTheme.colorScheme.primary,
-                onClick = {
-                    onCloseDrawer()
-                    onNavigateToShareTo()
-                },
-                testTag = "drawer_item_share_to"
             )
 
             Spacer(modifier = Modifier.height(6.dp))

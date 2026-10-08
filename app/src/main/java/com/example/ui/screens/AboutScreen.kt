@@ -107,7 +107,7 @@ fun AboutScreen(
             // App Identity Hero
             LoopifyLogo(
                 size = 80.dp,
-                animated = true
+                animated = false
             )
             Spacer(modifier = Modifier.height(14.dp))
             Text(

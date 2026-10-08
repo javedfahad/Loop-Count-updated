@@ -163,8 +163,7 @@ fun HomeScreen(
     onAddMultipleTracksToFolder: ((Long, List<AudioTrack>) -> Unit)? = null,
     onCreateFolderWithTrack: (String, AudioTrack) -> Unit = { _, _ -> },
     onCreateFolderWithMultipleTracks: ((String, List<AudioTrack>) -> Unit)? = null,
-    onOpenDualListen: (() -> Unit)? = null,
-    onShareTo: ((List<AudioTrack>) -> Unit)? = null
+    onOpenDualListen: (() -> Unit)? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = selectedTab.coerceIn(0, 1), pageCount = { 2 })
@@ -583,9 +582,6 @@ fun HomeScreen(
             onCreateFolderWithTrack = { folderName ->
                 onCreateFolderWithTrack(folderName, track)
             },
-            onShareTo = {
-                onShareTo?.invoke(listOf(track))
-            },
             onSelectMultiple = {
                 isMultiSelectMode = true
                 if (!selectedTracks.any { it.uri == track.uri }) {
@@ -736,35 +732,6 @@ fun HomeScreen(
                             }
                         },
                         actions = {
-                            // Prominent Share To Button (Fast Wi-Fi Transfer UI)
-                            Surface(
-                                onClick = { onShareTo?.invoke(emptyList()) },
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                modifier = Modifier
-                                    .padding(end = 8.dp)
-                                    .testTag("action_top_open_share_to")
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Share,
-                                        contentDescription = "Share To",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(5.dp))
-                                    Text(
-                                        text = "Share To",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                }
-                            }
-
                             // Prominent Multi-Select button with good logo
                             Surface(
                                 onClick = {
@@ -941,13 +908,6 @@ fun HomeScreen(
                         onDelete = {
                             if (selectedTracks.isNotEmpty()) {
                                 showBatchDeleteConfirmDialog = true
-                            }
-                        },
-                        onShareTo = {
-                            if (selectedTracks.isNotEmpty()) {
-                                onShareTo?.invoke(selectedTracks.toList())
-                                isMultiSelectMode = false
-                                selectedTracks.clear()
                             }
                         },
                         onDismiss = {

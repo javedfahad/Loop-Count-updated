@@ -71,7 +71,6 @@ fun FancySelectionBottomBar(
     onSelectAllToggle: () -> Unit,
     onPutInFolder: () -> Unit,
     onDelete: () -> Unit,
-    onShareTo: (() -> Unit)? = null,
     onDismiss: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -218,27 +217,7 @@ fun FancySelectionBottomBar(
                                 .testTag("selection_dock_put_in_folder")
                         )
 
-                        // Button 3: Share To
-                        if (onShareTo != null) {
-                            FancyDockButton(
-                                customIcon = {
-                                    MultiSelectLogo(
-                                        size = 22.dp,
-                                        badgeBackground = Color.Transparent
-                                    )
-                                },
-                                label = "Share To",
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                enabled = selectedCount > 0,
-                                onClick = onShareTo,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("selection_dock_share_to")
-                            )
-                        }
-
-                        // Button 4: Delete
+                        // Button 3: Delete
                         FancyDockButton(
                             icon = Icons.Default.DeleteOutline,
                             label = "Delete",

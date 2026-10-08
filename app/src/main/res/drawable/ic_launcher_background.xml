@@ -1,50 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Deep Space Midnight Obsidian Canvas -->
     <path
-        android:pathData="M0,0h108v108h-108z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="54"
-                android:startY="0"
-                android:endX="54"
-                android:endY="108"
-                android:type="linear">
-                <item android:color="#1A0A30" android:offset="0.0" />
-                <item android:color="#0D0418" android:offset="0.5" />
-                <item android:color="#040108" android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Center Radiant Neon Aurora Flare -->
-    <path
-        android:pathData="M54,54m-46,0a46,46 0 1,1 92,0a46,46 0 1,1 -92,0">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:startX="54"
-                android:startY="54"
-                android:endX="100"
-                android:endY="100"
-                android:type="radial"
-                android:gradientRadius="46">
-                <item android:color="#3D126E" android:offset="0.0" />
-                <item android:color="#200742" android:offset="0.55" />
-                <item android:color="#00000000" android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Subtle Orbit Wave Lines -->
-    <path
-        android:pathData="M54,54m-38,0a38,38 0 1,1 76,0a38,38 0 1,1 -76,0"
-        android:strokeWidth="0.8"
-        android:strokeColor="#2E1452" />
-
+        android:fillColor="#140A26"
+        android:pathData="M0,0h108v108h-108z"/>
 </vector>

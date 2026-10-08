@@ -79,7 +79,6 @@ fun TrackOptionsDialog(
     onDelete: () -> Unit,
     onAddToFolder: ((Long) -> Unit)? = null,
     onCreateFolderWithTrack: ((String) -> Unit)? = null,
-    onShareTo: (() -> Unit)? = null,
     onSelectMultiple: (() -> Unit)? = null
 ) {
     var isRenaming by remember { mutableStateOf(false) }
@@ -460,19 +459,6 @@ fun TrackOptionsDialog(
                     },
                     testTag = "option_repeat_settings"
                 )
-
-                if (onShareTo != null) {
-                    OptionMenuItem(
-                        icon = Icons.Default.Share,
-                        title = "Share To...",
-                        subtitle = "Share with a nearby listener via QR code",
-                        onClick = {
-                            onDismiss()
-                            onShareTo()
-                        },
-                        testTag = "option_share_to"
-                    )
-                }
 
                 if (onSelectMultiple != null) {
                     OptionMenuItem(

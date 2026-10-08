@@ -8,7 +8,6 @@ import coil.memory.MemoryCache
 import com.example.data.local.LoopCountDatabase
 import com.example.data.repository.AudioRepository
 import com.example.playback.AudioPlayerManager
-import com.example.transfer.WifiTransferManager
 import java.io.File
 
 class LoopCountApp : Application(), ImageLoaderFactory {
@@ -22,10 +21,6 @@ class LoopCountApp : Application(), ImageLoaderFactory {
 
     val playerManager: AudioPlayerManager by lazy {
         AudioPlayerManager(this, repository)
-    }
-
-    val transferManager: WifiTransferManager by lazy {
-        WifiTransferManager(this)
     }
 
     val bluetoothSyncManager: com.example.sync.BluetoothSyncManager by lazy {

@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.MusicNote
@@ -81,13 +82,12 @@ import androidx.compose.ui.unit.sp
 import com.example.sync.BluetoothSyncManager
 import com.example.sync.DualSyncConnectionState
 import com.example.sync.DualSyncRole
-import com.example.ui.components.LiveQrCodeScannerSheet
+import com.example.ui.dialogs.JoinPartySheet
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DualListenBottomSheet(
     syncManager: BluetoothSyncManager,
-    onNavigateToShareTo: (() -> Unit)? = null,
     onStopMusic: (() -> Unit)? = null,
     onPlayPauseMusic: (() -> Unit)? = null,
     onDismiss: () -> Unit
@@ -101,21 +101,17 @@ fun DualListenBottomSheet(
     val syncState by syncManager.uiState.collectAsState()
     val context = LocalContext.current
 
-    var showScannerSheet by remember { mutableStateOf(false) }
+    var showJoinSheet by remember { mutableStateOf(false) }
 
-    // Live QR Scanner Sheet
-    if (showScannerSheet) {
-        LiveQrCodeScannerSheet(
-            initialManualIp = syncState.hostIp.ifBlank { "192.168.43.1" },
-            onQrCodeDetected = { qrString ->
-                showScannerSheet = false
-                syncManager.joinPartyFromQr(qrString)
-            },
-            onManualConnect = { manualInput ->
-                showScannerSheet = false
+    // Camera-free Manual Join Sheet
+    if (showJoinSheet) {
+        JoinPartySheet(
+            initialHostIp = syncState.hostIp.ifBlank { "192.168.43.1" },
+            onConnect = { manualInput ->
+                showJoinSheet = false
                 syncManager.joinPartyFromQr(manualInput)
             },
-            onDismiss = { showScannerSheet = false }
+            onDismiss = { showJoinSheet = false }
         )
     }
 
@@ -214,7 +210,7 @@ fun DualListenBottomSheet(
                     InitialDualListenView(
                         errorMessage = syncState.errorMessage,
                         onCreateParty = { syncManager.createParty() },
-                        onJoinParty = { showScannerSheet = true }
+                        onJoinParty = { showJoinSheet = true }
                     )
                 }
 
@@ -408,7 +404,7 @@ private fun InitialDualListenView(
             shape = RoundedCornerShape(16.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.QrCodeScanner,
+                imageVector = Icons.Default.GroupAdd,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)

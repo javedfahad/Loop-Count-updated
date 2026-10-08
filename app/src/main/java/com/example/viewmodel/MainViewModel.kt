@@ -41,12 +41,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as LoopCountApp
     private val repository: AudioRepository = app.repository
     val playerManager: AudioPlayerManager = app.playerManager
-    val transferManager = app.transferManager
     val bluetoothSyncManager = app.bluetoothSyncManager
 
     val playbackState: StateFlow<PlaybackState> = playerManager.state
-    val receiverState = transferManager.receiverState
-    val senderProgress = transferManager.senderProgress
     val syncUiState = bluetoothSyncManager.uiState
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -439,21 +436,5 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearMessage() {
         _uiState.update { it.copy(message = null) }
-    }
-
-    // --- Wi-Fi Transfer Methods ---
-    fun startReceiverServer() {
-        transferManager.startReceiver()
-    }
-
-    fun stopReceiverServer() {
-        transferManager.stopReceiver()
-    }
-
-    fun onTransferCompleteRefresh() {
-        viewModelScope.launch {
-            refreshTracks(showFeedback = true)
-            _uiState.update { it.copy(message = "Music library updated with received songs!") }
-        }
     }
 }

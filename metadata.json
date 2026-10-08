@@ -1,6 +1,6 @@
 {
-  "name": "Tuny Music",
-  "description": "Precision Audio Looper & Smart Music Player engineered by Eert Labs with counted repetitions, zero-duplicate playlists, and offline playback.",
+  "name": "TunyMusic",
+  "description": "TunyMusic player with local audio playback, playlists, and Dual Listen synchronous party listening.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
