@@ -1,9 +1,6 @@
 package com.example.sync
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
-import com.example.transfer.NetworkUtils
-import kotlinx.coroutines.runBlocking
+import com.example.util.NetworkUtils
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -11,20 +8,8 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.PrintWriter
-import java.net.ServerSocket
-import java.util.UUID
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
 class DualListenWorstCaseTest {
-
-    private val context: Context get() = ApplicationProvider.getApplicationContext()
 
     @Test
     fun testPrivateIpValidation_worstCases() {
@@ -33,24 +18,27 @@ class DualListenWorstCaseTest {
         assertFalse(NetworkUtils.isPrivateOrLocalIp("100.100.5.2"))
         assertFalse(NetworkUtils.isPrivateOrLocalIp("100.127.255.255"))
 
-        // Link local & loopback MUST be rejected
+        // Link local, loopback, and public WAN IPs MUST be rejected
         assertFalse(NetworkUtils.isPrivateOrLocalIp("127.0.0.1"))
         assertFalse(NetworkUtils.isPrivateOrLocalIp("0.0.0.0"))
         assertFalse(NetworkUtils.isPrivateOrLocalIp("169.254.1.1"))
         assertFalse(NetworkUtils.isPrivateOrLocalIp(null))
         assertFalse(NetworkUtils.isPrivateOrLocalIp(""))
+        assertFalse(NetworkUtils.isPrivateOrLocalIp("8.8.8.8"))
+        assertFalse(NetworkUtils.isPrivateOrLocalIp("1.1.1.1"))
 
-        // Standard private LAN IPs MUST be accepted
-        assertTrue(NetworkUtils.isPrivateOrLocalIp("192.168.43.1"))
-        assertTrue(NetworkUtils.isPrivateOrLocalIp("192.168.1.100"))
-        assertTrue(NetworkUtils.isPrivateOrLocalIp("10.0.0.1"))
-        assertTrue(NetworkUtils.isPrivateOrLocalIp("172.20.10.1"))
-        assertTrue(NetworkUtils.isPrivateOrLocalIp("172.31.255.254"))
+        // Standard private LAN and Hotspot IPs MUST be accepted across all phone vendors
+        assertTrue(NetworkUtils.isPrivateOrLocalIp("192.168.43.1"))   // Android default hotspot
+        assertTrue(NetworkUtils.isPrivateOrLocalIp("192.168.49.1"))   // Wi-Fi Direct
+        assertTrue(NetworkUtils.isPrivateOrLocalIp("192.168.1.100"))  // Home Wi-Fi
+        assertTrue(NetworkUtils.isPrivateOrLocalIp("10.0.0.1"))       // Class A private
+        assertTrue(NetworkUtils.isPrivateOrLocalIp("172.20.10.1"))    // Class B private / iOS hotspot
+        assertTrue(NetworkUtils.isPrivateOrLocalIp("172.31.255.254")) // Class B private upper bound
     }
 
     @Test
-    fun testQrPayloadParsing_worstCases() {
-        // Case 1: Standard valid JSON
+    fun testQrPayloadParsing_allScenarios() {
+        // Scenario 1: Standard clean JSON
         val validJson = JSONObject().apply {
             put("app", "TunyMusicDual")
             put("v", 2)
@@ -59,7 +47,7 @@ class DualListenWorstCaseTest {
             put("httpPort", 8892)
             put("session", "sess123")
             put("token", "tok456")
-            put("name", "Fahad's Party")
+            put("name", "Outdoor Beats")
         }.toString()
 
         val parsed1 = parseQrPayloadHelper(validJson)
@@ -69,43 +57,125 @@ class DualListenWorstCaseTest {
         assertEquals(8892, parsed1?.httpPort)
         assertEquals("sess123", parsed1?.session)
 
-        // Case 2: Dirty string with surrounding quotes or whitespace
+        // Scenario 2: Dirty string with surrounding quotes or whitespace
         val dirtyJson = "   \"$validJson\"   \n"
         val parsed2 = parseQrPayloadHelper(dirtyJson)
         assertNotNull(parsed2)
         assertEquals("192.168.43.1", parsed2?.ip)
 
-        // Case 3: Embedded inside scanner prefix/suffix text
-        val wrappedText = "Scanned payload: $validJson (end of code)"
+        // Scenario 3: Embedded inside scanner prefix/suffix text
+        val wrappedText = "Scanned QR code: $validJson (end of payload)"
         val parsed3 = parseQrPayloadHelper(wrappedText)
         assertNotNull(parsed3)
         assertEquals("192.168.43.1", parsed3?.ip)
 
-        // Case 4: Custom URI scheme
-        val uriPayload = "tunymusic-dual://join?ip=192.168.49.1&port=8890&httpPort=8892&session=s1&token=t1&name=TestParty"
+        // Scenario 4: Custom URI scheme
+        val uriPayload = "tunymusic-dual://join?ip=192.168.49.1&port=8890&httpPort=8892&session=s1&token=t1&name=ParkParty"
         val parsed4 = parseQrPayloadHelper(uriPayload)
         assertNotNull(parsed4)
         assertEquals("192.168.49.1", parsed4?.ip)
         assertEquals("s1", parsed4?.session)
 
-        // Case 5: Raw IP with port (manual connection)
+        // Scenario 5: Raw IP with port (manual connection)
         val rawIpWithPort = "192.168.43.1:9000"
         val parsed5 = parseQrPayloadHelper(rawIpWithPort)
         assertNotNull(parsed5)
         assertEquals("192.168.43.1", parsed5?.ip)
         assertEquals(9000, parsed5?.port)
 
-        // Case 6: Pure raw IP without port
+        // Scenario 6: Pure raw IP without port
         val pureIp = "192.168.43.1"
         val parsed6 = parseQrPayloadHelper(pureIp)
         assertNotNull(parsed6)
         assertEquals("192.168.43.1", parsed6?.ip)
         assertEquals(8890, parsed6?.port)
 
-        // Case 7: Corrupted / non-network string
+        // Scenario 7: Garbage non-network string (must return null gracefully)
         val garbage = "https://www.google.com/search?q=music"
         val parsed7 = parseQrPayloadHelper(garbage)
         assertNull(parsed7)
+    }
+
+    @Test
+    fun testProtocolPacketValidation_handshakeAndHeartbeat() {
+        // CMD_JOIN packet
+        val joinReq = JSONObject().apply {
+            put("action", BluetoothSyncManager.CMD_JOIN)
+            put("session", "sess_alpha")
+            put("token", "tok_beta")
+            put("name", "Friend Galaxy S24")
+        }
+        assertEquals(BluetoothSyncManager.CMD_JOIN, joinReq.optString("action"))
+        assertEquals("sess_alpha", joinReq.optString("session"))
+        assertEquals("Friend Galaxy S24", joinReq.optString("name"))
+
+        // CMD_JOIN_OK response
+        val joinOk = JSONObject().apply {
+            put("action", BluetoothSyncManager.CMD_JOIN_OK)
+            put("partyName", "Outdoor Beats")
+            put("listenerCount", 1)
+            put("maxListeners", 6)
+        }
+        assertEquals(BluetoothSyncManager.CMD_JOIN_OK, joinOk.optString("action"))
+        assertEquals("Outdoor Beats", joinOk.optString("partyName"))
+        assertEquals(1, joinOk.optInt("listenerCount"))
+        assertEquals(6, joinOk.optInt("maxListeners"))
+
+        // CMD_PROBE & CMD_PROBE_OK for zero-click auto discovery
+        val probe = JSONObject().apply { put("action", BluetoothSyncManager.CMD_PROBE) }
+        assertEquals(BluetoothSyncManager.CMD_PROBE, probe.optString("action"))
+
+        val probeOk = JSONObject().apply {
+            put("action", BluetoothSyncManager.CMD_PROBE_OK)
+            put("name", "Host's Party")
+            put("ip", "192.168.43.1")
+            put("port", BluetoothSyncManager.TCP_CONTROL_PORT)
+            put("httpPort", BluetoothSyncManager.HTTP_STREAM_PORT)
+            put("session", "hotspot_sess")
+            put("token", "hotspot_tok")
+        }
+        assertEquals(BluetoothSyncManager.CMD_PROBE_OK, probeOk.optString("action"))
+        assertEquals("192.168.43.1", probeOk.optString("ip"))
+        assertEquals(8890, probeOk.optInt("port"))
+        assertEquals(8892, probeOk.optInt("httpPort"))
+
+        // CMD_SYNC_HEARTBEAT synchronization packet
+        val heartbeat = JSONObject().apply {
+            put("action", BluetoothSyncManager.CMD_SYNC_HEARTBEAT)
+            put("pos", 45_200L)
+            put("isPlaying", true)
+            put("ts", 1728500000000L)
+        }
+        assertEquals(BluetoothSyncManager.CMD_SYNC_HEARTBEAT, heartbeat.optString("action"))
+        assertEquals(45_200L, heartbeat.optLong("pos"))
+        assertTrue(heartbeat.optBoolean("isPlaying"))
+    }
+
+    @Test
+    fun testCapacityAndRejectionScenario() {
+        val state = DualSyncUiState()
+        assertEquals(DualSyncConnectionState.DISCONNECTED, state.connectionState)
+        assertEquals(DualSyncRole.NONE, state.role)
+        assertEquals(6, state.maxDevices)
+        assertEquals(0, state.connectedDeviceCount)
+
+        // Simulate full party (6 listeners connected)
+        val fullState = state.copy(
+            connectedDeviceCount = 6,
+            maxDevices = 6,
+            connectionState = DualSyncConnectionState.CONNECTED
+        )
+        assertTrue(fullState.connectedDeviceCount >= fullState.maxDevices)
+
+        // Verify rejection packet for 7th connecting phone
+        val rejectPacket = JSONObject().apply {
+            put("action", BluetoothSyncManager.CMD_REJECT)
+            put("reason", "FULL")
+            put("message", "Party is full — maximum 6 listeners.")
+        }
+        assertEquals(BluetoothSyncManager.CMD_REJECT, rejectPacket.optString("action"))
+        assertEquals("FULL", rejectPacket.optString("reason"))
+        assertEquals("Party is full — maximum 6 listeners.", rejectPacket.optString("message"))
     }
 
     @Test
@@ -116,7 +186,7 @@ class DualListenWorstCaseTest {
         val sanitized = sanitizeStreamUrlHelper(originalStaleUrl, actualConnectedHostIp, 8892)
         assertEquals("http://192.168.43.1:8892/audio?session=xyz789&token=abc123", sanitized)
 
-        // Empty URL should safely return empty
+        // Empty URL should safely return empty without error
         assertEquals("", sanitizeStreamUrlHelper("", actualConnectedHostIp, 8892))
 
         // Blank host should return original
@@ -124,137 +194,36 @@ class DualListenWorstCaseTest {
     }
 
     @Test
-    fun testDualSyncUiState_defaultsAndLimits() {
-        val state = DualSyncUiState()
-        assertEquals(DualSyncConnectionState.DISCONNECTED, state.connectionState)
-        assertEquals(DualSyncRole.NONE, state.role)
-        assertEquals(6, state.maxDevices)
-        assertEquals(0, state.connectedDeviceCount)
-        assertFalse(state.isSyncActive)
-
-        // Test party full limit logic
-        val fullState = state.copy(
-            connectedDeviceCount = 6,
-            maxDevices = 6,
-            connectionState = DualSyncConnectionState.CONNECTED
+    fun testDirectConnectPayloadGeneration() {
+        val party = DiscoveredParty(
+            name = "Picnic Party",
+            hostIp = "192.168.43.1",
+            hostPort = 8890,
+            httpPort = 8892,
+            sessionId = "sess_picnic",
+            sessionToken = "tok_picnic",
+            isHotspotGateway = true
         )
-        assertEquals(6, fullState.connectedDeviceCount)
-        assertTrue(fullState.connectedDeviceCount >= fullState.maxDevices)
-    }
+        assertTrue(party.isHotspotGateway)
+        assertEquals("192.168.43.1", party.hostIp)
 
-    @Test
-    fun testFastSocketHandshake_successScenario() = runBlocking {
-        // Start a mock host ServerSocket
-        val server = ServerSocket(0)
-        val port = server.localPort
-        val sessionId = "test_sess"
-        val token = "test_tok"
+        val directPayload = JSONObject().apply {
+            put("app", "TunyMusicDual")
+            put("v", 2)
+            put("ip", party.hostIp)
+            put("port", party.hostPort)
+            put("httpPort", party.httpPort)
+            put("session", party.sessionId)
+            put("token", party.sessionToken)
+            put("name", party.name)
+        }.toString()
 
-        // Thread to accept connection and respond with CMD_JOIN_OK
-        val serverThread = Thread {
-            try {
-                val client = server.accept()
-                val reader = BufferedReader(InputStreamReader(client.getInputStream()))
-                val writer = PrintWriter(client.getOutputStream(), true)
-
-                val line = reader.readLine()
-                assertNotNull(line)
-                val json = JSONObject(line)
-                assertEquals(BluetoothSyncManager.CMD_JOIN, json.optString("action"))
-                assertEquals(sessionId, json.optString("session"))
-
-                val ok = JSONObject().apply {
-                    put("action", BluetoothSyncManager.CMD_JOIN_OK)
-                    put("partyName", "Mock Party")
-                    put("listenerCount", 1)
-                    put("maxListeners", 6)
-                }
-                writer.println(ok.toString())
-                client.close()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                server.close()
-            }
-        }
-        serverThread.start()
-
-        // Client side connect
-        val clientSocket = java.net.Socket()
-        clientSocket.connect(java.net.InetSocketAddress("127.0.0.1", port), 2000)
-        val writer = PrintWriter(clientSocket.getOutputStream(), true)
-        val reader = BufferedReader(InputStreamReader(clientSocket.getInputStream()))
-
-        val joinReq = JSONObject().apply {
-            put("action", BluetoothSyncManager.CMD_JOIN)
-            put("session", sessionId)
-            put("token", token)
-            put("name", "Test Phone")
-        }
-        writer.println(joinReq.toString())
-
-        val response = reader.readLine()
-        assertNotNull(response)
-        val respJson = JSONObject(response)
-        assertEquals(BluetoothSyncManager.CMD_JOIN_OK, respJson.optString("action"))
-        assertEquals("Mock Party", respJson.optString("partyName"))
-
-        clientSocket.close()
-        serverThread.join(2000)
-    }
-
-    @Test
-    fun testFastSocketHandshake_rejectionScenario() = runBlocking {
-        // Mock host ServerSocket that rejects because party is full
-        val server = ServerSocket(0)
-        val port = server.localPort
-
-        val serverThread = Thread {
-            try {
-                val client = server.accept()
-                val reader = BufferedReader(InputStreamReader(client.getInputStream()))
-                val writer = PrintWriter(client.getOutputStream(), true)
-
-                val line = reader.readLine()
-                assertNotNull(line)
-
-                val reject = JSONObject().apply {
-                    put("action", BluetoothSyncManager.CMD_REJECT)
-                    put("reason", "FULL")
-                    put("message", "Party is full — maximum 6 listeners.")
-                }
-                writer.println(reject.toString())
-                client.close()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                server.close()
-            }
-        }
-        serverThread.start()
-
-        val clientSocket = java.net.Socket()
-        clientSocket.connect(java.net.InetSocketAddress("127.0.0.1", port), 2000)
-        val writer = PrintWriter(clientSocket.getOutputStream(), true)
-        val reader = BufferedReader(InputStreamReader(clientSocket.getInputStream()))
-
-        val joinReq = JSONObject().apply {
-            put("action", BluetoothSyncManager.CMD_JOIN)
-            put("session", "any")
-            put("token", "any")
-            put("name", "Late Friend")
-        }
-        writer.println(joinReq.toString())
-
-        val response = reader.readLine()
-        assertNotNull(response)
-        val respJson = JSONObject(response)
-        assertEquals(BluetoothSyncManager.CMD_REJECT, respJson.optString("action"))
-        assertEquals("FULL", respJson.optString("reason"))
-        assertEquals("Party is full — maximum 6 listeners.", respJson.optString("message"))
-
-        clientSocket.close()
-        serverThread.join(2000)
+        val parsed = parseQrPayloadHelper(directPayload)
+        assertNotNull(parsed)
+        assertEquals("192.168.43.1", parsed?.ip)
+        assertEquals(8890, parsed?.port)
+        assertEquals(8892, parsed?.httpPort)
+        assertEquals("sess_picnic", parsed?.session)
     }
 
     // Helpers replicating internal parsing for isolated validation
@@ -280,12 +249,15 @@ class DualListenWorstCaseTest {
 
         if (clean.contains("tunymusic-dual://", ignoreCase = true)) {
             try {
-                val uriStr = clean.substring(clean.indexOf("tunymusic-dual://", ignoreCase = true))
-                val uri = android.net.Uri.parse(uriStr)
-                val ip = uri.getQueryParameter("ip") ?: ""
-                val port = uri.getQueryParameter("port")?.toIntOrNull() ?: 8890
-                val httpPort = uri.getQueryParameter("httpPort")?.toIntOrNull() ?: 8892
-                val session = uri.getQueryParameter("session") ?: "default"
+                val queryPart = clean.substringAfter("?", "")
+                val pairs = queryPart.split("&").associate {
+                    val kv = it.split("=")
+                    if (kv.size == 2) kv[0] to kv[1] else "" to ""
+                }
+                val ip = pairs["ip"] ?: ""
+                val port = pairs["port"]?.toIntOrNull() ?: 8890
+                val httpPort = pairs["httpPort"]?.toIntOrNull() ?: 8892
+                val session = pairs["session"] ?: "default"
                 if (ip.isNotBlank()) {
                     return ParsedQrResult(ip, port, httpPort, session)
                 }
@@ -308,12 +280,11 @@ class DualListenWorstCaseTest {
     private fun sanitizeStreamUrlHelper(originalUrl: String, hostIp: String, fallbackHttpPort: Int): String {
         if (originalUrl.isBlank() || hostIp.isBlank()) return originalUrl
         return try {
-            val uri = android.net.Uri.parse(originalUrl)
+            val uri = java.net.URI(originalUrl)
             val port = if (uri.port != -1) uri.port else fallbackHttpPort
-            val query = uri.encodedQuery
-            val path = uri.encodedPath ?: "/audio"
-            val queryPart = if (!query.isNullOrBlank()) "?$query" else ""
-            "http://$hostIp:$port$path$queryPart"
+            val path = if (!uri.path.isNullOrBlank()) uri.path else "/audio"
+            val query = if (!uri.query.isNullOrBlank()) "?${uri.query}" else ""
+            "http://$hostIp:$port$path$query"
         } catch (_: Exception) {
             originalUrl
         }

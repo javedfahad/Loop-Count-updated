@@ -3,10 +3,19 @@ package com.example.util
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
 import com.google.zxing.BarcodeFormat
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.DecodeHintType
 import com.google.zxing.EncodeHintType
+import com.google.zxing.MultiFormatReader
+import com.google.zxing.RGBLuminanceSource
+import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.qrcode.QRCodeReader
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import java.net.Inet4Address
@@ -246,5 +255,83 @@ object NetworkUtils {
         val regex = Regex("""(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})""")
         val match = regex.find(clean)
         return match?.value
+    }
+
+    /**
+     * Binds the application process to the active local Wi-Fi / Hotspot network interface.
+     * CRITICAL for Hotspot listening when cellular data is on: prevents Android from routing
+     * offline local sockets and ExoPlayer stream requests to mobile data.
+     */
+    fun bindProcessToLocalWifi(context: Context): Boolean {
+        try {
+            val cm = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                for (network in cm.allNetworks) {
+                    val caps = cm.getNetworkCapabilities(network) ?: continue
+                    if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                        caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                    ) {
+                        cm.bindProcessToNetwork(network)
+                        return true
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return false
+    }
+
+    /**
+     * Unbinds the application process from the specific network, restoring default OS routing.
+     */
+    fun unbindProcessFromLocalWifi(context: Context) {
+        try {
+            val cm = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                cm.bindProcessToNetwork(null)
+            }
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Returns candidate broadcast addresses for local UDP party discovery.
+     */
+    fun getBroadcastAddresses(context: Context?): List<String> {
+        val result = linkedSetOf<String>()
+        result.add("255.255.255.255")
+        val localIp = getLocalIpAddress(context)
+        val prefix = localIp.substringBeforeLast(".", "")
+        if (prefix.isNotBlank()) {
+            result.add("$prefix.255")
+        }
+        result.add("192.168.43.255")
+        return result.toList()
+    }
+
+    /**
+     * Decodes a QR code string from an in-memory Bitmap using ZXing.
+     * Allows listeners to scan QR codes from screenshots or gallery photos without camera permission.
+     */
+    fun decodeQrFromBitmap(bitmap: Bitmap): String? {
+        return try {
+            val width = bitmap.width
+            val height = bitmap.height
+            val pixels = IntArray(width * height)
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+            val source = RGBLuminanceSource(width, height, pixels)
+            val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
+            val hints = mapOf(
+                DecodeHintType.TRY_HARDER to java.lang.Boolean.TRUE,
+                DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE)
+            )
+            try {
+                QRCodeReader().decode(binaryBitmap, hints).text
+            } catch (_: Exception) {
+                MultiFormatReader().decode(binaryBitmap, hints).text
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 }

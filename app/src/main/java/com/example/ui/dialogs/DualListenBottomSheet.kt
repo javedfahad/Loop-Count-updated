@@ -103,10 +103,18 @@ fun DualListenBottomSheet(
 
     var showJoinSheet by remember { mutableStateOf(false) }
 
+    // Start local network auto-discovery on sheet open
+    androidx.compose.runtime.LaunchedEffect(syncState.role) {
+        if (syncState.role == DualSyncRole.NONE) {
+            syncManager.startAutoDiscovery()
+        }
+    }
+
     // Camera-free Manual Join Sheet
     if (showJoinSheet) {
         JoinPartySheet(
             initialHostIp = syncState.hostIp.ifBlank { "192.168.43.1" },
+            discoveredParties = syncState.discoveredParties,
             onConnect = { manualInput ->
                 showJoinSheet = false
                 syncManager.joinPartyFromQr(manualInput)
@@ -209,6 +217,11 @@ fun DualListenBottomSheet(
                     // ---------------------------------------------------------
                     InitialDualListenView(
                         errorMessage = syncState.errorMessage,
+                        discoveredParties = syncState.discoveredParties,
+                        isAutoScanning = syncState.isAutoScanning,
+                        onJoinDiscoveredParty = { party ->
+                            syncManager.joinPartyDirect(party)
+                        },
                         onCreateParty = { syncManager.createParty() },
                         onJoinParty = { showJoinSheet = true }
                     )
@@ -282,6 +295,9 @@ fun DualListenBottomSheet(
 @Composable
 private fun InitialDualListenView(
     errorMessage: String?,
+    discoveredParties: List<com.example.sync.DiscoveredParty> = emptyList(),
+    isAutoScanning: Boolean = false,
+    onJoinDiscoveredParty: (com.example.sync.DiscoveredParty) -> Unit = {},
     onCreateParty: () -> Unit,
     onJoinParty: () -> Unit
 ) {
@@ -327,6 +343,100 @@ private fun InitialDualListenView(
             }
         }
 
+        // Automatic Party Discovery Card (1-Tap Join!)
+        if (discoveredParties.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(14.dp))
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Podcasts,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Party Detected Nearby!",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                letterSpacing = 0.8.sp
+                            )
+                            Text(
+                                text = discoveredParties.first().name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = { onJoinDiscoveredParty(discoveredParties.first()) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("one_tap_join_party_btn"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "1-Tap Join (${discoveredParties.first().hostIp})",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        } else if (isAutoScanning) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(12.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Searching local network for parties...",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         if (!errorMessage.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(14.dp))
             Surface(
@@ -365,7 +475,7 @@ private fun InitialDualListenView(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         // Create Party Button
         Button(

@@ -58,6 +58,17 @@ data class ConnectedListener(
     val joinedAt: Long = System.currentTimeMillis()
 )
 
+data class DiscoveredParty(
+    val name: String,
+    val hostIp: String,
+    val hostPort: Int = BluetoothSyncManager.TCP_CONTROL_PORT,
+    val httpPort: Int = BluetoothSyncManager.HTTP_STREAM_PORT,
+    val sessionId: String = "default",
+    val sessionToken: String = "default",
+    val isHotspotGateway: Boolean = false,
+    val discoveredAt: Long = System.currentTimeMillis()
+)
+
 data class DualSyncUiState(
     val connectionState: DualSyncConnectionState = DualSyncConnectionState.DISCONNECTED,
     val role: DualSyncRole = DualSyncRole.NONE,
@@ -83,6 +94,8 @@ data class DualSyncUiState(
     val isHostMusicPlaying: Boolean = false,
     val missingTrackTitle: String? = null,
     val missingClientName: String? = null,
+    val discoveredParties: List<DiscoveredParty> = emptyList(),
+    val isAutoScanning: Boolean = false,
     val statusMessage: String = "Dual Listen Offline Party ready",
     val errorMessage: String? = null
 )
@@ -105,6 +118,7 @@ class BluetoothSyncManager(
     companion object {
         const val TAG = "DualListenManager"
         const val TCP_CONTROL_PORT = 8890
+        const val UDP_DISCOVERY_PORT = 8891
         const val HTTP_STREAM_PORT = 8892
         const val MAX_LISTENERS = 6 // 1 Host + 6 Listeners = 7 phones maximum
 
@@ -121,6 +135,10 @@ class BluetoothSyncManager(
         const val CMD_PARTY_ENDED = "PARTY_ENDED"
         const val CMD_LEAVE = "LEAVE"
         const val CMD_LISTENER_COUNT_UPDATE = "LISTENER_COUNT_UPDATE"
+        const val CMD_PROBE = "TUNY_PROBE"
+        const val CMD_PROBE_OK = "TUNY_PROBE_OK"
+        const val CMD_BEACON = "TUNY_BEACON"
+        const val CMD_PING = "TUNY_PING"
     }
 
     private class HostClientSession(
@@ -146,6 +164,8 @@ class BluetoothSyncManager(
     private val connectedClients = CopyOnWriteArrayList<HostClientSession>()
     private var heartbeatJob: Job? = null
     private var hostIpMonitorJob: Job? = null
+    private var hostUdpBeaconJob: Job? = null
+    private var autoDiscoveryJob: Job? = null
 
     // Listener (Client) Uplink
     private var clientSocket: Socket? = null
@@ -266,6 +286,9 @@ class BluetoothSyncManager(
         val currentTrack = playerManager.state.value.currentTrack
         audioStreamServer.start(sessionId, sessionToken, currentTrack)
 
+        // Bind application process to local Wi-Fi / Hotspot interface
+        NetworkUtils.bindProcessToLocalWifi(context)
+
         // 2. Start TCP Control Server to handle listener handshakes & commands
         scope.launch {
             try {
@@ -291,6 +314,9 @@ class BluetoothSyncManager(
 
         // 4. Start Host IP Monitor (auto-updates QR code if Hotspot is turned on after party creation)
         startHostIpMonitor()
+
+        // 5. Start UDP Beacon Broadcaster for instant automatic party discovery
+        startUdpBeaconBroadcaster(sessionId, sessionToken, partyName)
     }
 
     private fun startHostIpMonitor() {
@@ -362,7 +388,22 @@ class BluetoothSyncManager(
                 }
 
                 val handshakeJson = JSONObject(handshakeLine)
-                if (handshakeJson.optString("action") != CMD_JOIN) {
+                val action = handshakeJson.optString("action")
+                if (action == CMD_PROBE) {
+                    val probeOk = JSONObject().apply {
+                        put("action", CMD_PROBE_OK)
+                        put("name", partyName)
+                        put("ip", _uiState.value.hostIp)
+                        put("port", TCP_CONTROL_PORT)
+                        put("httpPort", HTTP_STREAM_PORT)
+                        put("session", activeSessionId)
+                        put("token", activeToken)
+                    }
+                    writer.println(probeOk.toString())
+                    socket.close()
+                    return@launch
+                }
+                if (action != CMD_JOIN) {
                     socket.close()
                     return@launch
                 }
@@ -664,6 +705,8 @@ class BluetoothSyncManager(
 
         scope.launch {
             try {
+                // Prioritize local Wi-Fi / Hotspot interface over cellular data
+                NetworkUtils.bindProcessToLocalWifi(context)
                 val clientDeviceName = getUserDeviceName()
 
                 // Step 1: Direct fast connect to the Host IP from QR code (sub-50ms when on same Wi-Fi/Hotspot)
@@ -1165,6 +1208,13 @@ class BluetoothSyncManager(
         try { clientSocket?.close() } catch (_: Exception) {}
         clientSocket = null
 
+        // Stop Discovery and Unbind Local Wi-Fi
+        hostUdpBeaconJob?.cancel()
+        hostUdpBeaconJob = null
+        autoDiscoveryJob?.cancel()
+        autoDiscoveryJob = null
+        NetworkUtils.unbindProcessFromLocalWifi(context)
+
         _uiState.update {
             it.copy(
                 connectionState = DualSyncConnectionState.DISCONNECTED,
@@ -1182,8 +1232,241 @@ class BluetoothSyncManager(
                 currentStreamingTitle = null,
                 currentStreamingArtist = null,
                 isHostMusicPlaying = false,
+                isAutoScanning = false,
                 statusMessage = "Offline Dual Listen ready"
             )
+        }
+    }
+
+    // =========================================================================
+    // INSTANT LOCAL AUTO DISCOVERY & DIRECT CONNECT
+    // =========================================================================
+
+    /**
+     * Connects directly to a discovered party with a single tap.
+     */
+    fun joinPartyDirect(party: DiscoveredParty) {
+        val payload = JSONObject().apply {
+            put("app", "TunyMusicDual")
+            put("v", 2)
+            put("ip", party.hostIp)
+            put("port", party.hostPort)
+            put("httpPort", party.httpPort)
+            put("session", party.sessionId)
+            put("token", party.sessionToken)
+            put("name", party.name)
+        }.toString()
+        joinPartyFromQr(payload)
+    }
+
+    /**
+     * Automatically discovers active Host parties on the local Wi-Fi / Hotspot network.
+     * Uses UDP broadcasts + fast parallel TCP candidate IP probes (sub-200ms discovery).
+     */
+    fun startAutoDiscovery() {
+        if (isHost() || isSyncConnected()) return
+        autoDiscoveryJob?.cancel()
+        autoDiscoveryJob = scope.launch {
+            _uiState.update { it.copy(isAutoScanning = true) }
+            NetworkUtils.bindProcessToLocalWifi(context)
+
+            val discoveredMap = mutableMapOf<String, DiscoveredParty>()
+
+            fun addDiscovered(party: DiscoveredParty) {
+                if (!discoveredMap.containsKey(party.hostIp)) {
+                    discoveredMap[party.hostIp] = party
+                    _uiState.update {
+                        it.copy(
+                            discoveredParties = discoveredMap.values.toList(),
+                            statusMessage = "Found \"${party.name}\" nearby"
+                        )
+                    }
+                }
+            }
+
+            // Sub-routine 1: Instant parallel probes of Hotspot Gateway, 192.168.43.1, and candidate IPs
+            launch(Dispatchers.IO) {
+                val targets = linkedSetOf<String>()
+                val gw = NetworkUtils.getGatewayIpAddress(context)
+                if (!gw.isNullOrBlank() && NetworkUtils.isPrivateOrLocalIp(gw)) {
+                    targets.add(gw)
+                }
+                targets.add("192.168.43.1")
+                targets.addAll(NetworkUtils.getHotspotCandidateIps(context))
+                val selfIp = NetworkUtils.getLocalIpAddress(context)
+                targets.remove(selfIp)
+
+                for (cand in targets) {
+                    if (!isActive || isSyncConnected()) break
+                    val res = probeCandidateIp(cand)
+                    if (res != null) {
+                        addDiscovered(res)
+                    }
+                }
+            }
+
+            // Sub-routine 2: UDP Broadcast ping on port 8891 and listen for Host beacons
+            launch(Dispatchers.IO) {
+                var dSocket: java.net.DatagramSocket? = null
+                try {
+                    dSocket = java.net.DatagramSocket().apply {
+                        broadcast = true
+                        soTimeout = 1200
+                    }
+                    val pingBytes = JSONObject().apply {
+                        put("action", CMD_PING)
+                    }.toString().toByteArray(Charsets.UTF_8)
+
+                    // Send initial pings
+                    for (bcast in NetworkUtils.getBroadcastAddresses(context)) {
+                        try {
+                            val pkt = java.net.DatagramPacket(pingBytes, pingBytes.size, java.net.InetAddress.getByName(bcast), UDP_DISCOVERY_PORT)
+                            dSocket.send(pkt)
+                        } catch (_: Exception) {}
+                    }
+
+                    val buf = ByteArray(2048)
+                    val pkt = java.net.DatagramPacket(buf, buf.size)
+                    val startTime = System.currentTimeMillis()
+
+                    while (isActive && !isSyncConnected() && (System.currentTimeMillis() - startTime < 12_000L)) {
+                        try {
+                            dSocket.receive(pkt)
+                            val text = String(pkt.data, 0, pkt.length, Charsets.UTF_8)
+                            val json = JSONObject(text)
+                            val action = json.optString("action")
+                            if (action == CMD_BEACON || action == CMD_PROBE_OK) {
+                                val ip = json.optString("ip").ifBlank { pkt.address.hostAddress ?: "" }
+                                val name = json.optString("name", "Host's Party")
+                                val port = json.optInt("port", TCP_CONTROL_PORT)
+                                val httpPort = json.optInt("httpPort", HTTP_STREAM_PORT)
+                                val sess = json.optString("session", "default")
+                                val tok = json.optString("token", "default")
+                                if (ip.isNotBlank() && ip != NetworkUtils.getLocalIpAddress(context)) {
+                                    addDiscovered(
+                                        DiscoveredParty(
+                                            name = name,
+                                            hostIp = ip,
+                                            hostPort = port,
+                                            httpPort = httpPort,
+                                            sessionId = sess,
+                                            sessionToken = tok,
+                                            isHotspotGateway = (ip == "192.168.43.1" || ip == NetworkUtils.getGatewayIpAddress(context))
+                                        )
+                                    )
+                                }
+                            }
+                        } catch (_: SocketTimeoutException) {
+                            // Retry ping
+                            for (bcast in NetworkUtils.getBroadcastAddresses(context)) {
+                                try {
+                                    val retryPkt = java.net.DatagramPacket(pingBytes, pingBytes.size, java.net.InetAddress.getByName(bcast), UDP_DISCOVERY_PORT)
+                                    dSocket.send(retryPkt)
+                                } catch (_: Exception) {}
+                            }
+                        } catch (_: Exception) {}
+                    }
+                } catch (_: Exception) {} finally {
+                    try { dSocket?.close() } catch (_: Exception) {}
+                }
+            }
+
+            delay(12_000L)
+            _uiState.update { it.copy(isAutoScanning = false) }
+        }
+    }
+
+    fun stopAutoDiscovery() {
+        autoDiscoveryJob?.cancel()
+        autoDiscoveryJob = null
+        _uiState.update { it.copy(isAutoScanning = false) }
+    }
+
+    private fun probeCandidateIp(targetIp: String): DiscoveredParty? {
+        if (targetIp.isBlank() || targetIp == "127.0.0.1" || targetIp == "0.0.0.0") return null
+        return try {
+            val sock = Socket()
+            sock.connect(InetSocketAddress(targetIp, TCP_CONTROL_PORT), 400)
+            sock.soTimeout = 1200
+            val writer = PrintWriter(sock.getOutputStream(), true)
+            val reader = BufferedReader(InputStreamReader(sock.getInputStream()))
+
+            writer.println(JSONObject().apply { put("action", CMD_PROBE) }.toString())
+            val resp = reader.readLine()
+            sock.close()
+
+            if (!resp.isNullOrBlank()) {
+                val json = JSONObject(resp)
+                if (json.optString("action") == CMD_PROBE_OK) {
+                    val resolvedIp = sock.inetAddress?.hostAddress ?: targetIp
+                    DiscoveredParty(
+                        name = json.optString("name", "Host's Party"),
+                        hostIp = resolvedIp,
+                        hostPort = json.optInt("port", TCP_CONTROL_PORT),
+                        httpPort = json.optInt("httpPort", HTTP_STREAM_PORT),
+                        sessionId = json.optString("session", "default"),
+                        sessionToken = json.optString("token", "default"),
+                        isHotspotGateway = (resolvedIp == "192.168.43.1" || resolvedIp == NetworkUtils.getGatewayIpAddress(context))
+                    )
+                } else null
+            } else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun startUdpBeaconBroadcaster(sessionId: String, sessionToken: String, partyName: String) {
+        hostUdpBeaconJob?.cancel()
+        hostUdpBeaconJob = scope.launch(Dispatchers.IO) {
+            var dSocket: java.net.DatagramSocket? = null
+            try {
+                dSocket = java.net.DatagramSocket(UDP_DISCOVERY_PORT).apply {
+                    broadcast = true
+                    reuseAddress = true
+                    soTimeout = 1400
+                }
+                val receiveBuf = ByteArray(1024)
+                val receivePacket = java.net.DatagramPacket(receiveBuf, receiveBuf.size)
+
+                while (isPartyActive && isActive) {
+                    val hostIp = _uiState.value.hostIp
+                    val beaconJson = JSONObject().apply {
+                        put("action", CMD_BEACON)
+                        put("name", partyName)
+                        put("ip", hostIp)
+                        put("port", TCP_CONTROL_PORT)
+                        put("httpPort", HTTP_STREAM_PORT)
+                        put("session", sessionId)
+                        put("token", sessionToken)
+                    }.toString().toByteArray(Charsets.UTF_8)
+
+                    // Broadcast to subnet
+                    for (bcastIp in NetworkUtils.getBroadcastAddresses(context)) {
+                        try {
+                            val packet = java.net.DatagramPacket(beaconJson, beaconJson.size, java.net.InetAddress.getByName(bcastIp), UDP_DISCOVERY_PORT)
+                            dSocket.send(packet)
+                        } catch (_: Exception) {}
+                    }
+
+                    // Check for incoming TUNY_PING requests
+                    try {
+                        dSocket.receive(receivePacket)
+                        val receivedStr = String(receivePacket.data, 0, receivePacket.length, Charsets.UTF_8)
+                        if (receivedStr.contains(CMD_PING)) {
+                            val replyPacket = java.net.DatagramPacket(beaconJson, beaconJson.size, receivePacket.address, receivePacket.port)
+                            dSocket.send(replyPacket)
+                        }
+                    } catch (_: SocketTimeoutException) {
+                        // Regular timeout, continue loop
+                    } catch (_: Exception) {}
+
+                    delay(1200)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Host UDP beacon broadcaster: ${e.message}")
+            } finally {
+                try { dSocket?.close() } catch (_: Exception) {}
+            }
         }
     }
 }
