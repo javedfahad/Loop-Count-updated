@@ -2044,20 +2044,20 @@
                 <div class="qr-cyber-deck">
                     <div class="qr-cyber-header">
                         <span class="status-dot-green"></span>
-                        <span>KOTAK MAHINDRA BANK UPI TERMINAL</span>
+                        <span>GOOGLE PAY / AXIS BANK UPI TERMINAL</span>
                     </div>
 
                     <div class="qr-img-frame">
-                        <img src="kotak_upi_qr.png" alt="Kotak UPI QR Code for Eert Labs Support">
+                        <img src="gpay_upi_qr.png" alt="Google Pay UPI QR Code - Faahd Mallick (faahdmallick-1@okaxis)">
                     </div>
 
                     <div class="upi-copy-field">
-                        <span id="upiIdText" style="color: #FFFFFF; font-weight: 700;">7654992592@kotakbank</span>
+                        <span id="upiIdText" style="color: #FFFFFF; font-weight: 700;">faahdmallick-1@okaxis</span>
                         <button class="upi-copy-action" id="copyBtn" onclick="copyUpiId()">Copy</button>
                     </div>
 
                     <div class="upi-quick-buttons">
-                        <a href="upi://pay?pa=7654992592@kotakbank&pn=Tuny%20Audio&cu=INR" class="upi-pay-direct-btn">
+                        <a href="upi://pay?pa=faahdmallick-1@okaxis&pn=Faahd%20Mallick&cu=INR" class="upi-pay-direct-btn">
                             Pay via Any UPI App (GPay / PhonePe / Paytm)
                         </a>
                     </div>
@@ -2221,7 +2221,7 @@
 
         // Copy UPI with Feedback
         function copyUpiId() {
-            var upi = "7654992592@kotakbank";
+            var upi = "faahdmallick-1@okaxis";
             var btn = document.getElementById('copyBtn');
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(upi).then(showCopied).catch(fallback);
