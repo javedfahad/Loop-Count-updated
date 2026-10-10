@@ -189,11 +189,11 @@ class BluetoothSyncManager(
     fun isClient(): Boolean = _uiState.value.role == DualSyncRole.CLIENT
     fun isSyncConnected(): Boolean = _uiState.value.connectionState == DualSyncConnectionState.CONNECTED
 
-    fun isBluetoothAvailable(): Boolean = bluetoothAdapter != null
-    fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
+    fun isBluetoothAvailable(): Boolean = try { bluetoothAdapter != null } catch (_: Exception) { false }
+    fun isBluetoothEnabled(): Boolean = try { bluetoothAdapter?.isEnabled == true } catch (_: Exception) { false }
 
     fun updateBluetoothState() {
-        val isEnabled = bluetoothAdapter?.isEnabled == true
+        val isEnabled = try { bluetoothAdapter?.isEnabled == true } catch (_: Exception) { false }
         _uiState.update { it.copy(isBluetoothEnabled = isEnabled) }
     }
 
@@ -201,10 +201,11 @@ class BluetoothSyncManager(
     fun refreshPairedDevices() {
         try {
             val paired = bluetoothAdapter?.bondedDevices?.toList() ?: emptyList()
+            val isEnabled = try { bluetoothAdapter?.isEnabled == true } catch (_: Exception) { false }
             _uiState.update {
                 it.copy(
                     pairedDevices = paired,
-                    isBluetoothEnabled = bluetoothAdapter?.isEnabled == true
+                    isBluetoothEnabled = isEnabled
                 )
             }
         } catch (_: Exception) {

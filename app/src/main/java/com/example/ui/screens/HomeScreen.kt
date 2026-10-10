@@ -1038,8 +1038,10 @@ fun HomeScreen(
                                                 selectedTracks.add(track)
                                             }
                                         } else {
-                                            if (isCurrent) {
+                                            if (isCurrent && playbackState.isPlaying) {
                                                 onOpenNowPlaying()
+                                            } else if (isCurrent) {
+                                                playerManager.play()
                                             } else {
                                                 playerManager.playTrack(track, filteredTracks)
                                             }

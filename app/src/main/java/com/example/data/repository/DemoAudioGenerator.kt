@@ -16,7 +16,7 @@ import kotlin.math.sin
 
 object DemoAudioGenerator {
 
-    private const val SAMPLE_RATE = 44100
+    private const val SAMPLE_RATE = 22050
     private const val NUM_CHANNELS = 1
     private const val BITS_PER_SAMPLE = 16
 
@@ -57,7 +57,7 @@ object DemoAudioGenerator {
                     .split(" ")
                     .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
             }
-            val durationMs = if (isBase1) 16000L else if (isBase2) 20000L else 18000L
+            val durationMs = if (isBase1) 8000L else if (isBase2) 10000L else 10000L
 
             tracks.add(
                 AudioTrack(
@@ -139,7 +139,7 @@ object DemoAudioGenerator {
      * Synthesizes a 16-second loop with C major -> G -> Am -> F chord progression with bell chimes.
      */
     private fun generateMelodicAcousticTrack(outputFile: File) {
-        val durationSeconds = 16
+        val durationSeconds = 8
         val totalSamples = SAMPLE_RATE * durationSeconds
         val pcmData = ShortArray(totalSamples)
 
@@ -220,7 +220,7 @@ object DemoAudioGenerator {
      * Synthesizes a 20-second Lo-Fi focus chord loop with electric piano tone & warm bass.
      */
     private fun generateLoFiFocusTrack(outputFile: File) {
-        val durationSeconds = 20
+        val durationSeconds = 10
         val totalSamples = SAMPLE_RATE * durationSeconds
         val pcmData = ShortArray(totalSamples)
 

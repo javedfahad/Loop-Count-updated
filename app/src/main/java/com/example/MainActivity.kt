@@ -94,4 +94,16 @@ class MainActivity : ComponentActivity() {
             requestPermissionsLauncher.launch(permissions.toTypedArray())
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+        if (hasPermission && !viewModel.uiState.value.permissionGranted) {
+            viewModel.setPermissionGranted(true)
+        }
+    }
 }

@@ -520,6 +520,134 @@
             box-shadow: 0 0 30px rgba(255, 0, 122, 0.5);
         }
 
+        /* Official Announcement Card */
+        .official-announcement-card {
+            background: linear-gradient(135deg, rgba(255, 184, 0, 0.14) 0%, rgba(255, 0, 122, 0.14) 50%, rgba(0, 242, 254, 0.14) 100%);
+            border: 2px solid rgba(255, 184, 0, 0.7);
+            border-radius: 24px;
+            padding: 24px 30px;
+            max-width: 820px;
+            margin: 0 auto 28px auto;
+            box-shadow: 0 15px 45px rgba(0, 0, 0, 0.7), 0 0 35px rgba(255, 184, 0, 0.25);
+            backdrop-filter: blur(16px);
+            position: relative;
+            overflow: hidden;
+            text-align: left;
+        }
+
+        .official-announcement-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #FFB800, #FF007A, #00F2FE);
+        }
+
+        .announcement-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 184, 0, 0.22);
+            border: 1px solid rgba(255, 184, 0, 0.6);
+            border-radius: 999px;
+            padding: 5px 16px;
+            font-family: var(--font-mono);
+            font-size: 0.76rem;
+            color: #FFDE59;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        .status-pulse-amber {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #FFB800;
+            box-shadow: 0 0 10px #FFB800;
+            animation: pulseAmber 1.6s ease-in-out infinite;
+        }
+
+        @keyframes pulseAmber {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.35; transform: scale(1.3); }
+        }
+
+        .announcement-title-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .announcement-title-row h3 {
+            font-family: var(--font-tech);
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #FFFFFF;
+            letter-spacing: -0.01em;
+            margin: 0;
+        }
+
+        .announcement-desc {
+            font-family: var(--font-tech);
+            font-size: 0.96rem;
+            line-height: 1.65;
+            color: #E2E8F0;
+            margin-bottom: 18px;
+        }
+
+        .announcement-desc strong {
+            color: #FFFFFF;
+        }
+
+        .announcement-desc .highlight-text {
+            color: var(--neon-cyan);
+            font-weight: 700;
+        }
+
+        .announcement-actions-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 14px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .announcement-btn {
+            background: linear-gradient(135deg, #FFB800 0%, #FF007A 100%);
+            color: #000000;
+            font-family: var(--font-tech);
+            font-size: 0.9rem;
+            font-weight: 800;
+            padding: 11px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            box-shadow: 0 0 20px rgba(255, 184, 0, 0.45);
+            transition: all 0.22s ease;
+        }
+
+        .announcement-btn:hover {
+            transform: scale(1.04);
+            box-shadow: 0 0 30px rgba(255, 0, 122, 0.6);
+            color: #FFFFFF;
+        }
+
+        .announcement-badge-note {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--neon-cyan);
+            letter-spacing: 0.03em;
+        }
+
         /* Heartful Solo Developer Note Badge */
         .developer-heart-badge {
             display: inline-flex;
@@ -1482,7 +1610,12 @@
             .play-synth-btn, .stop-synth-btn { flex: 1; justify-content: center; padding: 12px 14px; font-size: 0.85rem; }
             .toggle-switch-group { justify-content: space-between; width: 100%; }
             
-            /* Release notification card */
+            /* Release & Announcement notification cards */
+            .official-announcement-card { padding: 18px 16px; border-radius: 18px; margin-bottom: 22px; }
+            .announcement-title-row { flex-direction: row; gap: 8px; }
+            .announcement-title-row h3 { font-size: 1.1rem; }
+            .announcement-actions-row { flex-direction: column; align-items: stretch; gap: 10px; }
+            .announcement-btn { width: 100%; justify-content: center; }
             .eert-release-card { flex-direction: column; text-align: center; padding: 18px 16px; border-radius: 16px; gap: 14px; }
             .release-left { text-align: center; }
             .release-download-link { width: 100%; justify-content: center; }
@@ -1550,9 +1683,9 @@
         <div class="container">
             <div class="hud-telemetry-content">
                 <div class="telemetry-item">
-                    <span class="status-dot-green"></span>
-                    <span>ENGINE STATUS:</span>
-                    <span class="telemetry-val">OPERATIONAL // EERT LABS CORE</span>
+                    <span class="status-pulse-amber"></span>
+                    <span>ANNOUNCEMENT:</span>
+                    <span class="telemetry-val" style="color: #FFDE59;">TODAY'S FIRST APK FIXED &amp; WORKING • DUAL LISTEN UPDATE IN PROGRESS</span>
                 </div>
                 <div class="telemetry-item">
                     <span>AUDIO JITTER:</span>
@@ -1680,7 +1813,7 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
                     </svg>
-                    Download tunymusic.apk (10/10/26 • October 10, 2026)
+                    Download tunymusic.apk (Fixed &amp; Working • October 10, 2026)
                 </a>
 
                 <button class="cyber-btn-secondary" onclick="document.getElementById('simulator').scrollIntoView({behavior: 'smooth'})">
@@ -1696,6 +1829,33 @@
                     </svg>
                     Support Developer
                 </a>
+            </div>
+
+            <!-- Official Urgent Developer Announcement -->
+            <div class="official-announcement-card">
+                <div class="announcement-badge">
+                    <span class="status-pulse-amber"></span>
+                    <span>OFFICIAL ANNOUNCEMENT // OCTOBER 10, 2026</span>
+                </div>
+                <div class="announcement-title-row">
+                    <span style="font-size: 1.6rem; line-height: 1;">📢</span>
+                    <h3>Sorry! Today's First APK Was Broken — Now Fixed &amp; Working!</h3>
+                </div>
+                <p class="announcement-desc">
+                    <strong>Notice to all our valued users:</strong> We sincerely apologize — today's first APK release was broken and audio playback was not initiating properly. We immediately diagnosed and resolved the issue. <strong>The APK is now completely fixed, tested, and fully working!</strong><br><br>
+                    Please download the updated APK below to enjoy smooth audio playback. And <strong>please be with us</strong> — soon we will release an update for <span class="highlight-text">Dual Listen</span> as our team is still actively working on it! Thank you so much for your trust and patience.
+                </p>
+                <div class="announcement-actions-row">
+                    <a href="tunymusic.apk" download="tunymusic.apk" class="announcement-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+                        </svg>
+                        Download Working APK (tunymusic.apk)
+                    </a>
+                    <span class="announcement-badge-note">
+                        ⚡ Verified Hotfix Package (23.3 MB) • Dual Listen Update in Progress
+                    </span>
+                </div>
             </div>
 
             <!-- Heartful Solo Developer Note & Community Care -->
@@ -1718,10 +1878,10 @@
                 <div class="release-left">
                     <div class="release-chip">
                         <span class="status-dot-green"></span>
-                        <span>NEW UPDATE AVAILABLE — TODAY (10/10/26 • OCTOBER 10, 2026)</span>
+                        <span>HOTFIX RELEASED — TODAY (10/10/26 • OCTOBER 10, 2026)</span>
                     </div>
-                    <div class="release-title">10/10/26 (October 10, 2026) — Universal Offline Dual-Listen Audio Mesh &amp; Instant Party Sync</div>
-                    <div class="release-subtitle">Universal Android APK • Fresh Build (10/10/26), Universal Zero-Configuration Local Mesh (Connect Anywhere with No Internet / Hotspot / Any Network, Instant Auto-Discovery &amp; 1-Tap Join, Camera-Free QR Decoder with Gallery Image Pick, Direct Wi-Fi Process Binding, Sub-50ms Range-Request Audio Server, All Worst-Case Scenarios Verified), 100% Offline, Zero Ads • EERT LABS</div>
+                    <div class="release-title">10/10/26 (October 10, 2026) — Audio Playback Fixed &amp; Fully Working</div>
+                    <div class="release-subtitle">Universal Android APK • Fresh Hotfix Build (10/10/26): Fixed audio initialization, track taps, permission resume sync, and player prepare state. Dual Listen sync update in active development • 100% Offline, Zero Ads • EERT LABS</div>
                 </div>
                 <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
                     <a href="tunymusic.apk" download="tunymusic.apk" class="release-download-link">
@@ -1731,7 +1891,7 @@
                         Direct APK (tunymusic.apk)
                     </a>
                     <span style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--neon-cyan); letter-spacing: 0.03em;">
-                        ⚡ Updated Today (10/10/26 • October 10, 2026) • Verified Package (29 MB)
+                        ⚡ Verified Working Hotfix (23.3 MB) • Tested &amp; Ready
                     </span>
                 </div>
             </div>
@@ -2166,7 +2326,7 @@
                 <div class="footer-col">
                     <h5>Engineering</h5>
                     <ul class="footer-links">
-                        <li><a href="tunymusic.apk" download="tunymusic.apk">Download tunymusic.apk (10/10/26 • October 10, 2026)</a></li>
+                        <li><a href="tunymusic.apk" download="tunymusic.apk">Download tunymusic.apk (Fixed &amp; Working • October 10, 2026)</a></li>
                         <li><a href="#privacy">Privacy Protocol</a></li>
                         <li><a href="#contact">Contact Lab</a></li>
                         <li><a href="privacy-policy.html">Full Legal Disclosure</a></li>

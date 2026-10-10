@@ -99,6 +99,25 @@ fun JoinPartySheet(
         }
     }
 
+    // Direct Camera Scanner Launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            try {
+                val decoded = NetworkUtils.decodeQrFromBitmap(bitmap)
+                if (!decoded.isNullOrBlank()) {
+                    statusNotice = "QR code detected! Connecting..."
+                    onConnect(decoded)
+                } else {
+                    errorMessage = "No QR code detected. Please point your camera directly at the host's screen and try again."
+                }
+            } catch (e: Exception) {
+                errorMessage = "Scan error: ${e.localizedMessage}"
+            }
+        }
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -305,6 +324,36 @@ fun JoinPartySheet(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
+
+            // Scan QR Code using Camera
+            Button(
+                onClick = {
+                    try {
+                        cameraLauncher.launch(null)
+                    } catch (e: Exception) {
+                        errorMessage = "Camera not available: ${e.localizedMessage}"
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .testTag("scan_qr_camera_btn")
+            ) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Scan QR Code (Camera)",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Scan QR from Screenshot / Photo (Zero Permission Photo Picker)
             OutlinedButton(

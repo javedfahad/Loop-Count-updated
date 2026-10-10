@@ -289,4 +289,28 @@ class DualListenWorstCaseTest {
             originalUrl
         }
     }
+
+    @Test
+    fun testDemoAudioGeneration() {
+        val tempDir = java.io.File.createTempFile("demo_test", "dir")
+        tempDir.delete()
+        tempDir.mkdirs()
+        val file1 = java.io.File(tempDir, "demo_acoustic_melody.wav")
+        val file2 = java.io.File(tempDir, "demo_lofi_focus.wav")
+
+        val start = System.currentTimeMillis()
+        val genMethod1 = com.example.data.repository.DemoAudioGenerator::class.java.getDeclaredMethod("generateMelodicAcousticTrack", java.io.File::class.java)
+        genMethod1.isAccessible = true
+        genMethod1.invoke(com.example.data.repository.DemoAudioGenerator, file1)
+
+        val genMethod2 = com.example.data.repository.DemoAudioGenerator::class.java.getDeclaredMethod("generateLoFiFocusTrack", java.io.File::class.java)
+        genMethod2.isAccessible = true
+        genMethod2.invoke(com.example.data.repository.DemoAudioGenerator, file2)
+        val elapsed = System.currentTimeMillis() - start
+
+        assertTrue(file1.exists() && file1.length() > 1000)
+        assertTrue(file2.exists() && file2.length() > 1000)
+        println("Generated demo tracks in ${elapsed}ms. File1: ${file1.length()} bytes, File2: ${file2.length()} bytes")
+        tempDir.deleteRecursively()
+    }
 }

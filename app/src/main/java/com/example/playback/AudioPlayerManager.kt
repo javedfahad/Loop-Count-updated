@@ -137,6 +137,12 @@ class AudioPlayerManager(
                 }
             }
         }
+
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            android.util.Log.e("AudioPlayerManager", "ExoPlayer playback error: ${error.message}", error)
+            _state.update { it.copy(isPlaying = false, isBuffering = false) }
+            releaseWakeLock()
+        }
     }
 
     init {
@@ -357,15 +363,19 @@ class AudioPlayerManager(
 
         ensureServiceStarted()
 
-        val mediaItem = buildMediaItem(track)
-        player.setMediaItem(mediaItem)
-        player.playbackParameters = PlaybackParameters(_state.value.playbackSpeed)
-        player.prepare()
-        if (startPositionMs > 0) {
-            player.seekTo(startPositionMs)
+        try {
+            val mediaItem = buildMediaItem(track)
+            player.setMediaItem(mediaItem)
+            player.playbackParameters = PlaybackParameters(_state.value.playbackSpeed)
+            player.prepare()
+            if (startPositionMs > 0) {
+                player.seekTo(startPositionMs)
+            }
+            player.play()
+            onSyncEvent?.invoke("TRACK", startPositionMs, track)
+        } catch (e: Exception) {
+            android.util.Log.e("AudioPlayerManager", "Failed to start playback for track ${track.title}: ${e.message}", e)
         }
-        player.play()
-        onSyncEvent?.invoke("TRACK", startPositionMs, track)
     }
 
     /**
@@ -603,7 +613,18 @@ class AudioPlayerManager(
     fun play() {
         ensureServiceStarted()
         val player = exoPlayer ?: return
-        if (player.playbackState == Player.STATE_ENDED) {
+        val current = _state.value.currentTrack
+        if (player.mediaItemCount == 0 && current != null) {
+            val mediaItem = buildMediaItem(current)
+            player.setMediaItem(mediaItem)
+            val savedPos = _state.value.currentPositionMs
+            if (savedPos > 0) {
+                player.seekTo(savedPos)
+            }
+        }
+        if (player.playbackState == Player.STATE_IDLE) {
+            player.prepare()
+        } else if (player.playbackState == Player.STATE_ENDED) {
             player.seekTo(0)
         }
         player.play()
