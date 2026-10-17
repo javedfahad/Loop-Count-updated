@@ -320,7 +320,7 @@ object RingtoneHelper {
             put(MediaStore.Audio.Media.IS_MUSIC, false)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_RINGTONES + "/Loopify")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_RINGTONES + "/TunyMusic")
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
         }

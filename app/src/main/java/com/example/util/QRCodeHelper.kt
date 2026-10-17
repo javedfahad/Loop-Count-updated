@@ -189,13 +189,13 @@ object QRCodeHelper {
     fun saveQrToGallery(context: Context): Boolean {
         return try {
             val bitmap = getKotakQrBitmap(context)
-            val fileName = "Loopify_Kotak_UPI_QR_${System.currentTimeMillis()}.png"
+            val fileName = "TunyMusic_Kotak_UPI_QR_${System.currentTimeMillis()}.png"
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                     put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Loopify")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/TunyMusic")
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
                 }
                 val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
@@ -213,8 +213,8 @@ object QRCodeHelper {
             } else {
                 @Suppress("DEPRECATION")
                 val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                val loopifyDir = File(picturesDir, "Loopify").apply { mkdirs() }
-                val file = File(loopifyDir, fileName)
+                val tunyDir = File(picturesDir, "TunyMusic").apply { mkdirs() }
+                val file = File(tunyDir, fileName)
                 FileOutputStream(file).use { out ->
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
                 }

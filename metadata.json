@@ -1,6 +1,8 @@
 {
-  "name": "TunyMusic",
-  "description": "TunyMusic player with local audio playback, playlists, and Dual Listen synchronous party listening.",
+  "name": "Tuny Music",
+  "description": "Tuny Music player with local audio playback, playlists, and Dual Listen synchronous party listening.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

@@ -217,7 +217,7 @@ fun NowPlayingScreen(
                         // Bold song title, artist below
                         SongTitleArtistBlock(
                             title = track?.displayTitle ?: "No Track Playing",
-                            artist = track?.displayArtist ?: "Loopify",
+                            artist = track?.displayArtist ?: "Tuny Music",
                             scale = scale
                         )
 
@@ -346,7 +346,7 @@ fun NowPlayingScreen(
                     // 3. Big bold song title, artist below it
                     SongTitleArtistBlock(
                         title = track?.displayTitle ?: "No Track Playing",
-                        artist = track?.displayArtist ?: "Loopify",
+                        artist = track?.displayArtist ?: "Tuny Music",
                         scale = scale
                     )
 
@@ -577,7 +577,7 @@ private fun AlbumArtCard(
             Spacer(modifier = Modifier.height((10.dp * scale).coerceIn(6.dp, 14.dp)))
 
             Text(
-                text = track?.displayTitle ?: "Loopify Audio",
+                text = track?.displayTitle ?: "Tuny Music",
                 fontSize = ((14f * scale).coerceIn(12f, 16f)).sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,

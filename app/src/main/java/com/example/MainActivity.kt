@@ -11,6 +11,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import android.content.Intent
+import android.net.Uri
 import androidx.lifecycle.ViewModelProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -51,6 +53,8 @@ class MainActivity : ComponentActivity() {
 
         checkAndRequestPermissions()
 
+        handleAudioIntent(intent)
+
         setContent {
             val uiState by viewModel.uiState.collectAsState()
             TunyMusicTheme(
@@ -67,6 +71,43 @@ class MainActivity : ComponentActivity() {
                     }
                 )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAudioIntent(intent)
+    }
+
+    private fun handleAudioIntent(incomingIntent: Intent?) {
+        if (incomingIntent == null) return
+        val action = incomingIntent.action
+        val uri: Uri? = when (action) {
+            Intent.ACTION_VIEW -> incomingIntent.data
+            Intent.ACTION_SEND -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    incomingIntent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    incomingIntent.getParcelableExtra(Intent.EXTRA_STREAM)
+                }
+            }
+            else -> incomingIntent.data
+        }
+
+        if (uri != null) {
+            try {
+                if (uri.scheme == "content") {
+                    val flags = incomingIntent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    if (flags != 0) {
+                        contentResolver.takePersistableUriPermission(uri, flags)
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore if not persistable
+            }
+            viewModel.playExternalAudio(uri)
         }
     }
 

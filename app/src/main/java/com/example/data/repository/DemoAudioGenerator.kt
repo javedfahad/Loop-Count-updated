@@ -64,13 +64,13 @@ object DemoAudioGenerator {
                     id = trackId,
                     uri = Uri.fromFile(file),
                     title = title,
-                    artist = "Loopify Creator",
+                    artist = "Tuny Music Creator",
                     album = "Custom & Demo Audio",
                     durationMs = durationMs,
-                    folderName = "Loopify Audio",
+                    folderName = "Tuny Music Audio",
                     albumId = -1L,
                     dateAdded = file.lastModified() / 1000,
-                    relativePath = "Loopify Audio/"
+                    relativePath = "Tuny Music Audio/"
                 )
             )
         }

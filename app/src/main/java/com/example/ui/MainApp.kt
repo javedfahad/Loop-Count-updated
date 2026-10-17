@@ -63,6 +63,14 @@ fun MainApp(
     var selectedFolderId by remember { mutableStateOf<Long?>(null) }
     var showDualListenBottomSheet by remember { mutableStateOf(false) }
 
+    val targetScreen by viewModel.targetScreen.collectAsState()
+    LaunchedEffect(targetScreen) {
+        targetScreen?.let {
+            currentScreen = it
+            viewModel.clearTargetScreen()
+        }
+    }
+
     // Display feedback toast messages from viewModel
     LaunchedEffect(uiState.message) {
         uiState.message?.let { msg ->

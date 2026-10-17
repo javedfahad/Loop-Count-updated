@@ -14,7 +14,11 @@ import com.example.playback.AudioPlayerManager
 import com.example.playback.PlaybackState
 import com.example.ui.theme.ThemeAccent
 import com.example.ui.theme.ThemeMode
+import android.media.MediaMetadataRetriever
+import android.net.Uri
+import android.provider.OpenableColumns
 import com.example.util.toProperTitleCase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +27,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class MainUiState(
     val allTracks: List<AudioTrack> = emptyList(),
@@ -48,6 +53,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    private val _targetScreen = MutableStateFlow<com.example.ui.Screen?>(null)
+    val targetScreen: StateFlow<com.example.ui.Screen?> = _targetScreen.asStateFlow()
+
+    fun navigateToScreen(screen: com.example.ui.Screen) {
+        _targetScreen.value = screen
+    }
+
+    fun clearTargetScreen() {
+        _targetScreen.value = null
+    }
 
     init {
         // Restore from persistent file storage if needed and keep synced
@@ -436,5 +452,82 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearMessage() {
         _uiState.update { it.copy(message = null) }
+    }
+
+    fun playExternalAudio(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val existing = _uiState.value.allTracks.firstOrNull {
+                it.uri == uri || it.uri.toString() == uri.toString()
+            }
+            val trackToPlay = existing ?: resolveExternalTrack(uri)
+
+            withContext(Dispatchers.Main) {
+                playerManager.playTrack(trackToPlay, listOf(trackToPlay))
+                navigateToScreen(com.example.ui.Screen.NOW_PLAYING)
+            }
+        }
+    }
+
+    private fun resolveExternalTrack(uri: Uri): AudioTrack {
+        val context = getApplication<Application>()
+        var displayName = "Audio Track"
+        var durationMs = 0L
+        var artist = "Tuny Music"
+        var album = "External Audio"
+
+        try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (nameIndex != -1 && cursor.moveToFirst()) {
+                    val name = cursor.getString(nameIndex)
+                    if (!name.isNullOrBlank()) {
+                        displayName = name
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore query failure
+        }
+
+        if (displayName == "Audio Track") {
+            uri.lastPathSegment?.let { segment ->
+                val clean = segment.substringAfterLast("/")
+                if (clean.isNotBlank()) {
+                    displayName = clean
+                }
+            }
+        }
+
+        var title = if (displayName.contains(".")) displayName.substringBeforeLast(".") else displayName
+
+        try {
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(context, uri)
+            val metaTitle = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+            val metaArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+            val metaAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+            val dur = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+
+            if (!metaTitle.isNullOrBlank()) title = metaTitle
+            if (!metaArtist.isNullOrBlank() && !metaArtist.equals("<unknown>", ignoreCase = true)) {
+                artist = metaArtist
+            }
+            if (!metaAlbum.isNullOrBlank()) album = metaAlbum
+            if (!dur.isNullOrBlank()) durationMs = dur.toLongOrNull() ?: 0L
+
+            retriever.release()
+        } catch (e: Exception) {
+            // Fall back gracefully
+        }
+
+        return AudioTrack(
+            id = -System.currentTimeMillis(),
+            uri = uri,
+            title = title,
+            artist = artist,
+            album = album,
+            durationMs = durationMs,
+            folderName = "External"
+        )
     }
 }
