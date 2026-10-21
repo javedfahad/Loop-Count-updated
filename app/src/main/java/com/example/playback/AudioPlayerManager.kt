@@ -823,6 +823,28 @@ class AudioPlayerManager(
     }
 
     /**
+     * Imperceptible speed adjustment for Dual Listen phase-lock synchronization.
+     * Alters playback speed by a tiny fraction (e.g. 1.025x or 0.975x) without cutting audio.
+     */
+    fun applyMicroSyncCorrection(multiplier: Float) {
+        val baseSpeed = _state.value.playbackSpeed
+        val target = (baseSpeed * multiplier).coerceIn(0.5f, 4.0f)
+        exoPlayer?.let { player ->
+            player.playbackParameters = PlaybackParameters(target)
+        }
+    }
+
+    /**
+     * Restores normal playback speed once phase-lock is achieved.
+     */
+    fun resetMicroSyncCorrection() {
+        val baseSpeed = _state.value.playbackSpeed
+        exoPlayer?.let { player ->
+            player.playbackParameters = PlaybackParameters(baseSpeed)
+        }
+    }
+
+    /**
      * Cycle through requested speeds: 1x -> 2x -> 3x -> 4x -> 1x
      */
     fun cyclePlaybackSpeed() {

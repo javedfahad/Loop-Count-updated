@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiTethering
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -56,6 +57,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import android.widget.Toast
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -64,9 +66,12 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.example.util.NetworkUtils
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -102,12 +107,156 @@ fun DualListenBottomSheet(
     val context = LocalContext.current
 
     var showJoinSheet by remember { mutableStateOf(false) }
+    var showHotspotSetupDialog by remember { mutableStateOf(false) }
+    var isWaitingForHotspot by remember { mutableStateOf(false) }
+    var secondsRemaining by remember { mutableIntStateOf(10) }
 
     // Start local network auto-discovery on sheet open
     androidx.compose.runtime.LaunchedEffect(syncState.role) {
         if (syncState.role == DualSyncRole.NONE) {
             syncManager.startAutoDiscovery()
         }
+    }
+
+    // At least 10-second wait to allow connection to stabilize and build a good QR code
+    androidx.compose.runtime.LaunchedEffect(isWaitingForHotspot) {
+        if (isWaitingForHotspot) {
+            secondsRemaining = 10
+            while (secondsRemaining > 0 && isWaitingForHotspot) {
+                delay(1000L)
+                secondsRemaining -= 1
+            }
+            if (isWaitingForHotspot) {
+                isWaitingForHotspot = false
+                showHotspotSetupDialog = false
+                syncManager.createParty()
+                Toast.makeText(context, "Party Ready! Enjoy music together.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // Party Setup Pop-up (Enjoy music with loved ones, automatic connection, clean countdown)
+    if (showHotspotSetupDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showHotspotSetupDialog = false
+                isWaitingForHotspot = false
+            },
+            icon = {
+                if (isWaitingForHotspot) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(36.dp),
+                        strokeWidth = 3.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Headphones,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            },
+            title = {
+                Text(
+                    text = if (isWaitingForHotspot) "Connecting with Loved Ones" else "Listen Together",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (isWaitingForHotspot) {
+                        Text(
+                            text = "Setting up your offline party space... Getting ready to listen together in sync!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 20.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        LinearProgressIndicator(
+                            progress = { (10 - secondsRemaining) / 10f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Ready in ${secondsRemaining}s...",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Connecting with loved ones...",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            text = "Enjoy music together with your friends and loved ones anywhere, anytime without internet. Tap Open QR to start your shared music party!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 22.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                if (isWaitingForHotspot) {
+                    Button(
+                        onClick = {
+                            isWaitingForHotspot = false
+                            showHotspotSetupDialog = false
+                            syncManager.createParty()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.testTag("hotspot_dialog_skip_wait_btn")
+                    ) {
+                        Text("Ready Now (Skip Wait)", fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            NetworkUtils.autoEnableHotspot(context)
+                            isWaitingForHotspot = true
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.testTag("hotspot_dialog_build_qr_btn")
+                    ) {
+                        Text("Open QR", fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showHotspotSetupDialog = false
+                        isWaitingForHotspot = false
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 
     // Camera-free Manual Join Sheet
@@ -222,7 +371,7 @@ fun DualListenBottomSheet(
                         onJoinDiscoveredParty = { party ->
                             syncManager.joinPartyDirect(party)
                         },
-                        onCreateParty = { syncManager.createParty() },
+                        onCreateParty = { showHotspotSetupDialog = true },
                         onJoinParty = { showJoinSheet = true }
                     )
                 }
@@ -241,19 +390,7 @@ fun DualListenBottomSheet(
                             onStopMusic = onStopMusic,
                             onPlayPauseMusic = onPlayPauseMusic,
                             onOpenHotspotSettings = {
-                                try {
-                                    val intent = Intent("android.settings.TETHER_SETTINGS").apply {
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                    context.startActivity(intent)
-                                } catch (_: Exception) {
-                                    try {
-                                        val intent = Intent(Settings.ACTION_WIRELESS_SETTINGS).apply {
-                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                        }
-                                        context.startActivity(intent)
-                                    } catch (_: Exception) {}
-                                }
+                                NetworkUtils.openHotspotSettings(context)
                             }
                         )
                     } else {

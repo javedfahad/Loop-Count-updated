@@ -139,6 +139,8 @@ class BluetoothSyncManager(
         const val CMD_PROBE_OK = "TUNY_PROBE_OK"
         const val CMD_BEACON = "TUNY_BEACON"
         const val CMD_PING = "TUNY_PING"
+        const val CMD_TIME_PING = "TIME_PING"
+        const val CMD_TIME_PONG = "TIME_PONG"
     }
 
     private class HostClientSession(
@@ -171,6 +173,18 @@ class BluetoothSyncManager(
     private var clientSocket: Socket? = null
     private var clientWriter: PrintWriter? = null
     private var clientReaderJob: Job? = null
+
+    // NTP Clock Synchronization state (eliminates phone wall-clock variance)
+    @Volatile
+    private var hostClockOffsetMs: Long = 0L
+
+    @Volatile
+    private var estimatedRttMs: Long = 20L
+
+    @Volatile
+    private var isClockOffsetCalibrated: Boolean = false
+
+    private var ntpSyncJob: Job? = null
 
     @Volatile
     private var connectedHostIp: String = ""
@@ -505,6 +519,15 @@ class BluetoothSyncManager(
                 CMD_LEAVE -> {
                     session.socket.close()
                 }
+                CMD_TIME_PING -> {
+                    val clientSendTs = json.optLong("clientSendTs", 0L)
+                    val pong = JSONObject().apply {
+                        put("action", CMD_TIME_PONG)
+                        put("clientSendTs", clientSendTs)
+                        put("hostReceiveTs", System.currentTimeMillis())
+                    }
+                    session.writer.println(pong.toString())
+                }
             }
         } catch (_: Exception) {}
     }
@@ -561,7 +584,7 @@ class BluetoothSyncManager(
         heartbeatJob?.cancel()
         heartbeatJob = scope.launch {
             while (isPartyActive && isActive) {
-                delay(3500)
+                delay(2000)
                 if (connectedClients.isNotEmpty()) {
                     val state = playerManager.state.value
                     val packet = JSONObject().apply {
@@ -809,6 +832,9 @@ class BluetoothSyncManager(
                     handleTrackStreamFromHost(trackObj)
                 }
 
+                // Start NTP Clock Calibration
+                startListenerNtpSync()
+
                 // Start Listener Command Receiver Loop
                 startListenerMessageLoop(reader)
             } catch (e: Exception) {
@@ -825,6 +851,32 @@ class BluetoothSyncManager(
                 }
             }
         }
+    }
+
+    private fun startListenerNtpSync() {
+        ntpSyncJob?.cancel()
+        ntpSyncJob = scope.launch {
+            // Quick burst of 3 pings upon joining for immediate clock calibration
+            repeat(3) {
+                sendNtpPing()
+                delay(120)
+            }
+            // Gentle periodic ping in background every 8 seconds
+            while (isPartyActive && isActive) {
+                delay(8000)
+                sendNtpPing()
+            }
+        }
+    }
+
+    private fun sendNtpPing() {
+        try {
+            val ping = JSONObject().apply {
+                put("action", CMD_TIME_PING)
+                put("clientSendTs", System.currentTimeMillis())
+            }
+            clientWriter?.println(ping.toString())
+        } catch (_: Exception) {}
     }
 
     private fun startListenerMessageLoop(reader: BufferedReader) {
@@ -856,23 +908,50 @@ class BluetoothSyncManager(
         }
     }
 
+    private fun computeEffectiveLatency(tsHost: Long): Long {
+        return if (tsHost > 0 && isClockOffsetCalibrated) {
+            val localHostTs = tsHost - hostClockOffsetMs
+            (System.currentTimeMillis() - localHostTs).coerceIn(0L, 3000L)
+        } else {
+            estimatedRttMs / 2
+        }
+    }
+
     private fun handleIncomingHostMessage(line: String) {
         try {
             val json = JSONObject(line)
             when (json.optString("action")) {
+                CMD_TIME_PONG -> {
+                    val clientSendTs = json.optLong("clientSendTs", 0L)
+                    val hostReceiveTs = json.optLong("hostReceiveTs", 0L)
+                    val clientReceiveTs = System.currentTimeMillis()
+                    val rtt = (clientReceiveTs - clientSendTs).coerceAtLeast(0L)
+                    val oneWay = rtt / 2
+                    val offset = hostReceiveTs - (clientSendTs + oneWay)
+                    if (!isClockOffsetCalibrated) {
+                        hostClockOffsetMs = offset
+                        estimatedRttMs = rtt
+                        isClockOffsetCalibrated = true
+                    } else {
+                        // Smooth moving average
+                        hostClockOffsetMs = (hostClockOffsetMs * 0.7 + offset * 0.3).toLong()
+                        estimatedRttMs = (estimatedRttMs * 0.7 + rtt * 0.3).toLong()
+                    }
+                }
                 CMD_TRACK_CHANGE -> {
                     handleTrackStreamFromHost(json)
                 }
                 CMD_PLAY -> {
                     val pos = json.optLong("pos", 0L)
-                    val ts = json.optLong("ts", System.currentTimeMillis())
-                    val latency = (System.currentTimeMillis() - ts).coerceAtLeast(0L)
+                    val ts = json.optLong("ts", 0L)
+                    val latency = computeEffectiveLatency(ts)
                     val targetPos = pos + latency
 
                     isInternalCommandExecuting = true
                     scope.launch(Dispatchers.Main) {
                         try {
                             if (targetPos > 0) playerManager.seekTo(targetPos)
+                            playerManager.resetMicroSyncCorrection()
                             playerManager.play()
                             _uiState.update { it.copy(isHostMusicPlaying = true) }
                         } finally {
@@ -886,6 +965,7 @@ class BluetoothSyncManager(
                     scope.launch(Dispatchers.Main) {
                         try {
                             if (pos >= 0) playerManager.seekTo(pos)
+                            playerManager.resetMicroSyncCorrection()
                             playerManager.pause()
                             _uiState.update { it.copy(isHostMusicPlaying = false) }
                         } finally {
@@ -897,6 +977,7 @@ class BluetoothSyncManager(
                     isInternalCommandExecuting = true
                     scope.launch(Dispatchers.Main) {
                         try {
+                            playerManager.resetMicroSyncCorrection()
                             playerManager.stop()
                             _uiState.update { it.copy(isHostMusicPlaying = false) }
                         } finally {
@@ -910,6 +991,7 @@ class BluetoothSyncManager(
                     scope.launch(Dispatchers.Main) {
                         try {
                             playerManager.seekTo(pos)
+                            playerManager.resetMicroSyncCorrection()
                         } finally {
                             isInternalCommandExecuting = false
                         }
@@ -918,22 +1000,52 @@ class BluetoothSyncManager(
                 CMD_SYNC_HEARTBEAT -> {
                     val pos = json.optLong("pos", 0L)
                     val isPlaying = json.optBoolean("isPlaying", false)
-                    val ts = json.optLong("ts", System.currentTimeMillis())
-                    val latency = (System.currentTimeMillis() - ts).coerceAtLeast(0L)
+                    val ts = json.optLong("ts", 0L)
+                    val latency = computeEffectiveLatency(ts)
                     val expectedPos = pos + latency
 
                     scope.launch(Dispatchers.Main) {
+                        if (!isPlaying) {
+                            if (playerManager.state.value.isPlaying) {
+                                isInternalCommandExecuting = true
+                                try {
+                                    playerManager.pause()
+                                } finally {
+                                    isInternalCommandExecuting = false
+                                }
+                            }
+                            playerManager.resetMicroSyncCorrection()
+                            _uiState.update { it.copy(isHostMusicPlaying = false) }
+                            return@launch
+                        }
+
                         val currentLocalPos = playerManager.state.value.currentPositionMs
-                        val drift = Math.abs(currentLocalPos - expectedPos)
-                        // If drift exceeds 800ms, gently resync position
-                        if (drift > 800L && isPlaying) {
+                        val diff = expectedPos - currentLocalPos // positive means listener is behind
+                        val drift = Math.abs(diff)
+
+                        if (drift > 1500L) {
+                            // Large manual jump/scrub on host: clean seek
                             isInternalCommandExecuting = true
                             try {
                                 playerManager.seekTo(expectedPos)
+                                playerManager.resetMicroSyncCorrection()
                             } finally {
                                 isInternalCommandExecuting = false
                             }
+                        } else if (drift > 45L) {
+                            // Gentle micro-speed correction: pitch/time adjustment without audio cuts
+                            if (diff > 0) {
+                                // Listener is behind host -> speed up slightly to catch up
+                                playerManager.applyMicroSyncCorrection(1.025f)
+                            } else {
+                                // Listener is ahead of host -> slow down slightly to let host catch up
+                                playerManager.applyMicroSyncCorrection(0.975f)
+                            }
+                        } else {
+                            // In phase lock!
+                            playerManager.resetMicroSyncCorrection()
                         }
+
                         _uiState.update { it.copy(isHostMusicPlaying = isPlaying) }
                     }
                 }
@@ -976,11 +1088,11 @@ class BluetoothSyncManager(
         val streamUrl = sanitizeStreamUrl(rawStreamUrl, activeHost, HTTP_STREAM_PORT)
         val pos = trackJson.optLong("pos", 0L)
         val isPlaying = trackJson.optBoolean("isPlaying", true)
-        val ts = trackJson.optLong("ts", System.currentTimeMillis())
+        val ts = trackJson.optLong("ts", 0L)
 
         if (streamUrl.isBlank()) return
 
-        val latency = (System.currentTimeMillis() - ts).coerceAtLeast(0L)
+        val latency = computeEffectiveLatency(ts)
         val startPos = pos + latency
 
         _uiState.update {
@@ -1184,10 +1296,16 @@ class BluetoothSyncManager(
         hostIpMonitorJob = null
         clientReaderJob?.cancel()
         clientReaderJob = null
+        ntpSyncJob?.cancel()
+        ntpSyncJob = null
+        hostClockOffsetMs = 0L
+        isClockOffsetCalibrated = false
+        playerManager.resetMicroSyncCorrection()
         connectedHostIp = ""
 
         // Stop Audio Server
         audioStreamServer.stop()
+        NetworkUtils.stopLocalHotspot()
 
         // Close Host Sockets
         try { hostServerSocket?.close() } catch (_: Exception) {}
