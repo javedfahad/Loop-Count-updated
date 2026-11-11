@@ -35,19 +35,6 @@ class LoopCountApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
-
-        // Connect player events to Dual Listen Party Host broadcast
-        playerManager.onSyncEvent = { event, pos, track ->
-            if (bluetoothSyncManager.isHost()) {
-                when (event) {
-                    "PLAY" -> bluetoothSyncManager.onUserPlay(pos)
-                    "PAUSE" -> bluetoothSyncManager.onUserPause(pos)
-                    "STOP" -> bluetoothSyncManager.onUserStop()
-                    "SEEK" -> bluetoothSyncManager.onUserSeek(pos)
-                    "TRACK" -> track?.let { bluetoothSyncManager.sendTrackChange(it, pos, true) }
-                }
-            }
-        }
     }
 
     override fun newImageLoader(): ImageLoader {

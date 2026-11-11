@@ -124,7 +124,6 @@ import com.example.ui.components.FancySelectionBottomBar
 import com.example.ui.components.FolderItemCard
 import com.example.ui.components.LoopifyLogo
 import com.example.ui.components.MiniPlayerBar
-import com.example.ui.components.MultiSelectLogo
 import com.example.ui.components.TrackItemCard
 import com.example.ui.dialogs.FolderOptionsDialog
 import com.example.ui.dialogs.RepeatCountDialog
@@ -162,8 +161,7 @@ fun HomeScreen(
     onAddTrackToFolder: (Long, AudioTrack) -> Unit = { _, _ -> },
     onAddMultipleTracksToFolder: ((Long, List<AudioTrack>) -> Unit)? = null,
     onCreateFolderWithTrack: (String, AudioTrack) -> Unit = { _, _ -> },
-    onCreateFolderWithMultipleTracks: ((String, List<AudioTrack>) -> Unit)? = null,
-    onOpenDualListen: (() -> Unit)? = null
+    onCreateFolderWithMultipleTracks: ((String, List<AudioTrack>) -> Unit)? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = selectedTab.coerceIn(0, 1), pageCount = { 2 })
@@ -731,34 +729,7 @@ fun HomeScreen(
                                 )
                             }
                         },
-                        actions = {
-                            // Prominent Multi-Select button with good logo
-                            Surface(
-                                onClick = {
-                                    isMultiSelectMode = true
-                                    selectedTracks.clear()
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier
-                                    .padding(end = 12.dp)
-                                    .testTag("action_enter_multi_select")
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    MultiSelectLogo(size = 20.dp)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Select",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                            }
-                        },
+                        actions = {},
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background
                         )
@@ -1680,22 +1651,7 @@ fun BottomOneHandedDock(
                         onClick = onRefresh
                     )
 
-                    if (selectedTabIndex == 0 && onEnterMultiSelect != null) {
-                        IconButton(
-                            onClick = onEnterMultiSelect,
-                            modifier = Modifier
-                                .size(44.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    shape = CircleShape
-                                )
-                                .testTag("dock_multi_select_button")
-                        ) {
-                            MultiSelectLogo(
-                                size = 22.dp
-                            )
-                        }
-                    }
+
 
                     if (selectedTabIndex == 1) {
                         IconButton(

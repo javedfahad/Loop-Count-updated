@@ -93,7 +93,6 @@ import com.example.ui.theme.SunsetPink
 fun NowPlayingScreen(
     playbackState: PlaybackState,
     playerManager: AudioPlayerManager,
-    onOpenDualListen: () -> Unit = {},
     onBack: () -> Unit
 ) {
     BackHandler {

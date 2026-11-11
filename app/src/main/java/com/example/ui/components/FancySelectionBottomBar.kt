@@ -29,7 +29,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Deselect
-import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -123,7 +123,7 @@ fun FancySelectionBottomBar(
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp, vertical = 8.dp)
                 ) {
-                    // Top Status Row: Shows Logo + Selected count + Done/Dismiss button
+                    // Top Status Row: Shows Selected count + Done/Dismiss button
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -131,21 +131,12 @@ fun FancySelectionBottomBar(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            MultiSelectLogo(
-                                size = 22.dp,
-                                modifier = Modifier.testTag("selection_dock_logo")
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (selectedCount == 0) "No songs selected" else "$selectedCount of $totalCount selected",
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (selectedCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        Text(
+                            text = if (selectedCount == 0) "No songs selected" else "$selectedCount of $totalCount selected",
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
                         if (onDismiss != null) {
                             Surface(
@@ -193,7 +184,7 @@ fun FancySelectionBottomBar(
                     ) {
                         // Button 1: Select All / Deselect
                         FancyDockButton(
-                            icon = if (isAllSelected) Icons.Default.Deselect else Icons.Default.SelectAll,
+                            icon = if (isAllSelected) Icons.Default.Deselect else Icons.Default.DoneAll,
                             label = if (isAllSelected) "Deselect" else "Select All",
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                             contentColor = MaterialTheme.colorScheme.onSurface,

@@ -25,7 +25,6 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.model.AudioTrack
 import com.example.model.UserFolder
 import com.example.ui.components.NavigationDrawerContent
-import com.example.ui.dialogs.DualListenBottomSheet
 import com.example.ui.screens.AboutScreen
 import com.example.ui.screens.AppearanceScreen
 import com.example.ui.screens.FolderDetailScreen
@@ -61,7 +60,6 @@ fun MainApp(
 
     var currentScreen by remember { mutableStateOf(Screen.SPLASH) }
     var selectedFolderId by remember { mutableStateOf<Long?>(null) }
-    var showDualListenBottomSheet by remember { mutableStateOf(false) }
 
     val targetScreen by viewModel.targetScreen.collectAsState()
     LaunchedEffect(targetScreen) {
@@ -83,16 +81,6 @@ fun MainApp(
         uiState.userFolders.find { it.id == selectedFolderId } ?: UserFolder(
             id = selectedFolderId ?: 0L,
             name = "Folder"
-        )
-    }
-
-    // Modal Bottom Sheet for Dual Listen Party [Beta]
-    if (showDualListenBottomSheet) {
-        DualListenBottomSheet(
-            syncManager = viewModel.bluetoothSyncManager,
-            onStopMusic = { viewModel.playerManager.stop() },
-            onPlayPauseMusic = { viewModel.playerManager.togglePlayPause() },
-            onDismiss = { showDualListenBottomSheet = false }
         )
     }
 
@@ -129,10 +117,6 @@ fun MainApp(
                                     scope.launch { drawerState.close() }
                                     currentScreen = Screen.ABOUT
                                 },
-                                onOpenDualListen = {
-                                    scope.launch { drawerState.close() }
-                                    showDualListenBottomSheet = true
-                                },
                                 onCloseDrawer = {
                                     scope.launch { drawerState.close() }
                                 }
@@ -166,8 +150,7 @@ fun MainApp(
                             onAddTrackToFolder = { folderId, track -> viewModel.addTrackToFolder(folderId, track) },
                             onAddMultipleTracksToFolder = { folderId, tracks -> viewModel.addTracksToFolder(folderId, tracks) },
                             onCreateFolderWithTrack = { name, track -> viewModel.createUserFolderWithTrack(name, track) },
-                            onCreateFolderWithMultipleTracks = { name, tracks -> viewModel.createFolderWithMultipleTracks(name, tracks) },
-                            onOpenDualListen = { showDualListenBottomSheet = true }
+                            onCreateFolderWithMultipleTracks = { name, tracks -> viewModel.createFolderWithMultipleTracks(name, tracks) }
                         )
                     }
                 }
@@ -279,9 +262,6 @@ fun MainApp(
                     NowPlayingScreen(
                         playbackState = playbackState,
                         playerManager = viewModel.playerManager,
-                        onOpenDualListen = {
-                            showDualListenBottomSheet = true
-                        },
                         onBack = {
                             currentScreen = Screen.HOME
                         }
