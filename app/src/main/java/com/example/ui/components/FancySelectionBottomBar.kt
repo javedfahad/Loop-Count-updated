@@ -28,8 +28,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -184,7 +184,7 @@ fun FancySelectionBottomBar(
                     ) {
                         // Button 1: Select All / Deselect
                         FancyDockButton(
-                            icon = if (isAllSelected) Icons.Default.Deselect else Icons.Default.DoneAll,
+                            icon = if (isAllSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll,
                             label = if (isAllSelected) "Deselect" else "Select All",
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                             contentColor = MaterialTheme.colorScheme.onSurface,
