@@ -39,9 +39,11 @@
     * Transfer individual songs or **entire playlists & folders** with folder structures preserved intact.
     * Uses local Wi-Fi / Hotspot with QR pairing and automatic reception so songs land directly into the recipient's Tuny Music library without needing WhatsApp or internet data.
 
-  * **3. Dual Listen Party ("Live Synced Audio Stream"):**
+  * **3. Dual Listen Party ("Live Synced Audio Stream" — Up to 8 Devices Total):**
     * Real-time synchronized playback broadcast (listen together at the exact same millisecond).
-    * One phone is the Host/DJ; other phones join via QR scan to listen simultaneously without file downloading.
+    * **Capacity:** Up to **8 devices total (1 Host + 7 Listeners)**.
+    * **Use Case:** Designed specifically for cozy, intimate listening: couples sharing an album, friends traveling on a flight/train with no internet, road trips, or campfire sessions.
+    * One phone is the Host/DJ; other phones join with a simple QR scan to listen simultaneously without needing file downloads or mobile data.
 
 ---
 
